@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Control scoreboard</title>
+    <script src="js/firebase-app.js"></script>
+    <script src="js/firebase-firestore.js"></script>
+    <link href="css/css.css" rel="stylesheet">
+    <script>
+      var token = "test1"
+    </script>
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/ctl.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/styles.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="row text-center">
+        <div class="col-xs-12 col-md-4">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Show</h3>
+            </div>
+            <div class="panel-body">
+              <!--input type="checkbox" class="checkbox" id="show"></input-->
+              <button data-val="0" class="btn show-select" type="button">none</button>
+              <button data-val="1" class="btn show-select" type="button">top</button>
+              <button data-val="2" class="btn show-select" type="button">bottom</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title home_team">home</h3>
+            </div>
+            <div class="panel-body">
+              <div class="score-field" id="home_score"></div>
+              <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
+              <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
+            </div>
+            <div class="panel-heading">
+              <h3 class="panel-title away_team">away</h3>
+            </div>
+            <div class="panel-body">
+              <div class="score-field" id="away_score"></div>
+              <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
+              <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
+            </div>
+          </div>
+        </div> 
+        <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title home_team">home</h3>
+            </div>
+            <div class="panel-body">
+              <span id="home_fouls" class="score-field period-score"></span>
+              <br>
+              <button data-team="home" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
+              <button data-team="home" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
+            </div>
+            <div class="panel-heading">
+              <h3 class="panel-title away_team">away</h3>
+            </div>
+            <div class="panel-body">
+              <span id="away_fouls" class="score-field period-score"></span>
+              <br>
+              <button data-team="away" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
+              <button data-team="away" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row text-center">
+        <div class="col-xs-12 col-md-4"> <!-- BEGIN PERIOD -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Period</h3>
+            </div>
+            <div class="panel-body">
+              <div class="score-field" id="period"></div>
+              <button class="period-btn btn btn-default" type="button">-1</button>
+              <button class="period-btn btn btn-info" type="button">+1</button>
+            </div>
+          </div>
+        </div> <!-- END PERIOD -->
+        <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Name</h3>
+            </div>
+            <div class="panel-body">
+              <div class="panel-body">
+                <input id="in_home_team">
+                <input type="color" id="col_home_team" value="#ff0000" style="width:50%;">
+              </div>
+              <div class="panel-body">
+                <input id="in_away_team">
+                <input type="color" id="col_away_team" value="#ff0000" style="width:50%;">
+              </div>
+              <div class="panel-body">
+                <button class="names-btn btn btn-info" type="button">save</button>
+                <button class="reset-btn btn btn-info" type="button">reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  </body>
+</html>
