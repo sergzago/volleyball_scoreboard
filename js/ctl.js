@@ -1,22 +1,8 @@
-var config = {
-  apiKey: "AIzaSyD4rlX0sNaezoSpksuH3kk3SQ-QenicK24",
-  authDomain: "volleyball-7a4da.firebaseapp.com",
-  databaseURL: "https://volleyball-7a4da.firebaseio.com",
-  projectId: "volleyball-7a4da",
-  storageBucket: "volleyball-7a4da.appspot.com",
-  messagingSenderId: "418301534847",
-  appId: "1:418301534847:web:1a7a8d7c622374e3d2154a"
-};
-
-
-var updateLoop;
-var scoreboard_data={};
-firebase.initializeApp(config);
-db=firebase.firestore();
-scoreboard_collection=db.collection('volleyball')
-scoreboard_query=scoreboard_collection.doc(token)
 scoreboard_query.onSnapshot(
   function(documentSnapshot){
+    if(!documentSnapshot.exists)
+      return;
+    $(".hidden").removeClass("hidden");
     scoreboard_data=documentSnapshot.data();
     console.log(scoreboard_data);
     $('.away_team').html(scoreboard_data['away_team'])
@@ -86,7 +72,7 @@ $(document).ready(function(){
     update_db(update);
   });
   $(".reset-btn").click(function(){
-    scoreboard_collection.doc(token).set({
+    scoreboard_collection.doc(game_id).set({
       home_score:0,
       home_fouls:0,
       away_score:0,

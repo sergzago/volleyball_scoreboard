@@ -1,23 +1,24 @@
-var config = {
-    apiKey: "AIzaSyD4rlX0sNaezoSpksuH3kk3SQ-QenicK24",
-    authDomain: "volleyball-7a4da.firebaseapp.com",
-    databaseURL: "https://volleyball-7a4da.firebaseio.com",
-    projectId: "volleyball-7a4da",
-    storageBucket: "volleyball-7a4da.appspot.com",
-    messagingSenderId: "418301534847",
-    appId: "1:418301534847:web:1a7a8d7c622374e3d2154a"
-  };
-
-var updateLoop;
 var scoreboard_data={};
-firebase.initializeApp(config);
-db=firebase.firestore();
-scoreboard_collection=db.collection('volleyball')
-scoreboard_query=scoreboard_collection.doc(token)
 scoreboard_query.onSnapshot(
   function(documentSnapshot){
     var pdata=scoreboard_data;
-    scoreboard_data=documentSnapshot.data();
+    if(!documentSnapshot.exists){
+      pdata={show:0};
+      scoreboard_data={
+        "show": 1,
+        "away_color": "#000000",
+        "away_fouls": '-',
+        "away_score": '-',
+        "away_team": "--------",
+        "current_period": '0',
+        "home_color": "#000000",
+        "home_fouls": '-',
+        "home_score": '-',
+        "home_team": "--------"
+      };
+    }else{
+      scoreboard_data=documentSnapshot.data();
+    }
     if(pdata['show'] != scoreboard_data['show']){
       if(scoreboard_data.show == 2){
         $(".big-table").animate({"left":80},1000)

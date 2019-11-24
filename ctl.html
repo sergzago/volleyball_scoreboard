@@ -7,17 +7,15 @@
     <script src="js/firebase-app.js"></script>
     <script src="js/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
-    <script>
-      var token = "test2"
-    </script>
     <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/common.js"></script>
     <script src="js/ctl.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
   </head>
   <body>
     <div class="container">
       <div class="row text-center">
-        <div class="col-xs-12 col-md-4">
+        <div class="col-xs-12 col-md-4 hidden">
           <div class="panel panel-default">
             <div class="panel-heading">
               <h3 class="panel-title">Show</h3>
@@ -30,7 +28,7 @@
             </div>
           </div>
         </div>
-        <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN HOME -->
           <div class="panel panel-default">
             <div class="panel-heading">
               <h3 class="panel-title home_team">home</h3>
@@ -50,7 +48,7 @@
             </div>
           </div>
         </div> 
-        <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN HOME -->
           <div class="panel panel-default">
             <div class="panel-heading">
               <h3 class="panel-title home_team">home</h3>
@@ -74,7 +72,7 @@
         </div>
       </div>
       <div class="row text-center">
-        <div class="col-xs-12 col-md-4"> <!-- BEGIN PERIOD -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN PERIOD -->
           <div class="panel panel-default">
             <div class="panel-heading">
               <h3 class="panel-title">Period</h3>
@@ -101,7 +99,7 @@
                 <input type="color" id="col_away_team" value="#00ff00" style="width:50%;">
               </div>
               <div class="panel-body">
-                <button class="names-btn btn btn-info" type="button">save</button>
+                <button class="names-btn btn btn-info hidden" type="button">save</button>
                 <button class="reset-btn btn btn-info" type="button">reset</button>
               </div>
             </div>
