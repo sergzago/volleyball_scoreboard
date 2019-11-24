@@ -38,8 +38,8 @@
       <script>
         $("#game_id").change(function(){
           console.log($(this).val());
-          var sb=window.location.href.replace(/index.html.+/,"scoreboard.html?game="+$(this).val());
-          var ctl=window.location.href.replace(/index.html.+/,"ctl.html?game="+$(this).val());
+          var sb=window.location.href.replace(/\/[^\/]*$/,"/scoreboard.html?game="+$(this).val());
+          var ctl=window.location.href.replace(/\/[^\/]*$/,"/ctl.html?game="+$(this).val());
           $(".ctl-btn").attr('href',ctl);
           $("#ctl_link").html(ctl);
           $(".scoreboard-btn").attr('href',sb);
