@@ -1,0 +1,52 @@
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scoreboard creator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.8/uuid.min.js" integrity="sha384-ojT96dIkO5uDUptuYUBcwQK3flLsTlH0IH2eqFDFzvsvyWu+Uj6z6kjaCUzanmkf" crossorigin="anonymous"></script>
+    <link href="css/css.css" rel="stylesheet">
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/styles.css">
+  </head>
+  <body>
+    <div class="container">
+      <div class="row text-center">
+        <div class="col-xs-12 col-md-4">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Game creation</h3>
+            </div>
+            <div class="panel-body">
+              <div class="panel-body">
+                <label for="game_id">Game ID</label>
+                <input id="game_id" value="demo">
+              </div>
+              <div class="panel-body">
+                <a class="scoreboard-btn btn btn-info" target="_blank" href="#">Scoreboard</a>
+                <br>
+                <span id="scoreboard_link"></span>
+                <hr />
+                <a class="ctl-btn btn btn-info" target="_blank" href="#">Control panel</a>
+                <br>
+                <span id="ctl_link"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        $("#game_id").change(function(){
+          console.log($(this).val());
+          var sb=window.location.href.replace(/index.html.+/,"scoreboard.html?game="+$(this).val());
+          var ctl=window.location.href.replace(/index.html.+/,"ctl.html?game="+$(this).val());
+          $(".ctl-btn").attr('href',ctl);
+          $("#ctl_link").html(ctl);
+          $(".scoreboard-btn").attr('href',sb);
+          $("#scoreboard_link").html(sb);
+        });
+        $("#game_id").val(uuid()).change();
+      </script>
+  
+  </body>
+</html>
