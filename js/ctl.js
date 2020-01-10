@@ -16,6 +16,10 @@ scoreboard_query.onSnapshot(
       $(".show-select[data-val='1']").addClass("btn-info");
     }else if(disp == 2){
       $(".show-select[data-val='2']").addClass("btn-info");
+    }else if(disp == 4){
+      $(".show-select[data-val='4']").addClass("btn-info");
+    }else if(disp == 6){
+      $(".show-select[data-val='6']").addClass("btn-info");
     }
 
     //$("#show").prop("checked",(scoreboard_data['show']));
@@ -29,6 +33,7 @@ scoreboard_query.onSnapshot(
     $('#home_score').html(scoreboard_data['home_score'])
     $('#home_fouls').html(scoreboard_data['home_fouls'])
     $('#period').html(scoreboard_data['current_period'])
+    $('#custom_label').val(scoreboard_data['custom_label'])
   });
 
 function update_db(data){
@@ -60,6 +65,13 @@ $(document).ready(function(){
         update_db({away_fouls:scoreboard_data['away_fouls']+delta})
     }
   });
+  $(".label-btn").click(function(){
+    var update={
+      custom_label: $("#custom_label").val(),
+    };
+    console.log(update);
+    update_db(update);
+  });
 
   $(".names-btn").click(function(){
     var update={
@@ -73,11 +85,13 @@ $(document).ready(function(){
   });
   $(".reset-btn").click(function(){
     scoreboard_collection.doc(game_id).set({
+      show:0,
       home_score:0,
       home_fouls:0,
       away_score:0,
       away_fouls:0,
       current_period:1,
+      custom_label: "Предматчевая разминка",
       away_team: $("#in_away_team").val(),
       away_color: $("#col_away_team").val(),
       home_team: $("#in_home_team").val(),
