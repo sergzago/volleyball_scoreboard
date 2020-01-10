@@ -20,6 +20,8 @@ scoreboard_query.onSnapshot(
       $(".show-select[data-val='4']").addClass("btn-info");
     }else if(disp == 6){
       $(".show-select[data-val='6']").addClass("btn-info");
+    }else if(disp == 14){
+      $(".show-select[data-val='14']").addClass("btn-info");
     }
 
     //$("#show").prop("checked",(scoreboard_data['show']));

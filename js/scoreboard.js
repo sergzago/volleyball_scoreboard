@@ -38,6 +38,13 @@ scoreboard_query.onSnapshot(
         $("div.top_label").animate({"left":-500,"opacity":0},1000,
         "linear", function(X){})
       }
+      if(scoreboard_data.show & 8){
+        $(".big-table div.time").css("opacity",0);
+        $(".big-table div.team div.bottom").css("opacity",0);
+      }else{
+        $(".big-table div.time").css("opacity",1);
+        $(".big-table div.team div.bottom").css("opacity",1);
+      }
     }
     if(scoreboard_data.show & 4 && pdata.show & 4 &&
       scoreboard_data['custom_label'] != pdata['custom_label']){
