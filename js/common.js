@@ -9,13 +9,13 @@ function getParameterByName(name, url) {
 }
 
 var config = {
-  apiKey: "AIzaSyD4rlX0sNaezoSpksuH3kk3SQ-QenicK24",
-  authDomain: "volleyball-7a4da.firebaseapp.com",
-  databaseURL: "https://volleyball-7a4da.firebaseio.com",
-  projectId: "volleyball-7a4da",
-  storageBucket: "volleyball-7a4da.appspot.com",
-  messagingSenderId: "418301534847",
-  appId: "1:418301534847:web:1a7a8d7c622374e3d2154a"
+  apiKey: "AIzaSyDnGHsNYX9x5KLlsZ8zBDDuNv77KOoTVSo",
+  authDomain: "myhome-6a0de.firebaseapp.com",
+  databaseURL: "https://myhome-6a0de.firebaseio.com",
+  projectId: "myhome-6a0de",
+  storageBucket: "myhome-6a0de.firebasestorage.app",
+  messagingSenderId: "306306485057",
+  appId: "1:306306485057:web:4eb724d75f7ad55825efc0"
 };
 
 
