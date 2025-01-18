@@ -9,7 +9,7 @@ function getParameterByName(name, url) {
 }
 
 var config = {
-  apiKey: "AIzaSyDnGHsNYX9x5KLlsZ8zBDDuNv77KOoTVSo",
+  apiKey: "AIzaSyCoyoP7omkMI7hVHLfztBoyONe3jnbgrO0",
   authDomain: "myhome-6a0de.firebaseapp.com",
   databaseURL: "https://myhome-6a0de.firebaseio.com",
   projectId: "myhome-6a0de",
@@ -22,7 +22,7 @@ var config = {
 var scoreboard_data={};
 firebase.initializeApp(config);
 db=firebase.firestore();
-scoreboard_collection=db.collection('volleyball')
+scoreboard_collection=db.collection('Volleyball')
 var game_id=getParameterByName('game');
 if(!game_id) game_id='test1';
 console.log(game_id);
