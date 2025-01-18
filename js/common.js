@@ -22,7 +22,7 @@ var config = {
 var scoreboard_data={};
 firebase.initializeApp(config);
 db=firebase.firestore();
-scoreboard_collection=db.collection('Volleyball')
+scoreboard_collection=db.collection('volleyball')
 var game_id=getParameterByName('game');
 if(!game_id) game_id='test1';
 console.log(game_id);
