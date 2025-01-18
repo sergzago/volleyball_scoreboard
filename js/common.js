@@ -9,7 +9,7 @@ function getParameterByName(name, url) {
 }
 
 var config = {
-  apiKey: "AIzaSyCoyoP7omkMI7hVHLfztBoyONe3jnbgrO0",
+  apiKey: "AIzaSyDnGHsNYX9x5KLlsZ8zBDDuNv77KOoTVSo",
   authDomain: "myhome-6a0de.firebaseapp.com",
   databaseURL: "https://myhome-6a0de.firebaseio.com",
   projectId: "myhome-6a0de",
