@@ -93,7 +93,7 @@ $(document).ready(function(){
       away_score:0,
       away_fouls:0,
       current_period:1,
-      custom_label: "Предматчевая разминка",
+      custom_label: "Таймаут",
       away_team: $("#in_away_team").val(),
       away_color: $("#col_away_team").val(),
       home_team: $("#in_home_team").val(),
