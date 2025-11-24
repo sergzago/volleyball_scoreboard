@@ -37,7 +37,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start/* center */;
         padding: clamp(10px, 4vh, 60px) clamp(10px, 4vw, 120px);
         box-sizing: border-box;
       }
@@ -47,7 +47,10 @@
         font-size: clamp(26px, 3vw, 40px);
         text-transform: uppercase;
         letter-spacing: 4px;
-        margin-top: clamp(64px, 12vh, 150px);
+        margin-bottom: 0; /* Убран отступ снизу */
+        /*margin-top: clamp(10px, 2vh, 30px); /* Увеличен отступ сверху */
+        margin-top: 0
+       /* margin-bottom: clamp(32px, 5vh, 100px); */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -55,6 +58,8 @@
         flex-wrap: wrap;
       }
       .tablo-score {
+         /* margin-top: auto; /* Располагаем снизу */
+        margin-top: clamp(150px,16vh, 300px); /* Увеличен отступ сверху */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -70,22 +75,22 @@
       }
       .tablo-score span {
         display: inline-block;
-        transform: scaleY(1.9);
+        transform: scaleY(2);
         transform-origin: center;
       }
     </style>
   </head>
   <body>
     <div class="tablo-screen">
-      <div class="tablo-score">
-        <span class="away_score">0</span>
-        <span class="tablo-separator score-separator">:</span>
-        <span class="home_score">0</span>
-      </div>
       <div class="tablo-teams">
         <span class="away_team">AWAY</span>
         <span class="tablo-separator teams-separator">vs</span>
         <span class="home_team">HOME</span>
+      </div>
+      <div class="tablo-score">
+        <span class="away_score">0</span>
+        <span class="tablo-separator score-separator">:</span>
+        <span class="home_score">0</span>
       </div>
     </div>
   </body>
