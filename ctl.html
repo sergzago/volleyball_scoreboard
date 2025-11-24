@@ -11,6 +11,28 @@
     <script src="js/common.js"></script>
     <script src="js/ctl.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+      .score-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 15px;
+        justify-content: space-between;
+      }
+      .score-row .score-col {
+        flex: 1 1 0;
+      }
+      .score-row .score-col h4 {
+        margin-top: 0;
+      }
+      @media (max-width: 480px) {
+        .score-row {
+          gap: 8px;
+        }
+        .score-row .score-col {
+          font-size: 14px;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="container">
@@ -35,45 +57,51 @@
 
           </div>
         </div>
-        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN HOME -->
+        <div class="col-xs-12 col-md-8 hidden"> <!-- BEGIN SCORE -->
           <div class="panel panel-default">
             <div class="panel-heading">
-              <h3 class="panel-title home_team">home</h3>
+              <h3 class="panel-title">Сет</h3>
             </div>
             <div class="panel-body">
-              <div class="score-field" id="home_score"></div>
-              <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
-              <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
-            </div>
-            <div class="panel-heading">
-              <h3 class="panel-title away_team">away</h3>
-            </div>
-            <div class="panel-body">
-              <div class="score-field" id="away_score"></div>
-              <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
-              <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
+              <div class="row score-row">
+                <div class="score-col text-center">
+                  <h4 class="home_team">home</h4>
+                  <div class="score-field" id="home_score"></div>
+                  <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
+                  <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
+                </div>
+                <div class="score-col text-center">
+                  <h4 class="away_team">away</h4>
+                  <div class="score-field" id="away_score"></div>
+                  <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
+                  <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
+                </div>
+              </div>
             </div>
           </div>
-        </div> 
-        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN HOME -->
+        </div>
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN FOULS -->
           <div class="panel panel-default">
             <div class="panel-heading">
-              <h3 class="panel-title home_team">home</h3>
+              <h3 class="panel-title">Счёт</h3>
             </div>
             <div class="panel-body">
-              <span id="home_fouls" class="score-field period-score"></span>
-              <br>
-              <button data-team="home" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
-              <button data-team="home" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
-            </div>
-            <div class="panel-heading">
-              <h3 class="panel-title away_team">away</h3>
-            </div>
-            <div class="panel-body">
-              <span id="away_fouls" class="score-field period-score"></span>
-              <br>
-              <button data-team="away" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
-              <button data-team="away" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
+              <div class="row score-row">
+                <div class="score-col text-center">
+                  <h4 class="home_team">home</h4>
+                  <span id="home_fouls" class="score-field period-score"></span>
+                  <br>
+                  <button data-team="home" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
+                  <button data-team="home" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
+                </div>
+                <div class="score-col text-center">
+                  <h4 class="away_team">away</h4>
+                  <span id="away_fouls" class="score-field period-score"></span>
+                  <br>
+                  <button data-team="away" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
+                  <button data-team="away" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -91,6 +119,24 @@
             </div>
           </div>
         </div> <!-- END PERIOD -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN BEACH MODE -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Режим</h3>
+            </div>
+            <div class="panel-body">
+              <label class="checkbox-inline">
+                <input type="checkbox" id="beach_mode_toggle">
+                Пляжный волейбол
+              </label>
+              <div class="alert alert-warning beach-switch-alert hidden">
+                <span class="switch-text"></span>
+                <button class="btn btn-xs btn-success beach-switch-reset" type="button">Смена выполнена</button>
+              </div>
+              <div class="alert alert-success beach-match-status hidden"></div>
+            </div>
+          </div>
+        </div> <!-- END BEACH MODE -->
         <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
           <div class="panel panel-default">
             <div class="panel-heading">
