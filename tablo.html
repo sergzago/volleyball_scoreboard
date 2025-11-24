@@ -11,6 +11,16 @@
     <script src="js/jquery-3.4.1.min.js"></script>
     <script src="js/common.js"></script>
     <script src="js/scoreboard.js"></script>
+    <script>
+      $(document).ready(function(){
+        // Инициализация порядка при загрузке
+        setTimeout(function(){
+          if(typeof updateTabloSides === 'function'){
+            updateTabloSides();
+          }
+        }, 500);
+      });
+    </script>
     <style>
       html, body {
         width: 100%;
@@ -37,7 +47,7 @@
         font-size: clamp(26px, 3vw, 40px);
         text-transform: uppercase;
         letter-spacing: 4px;
-        margin-top: clamp(16px, 3vh, 60px);
+        margin-top: clamp(64px, 12vh, 150px);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -60,7 +70,7 @@
       }
       .tablo-score span {
         display: inline-block;
-        transform: scaleY(1.5);
+        transform: scaleY(1.9);
         transform-origin: center;
       }
     </style>
@@ -69,15 +79,13 @@
     <div class="tablo-screen">
       <div class="tablo-score">
         <span class="away_score">0</span>
-        <span class="tablo-separator">:</span>
+        <span class="tablo-separator score-separator">:</span>
         <span class="home_score">0</span>
       </div>
       <div class="tablo-teams">
-        <div>
-          <span class="away_team">AWAY</span>
-          <span class="tablo-separator">vs</span>
-          <span class="home_team">HOME</span>
-        </div>
+        <span class="away_team">AWAY</span>
+        <span class="tablo-separator teams-separator">vs</span>
+        <span class="home_team">HOME</span>
       </div>
     </div>
   </body>

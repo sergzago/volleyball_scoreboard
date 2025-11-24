@@ -24,7 +24,8 @@ scoreboard_query.onSnapshot(
         "classic_match_finished": false,
         "home_side": "left",
         "away_side": "right",
-        "classic_tiebreak_switch_done": true
+        "classic_tiebreak_switch_done": true,
+        "invert_tablo": false
       };
     }else{
       scoreboard_data=documentSnapshot.data();
@@ -83,6 +84,8 @@ scoreboard_query.onSnapshot(
     var showTop = !!(scoreboard_data.show & 1);
     var showBottom = !!(scoreboard_data.show & 2);
     renderSetHistory(scoreboard_data['set_history'], showTop, showBottom);
+    // Обновляем порядок на табло (функция сама проверит наличие элементов)
+    updateTabloSides();
   });
 
 function renderSetHistory(history, showTop, showBottom){
@@ -113,5 +116,44 @@ function updateHistoryElement(selector, shouldShow, text){
   }
   var displayValue = el.hasClass('set-history-top') ? 'inline-block' : 'block';
   el.css('display', displayValue).text(text);
+}
+
+function updateTabloSides(){
+  var scoreContainer=$('.tablo-score');
+  if(!scoreContainer.length)
+    return;
+  var homeSide=scoreboard_data['home_side'] || 'left';
+  var invertTablo = !!scoreboard_data['invert_tablo'];
+  // На табло порядок такой же, как на физическом табло (если не инвертировано)
+  // Если home физически слева, на табло home слева (order 1), away справа (order 3)
+  // При инвертировании порядок противоположный
+  var baseHomeOrder = homeSide==='left' ? 1 : 3;
+  var baseAwayOrder = homeSide==='left' ? 3 : 1;
+  var homeOrder = invertTablo ? baseAwayOrder : baseHomeOrder;
+  var awayOrder = invertTablo ? baseHomeOrder : baseAwayOrder;
+  var separatorOrder = 2;
+  scoreContainer.find('.home_score').css('order', homeOrder);
+  scoreContainer.find('.away_score').css('order', awayOrder);
+  var sep = scoreContainer.find('.score-separator');
+  if(sep.length){
+    sep.css('order', separatorOrder);
+  }else{
+    // Если класс не найден, ищем по тексту
+    scoreContainer.children().each(function(){
+      if($(this).text().trim() === ':'){
+        $(this).css('order', separatorOrder);
+      }
+    });
+  }
+  var teamContainer=$('.tablo-teams');
+  if(teamContainer.length){
+    teamContainer.css('display','flex');
+    teamContainer.find('.home_team').css('order', homeOrder);
+    teamContainer.find('.away_team').css('order', awayOrder);
+    var teamSep = teamContainer.find('.teams-separator');
+    if(teamSep.length){
+      teamSep.css('order', separatorOrder);
+    }
+  }
 }
 

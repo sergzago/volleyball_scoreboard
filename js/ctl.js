@@ -35,6 +35,8 @@ scoreboard_query.onSnapshot(
     $('.beach-hint').toggleClass('hidden', !beachMode);
     $(".foul-btn").prop('disabled', beachMode);
     $(".period-btn").prop('disabled', beachMode);
+    var invertTablo = !!scoreboard_data['invert_tablo'];
+    $('#invert_tablo_toggle').prop('checked', invertTablo);
 
     var reminder=scoreboard_data['beach_switch_message'];
     if(beachMode && reminder){
@@ -415,6 +417,7 @@ $(document).ready(function(){
   });
   $(".reset-btn").click(function(){
     var beachEnabled=isBeachMode();
+    var invertTablo = !!scoreboard_data['invert_tablo'];
     scoreboard_collection.doc(game_id).set({
       show:0,
       home_score:0,
@@ -438,7 +441,8 @@ $(document).ready(function(){
       classic_match_finished:false,
       home_side:'left',
       away_side:'right',
-      classic_tiebreak_switch_done:true
+      classic_tiebreak_switch_done:true,
+      invert_tablo:invertTablo
     });
   });
   $(".period-btn").click(function(){
@@ -474,6 +478,10 @@ $(document).ready(function(){
 
   $("#beach_mode_toggle").change(function(){
     toggleBeachMode($(this).is(':checked'));
+  });
+
+  $("#invert_tablo_toggle").change(function(){
+    update_db({invert_tablo: $(this).is(':checked')});
   });
 
   $(".beach-switch-reset").click(function(){
