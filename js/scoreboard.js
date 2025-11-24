@@ -21,7 +21,10 @@ scoreboard_query.onSnapshot(
         "beach_switch_message": "",
         "beach_current_set": 1,
         "set_history": [],
-        "classic_match_finished": false
+        "classic_match_finished": false,
+        "home_side": "left",
+        "away_side": "right",
+        "classic_tiebreak_switch_done": true
       };
     }else{
       scoreboard_data=documentSnapshot.data();

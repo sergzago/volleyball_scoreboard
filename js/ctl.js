@@ -65,6 +65,7 @@ scoreboard_query.onSnapshot(
     $('#home_fouls').html(beachMode ? ensureNumber(scoreboard_data['home_sets']) : scoreboard_data['home_fouls'])
     $('#period').html(scoreboard_data['current_period'])
     $('#custom_label').val(scoreboard_data['custom_label'])
+    updateSideLayout();
   });
 
 function update_db(data){
@@ -76,6 +77,65 @@ function ensureNumber(value){
   if(isNaN(parsed))
     return 0;
   return parsed;
+}
+
+function getOppositeSide(side){
+  return side==='right'?'left':'right';
+}
+
+function getHomeSide(){
+  return scoreboard_data['home_side'] || 'left';
+}
+
+function getTeamSide(team){
+  if(team==='home')
+    return getHomeSide();
+  return getOppositeSide(getHomeSide());
+}
+
+function flipSidesPayload(extra){
+  var newHomeSide=getOppositeSide(getHomeSide());
+  var payload={
+    home_side:newHomeSide,
+    away_side:getOppositeSide(newHomeSide)
+  };
+  if(extra)
+    Object.assign(payload, extra);
+  return payload;
+}
+
+function sideLabelText(side){
+  return side==='left'?'Слева от судьи':'Справа от судьи';
+}
+
+function updateSideLayout(){
+  if(typeof scoreboard_data['home_side']==='undefined'){
+    scoreboard_data['home_side']='left';
+    scoreboard_data['away_side']='right';
+    update_db({home_side:'left', away_side:'right'});
+  }
+  var homeSide=getHomeSide();
+  var awaySide=getTeamSide('away');
+  var homeOrder=homeSide==='left'?1:2;
+  var awayOrder=homeOrder===1?2:1;
+  $(".score-row .home-col").css('order',homeOrder);
+  $(".score-row .away-col").css('order',awayOrder);
+  $(".home_side_label").text(sideLabelText(homeSide));
+  $(".away_side_label").text(sideLabelText(awaySide));
+  $("input[name='side_control'][value='home']").prop('checked', homeSide==='left');
+  $("input[name='side_control'][value='away']").prop('checked', homeSide!=='left');
+}
+
+function shouldClassicMidSwitch(homeAfter, awayAfter){
+  if(isBeachMode())
+    return false;
+  if(ensureNumber(scoreboard_data['current_period'])!=5)
+    return false;
+  if(scoreboard_data['classic_tiebreak_switch_done'])
+    return false;
+  if(Math.max(homeAfter, awayAfter)<8)
+    return false;
+  return true;
 }
 
 function isBeachMode(){
@@ -179,11 +239,12 @@ function applyBeachSetWin(team, homeScore, awayScore, baseUpdate){
   }
   var matchFinished=(homeSets>=BEACH_SETS_TO_WIN)||(awaySets>=BEACH_SETS_TO_WIN);
   var currentSet=getBeachSetNumber();
-  var update=Object.assign({}, baseUpdate, {
-    home_sets:homeSets,
-    away_sets:awaySets,
-    beach_switch_message:''
-  });
+  var update=Object.assign({}, baseUpdate || {});
+  update['home_sets']=homeSets;
+  update['away_sets']=awaySets;
+  if(!('beach_switch_message' in update)){
+    update['beach_switch_message']='';
+  }
 
   if(matchFinished || currentSet>=BEACH_MAX_SETS){
     update['beach_match_finished']=true;
@@ -207,7 +268,8 @@ function toggleBeachMode(enabled){
     beach_mode:enabled,
     beach_match_finished:false,
     set_history:[],
-    classic_match_finished:false
+    classic_match_finished:false,
+    classic_tiebreak_switch_done:true
   };
   if(enabled){
     update['home_sets']=0;
@@ -224,7 +286,7 @@ function toggleBeachMode(enabled){
     update['home_sets']=0;
     update['away_sets']=0;
     update['beach_current_set']=1;
-    update['period_count']=scoreboard_data['period_count']||5;
+    update['period_count']=5;
     update['home_score']=0;
     update['away_score']=0;
   }
@@ -257,6 +319,13 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
     current_period:matchFinished?currentPeriod:nextPeriod,
     classic_match_finished:matchFinished
   });
+  if(!matchFinished){
+    Object.assign(update, flipSidesPayload({
+      classic_tiebreak_switch_done: nextPeriod==5 ? false : true
+    }));
+  }else{
+    update['classic_tiebreak_switch_done']=true;
+  }
   if(matchFinished){
     update['home_score']=homeFinal;
     update['away_score']=awayFinal;
@@ -281,6 +350,11 @@ function handleClassicScore(team, delta){
   update[scoreKey]=newScore;
   if(delta>0){
     var otherScore=ensureNumber(scoreboard_data[otherKey]);
+    var homeAfter=team=='home'?newScore:ensureNumber(scoreboard_data['home_score']);
+    var awayAfter=team=='home'?otherScore:newScore;
+    if(shouldClassicMidSwitch(homeAfter, awayAfter)){
+      Object.assign(update, flipSidesPayload({classic_tiebreak_switch_done:true}));
+    }
     if(classicSetWon(newScore, otherScore)){
       applyClassicSetWin(team, newScore, otherScore, update);
       return;
@@ -363,7 +437,10 @@ $(document).ready(function(){
       beach_match_finished:false,
       period_count: beachEnabled ? 3 : 5,
       set_history:[],
-      classic_match_finished:false
+      classic_match_finished:false,
+      home_side:'left',
+      away_side:'right',
+      classic_tiebreak_switch_done:true
     });
   });
   $(".period-btn").click(function(){
@@ -402,6 +479,19 @@ $(document).ready(function(){
   });
 
   $(".beach-switch-reset").click(function(){
-    update_db({beach_switch_message:''});
+    var update={beach_switch_message:''};
+    if(isBeachMode()){
+      Object.assign(update, flipSidesPayload());
+    }
+    update_db(update);
+  });
+
+  $("input[name='side_control']").change(function(){
+    var val=$(this).val();
+    if(val==='home'){
+      update_db({home_side:'left', away_side:'right'});
+    }else if(val==='away'){
+      update_db({home_side:'right', away_side:'left'});
+    }
   });
 });

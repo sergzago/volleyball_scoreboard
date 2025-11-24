@@ -23,6 +23,14 @@
       }
       .score-row .score-col h4 {
         margin-top: 0;
+        margin-bottom: 4px;
+      }
+      .side-label {
+        display: block;
+        font-size: 12px;
+        color: #777;
+        margin-bottom: 6px;
+        min-height: 16px;
       }
       @media (max-width: 480px) {
         .score-row {
@@ -64,14 +72,16 @@
             </div>
             <div class="panel-body">
               <div class="row score-row">
-                <div class="score-col text-center">
+                <div class="score-col home-col text-center">
                   <h4 class="home_team">home</h4>
+                  <span class="side-label home_side_label"></span>
                   <div class="score-field" id="home_score"></div>
                   <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
                 </div>
-                <div class="score-col text-center">
+                <div class="score-col away-col text-center">
                   <h4 class="away_team">away</h4>
+                  <span class="side-label away_side_label"></span>
                   <div class="score-field" id="away_score"></div>
                   <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
@@ -87,15 +97,17 @@
             </div>
             <div class="panel-body">
               <div class="row score-row">
-                <div class="score-col text-center">
+                <div class="score-col home-col text-center">
                   <h4 class="home_team">home</h4>
+                  <span class="side-label home_side_label"></span>
                   <span id="home_fouls" class="score-field period-score"></span>
                   <br>
                   <button data-team="home" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
                   <button data-team="home" class="foul-btn btn btn-sm btn-info" type="button">+1</button>
                 </div>
-                <div class="score-col text-center">
+                <div class="score-col away-col text-center">
                   <h4 class="away_team">away</h4>
+                  <span class="side-label away_side_label"></span>
                   <span id="away_fouls" class="score-field period-score"></span>
                   <br>
                   <button data-team="away" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
@@ -107,18 +119,6 @@
         </div>
       </div>
       <div class="row text-center">
-        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN PERIOD -->
-          <div class="panel panel-default">
-            <div class="panel-heading">
-              <h3 class="panel-title">Period</h3>
-            </div>
-            <div class="panel-body">
-              <div class="score-field" id="period"></div>
-              <button class="period-btn btn btn-default" type="button">-1</button>
-              <button class="period-btn btn btn-info" type="button">+1</button>
-            </div>
-          </div>
-        </div> <!-- END PERIOD -->
         <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN BEACH MODE -->
           <div class="panel panel-default">
             <div class="panel-heading">
@@ -137,6 +137,35 @@
             </div>
           </div>
         </div> <!-- END BEACH MODE -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN SIDE CONTROL -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Стороны</h3>
+            </div>
+            <div class="panel-body text-left">
+              <label class="radio-inline">
+                <input type="radio" name="side_control" value="home">
+                Домашняя слева
+              </label>
+              <label class="radio-inline">
+                <input type="radio" name="side_control" value="away">
+                Гостевая слева
+              </label>
+            </div>
+          </div>
+        </div> <!-- END SIDE CONTROL -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN PERIOD -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Period</h3>
+            </div>
+            <div class="panel-body">
+              <div class="score-field" id="period"></div>
+              <button class="period-btn btn btn-default" type="button">-1</button>
+              <button class="period-btn btn btn-info" type="button">+1</button>
+            </div>
+          </div>
+        </div> <!-- END PERIOD -->
         <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
           <div class="panel panel-default">
             <div class="panel-heading">
