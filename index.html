@@ -30,6 +30,10 @@
                 <a class="ctl-btn btn btn-info" target="_blank" href="#">Control panel</a>
                 <br>
                 <span id="ctl_link"></span>
+                <hr />
+                <a class="tablo-btn btn btn-info" target="_blank" href="#">Табло</a>
+                <br>
+                <span id="tablo_link"></span>
               </div>
             </div>
           </div>
@@ -40,10 +44,13 @@
           console.log($(this).val());
           var sb=window.location.href.replace(/\/[^\/]*$/,"/scoreboard.html?game="+$(this).val());
           var ctl=window.location.href.replace(/\/[^\/]*$/,"/ctl.html?game="+$(this).val());
+          var tablo=window.location.href.replace(/\/[^\/]*$/,"/tablo.html?game="+$(this).val());
           $(".ctl-btn").attr('href',ctl);
           $("#ctl_link").html(ctl);
           $(".scoreboard-btn").attr('href',sb);
           $("#scoreboard_link").html(sb);
+          $(".tablo-btn").attr('href',tablo);
+          $("#tablo_link").html(tablo);
         });
         $("#game_id").val(uuid()).change();
       </script>
