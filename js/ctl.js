@@ -120,8 +120,6 @@ function updateSideLayout(){
   var awayOrder=homeOrder===1?2:1;
   $(".score-row .home-col").css('order',homeOrder);
   $(".score-row .away-col").css('order',awayOrder);
-  $(".home_side_label").text(sideLabelText(homeSide));
-  $(".away_side_label").text(sideLabelText(awaySide));
   $("input[name='side_control'][value='home']").prop('checked', homeSide==='left');
   $("input[name='side_control'][value='away']").prop('checked', homeSide!=='left');
 }

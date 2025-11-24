@@ -25,13 +25,6 @@
         margin-top: 0;
         margin-bottom: 4px;
       }
-      .side-label {
-        display: block;
-        font-size: 12px;
-        color: #777;
-        margin-bottom: 6px;
-        min-height: 16px;
-      }
       @media (max-width: 480px) {
         .score-row {
           gap: 8px;
@@ -74,14 +67,12 @@
               <div class="row score-row">
                 <div class="score-col home-col text-center">
                   <h4 class="home_team">home</h4>
-                  <span class="side-label home_side_label"></span>
                   <div class="score-field" id="home_score"></div>
                   <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
                 </div>
                 <div class="score-col away-col text-center">
                   <h4 class="away_team">away</h4>
-                  <span class="side-label away_side_label"></span>
                   <div class="score-field" id="away_score"></div>
                   <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
@@ -99,7 +90,6 @@
               <div class="row score-row">
                 <div class="score-col home-col text-center">
                   <h4 class="home_team">home</h4>
-                  <span class="side-label home_side_label"></span>
                   <span id="home_fouls" class="score-field period-score"></span>
                   <br>
                   <button data-team="home" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
@@ -107,7 +97,6 @@
                 </div>
                 <div class="score-col away-col text-center">
                   <h4 class="away_team">away</h4>
-                  <span class="side-label away_side_label"></span>
                   <span id="away_fouls" class="score-field period-score"></span>
                   <br>
                   <button data-team="away" class="foul-btn btn btn-sm btn-default" type="button">-1</button>
