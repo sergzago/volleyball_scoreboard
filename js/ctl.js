@@ -484,12 +484,7 @@ $(document).ready(function(){
     update_db(update);
   });
 
-  $("input[name='side_control']").change(function(){
-    var val=$(this).val();
-    if(val==='home'){
-      update_db({home_side:'left', away_side:'right'});
-    }else if(val==='away'){
-      update_db({home_side:'right', away_side:'left'});
-    }
+  $(".side-switch-btn").click(function(){
+    update_db(flipSidesPayload());
   });
 });
