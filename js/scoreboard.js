@@ -98,8 +98,9 @@ function renderSetHistory(history, showTop, showBottom){
     }
     text=parts.join(' ');
   }
-  updateHistoryElement('#set-history-top', showTop, text);
-  updateHistoryElement('#set-history-bottom', showBottom, text);
+  var hasHistory = text.length>0;
+  updateHistoryElement('#set-history-top', showTop && hasHistory, text);
+  updateHistoryElement('#set-history-bottom', showBottom && hasHistory, text);
 }
 
 function updateHistoryElement(selector, shouldShow, text){
@@ -107,11 +108,9 @@ function updateHistoryElement(selector, shouldShow, text){
   if(!el.length)
     return;
   if(!shouldShow){
-    el.css('display','none').html('&nbsp;');
+    el.css('display','none').text('');
     return;
   }
-  if(!text)
-    text='\xa0';
   var displayValue = el.hasClass('set-history-top') ? 'inline-block' : 'block';
   el.css('display', displayValue).text(text);
 }
