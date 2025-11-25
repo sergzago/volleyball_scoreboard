@@ -60,6 +60,7 @@
         </div>
         <div class="col-xs-12 hidden">
           <button class="btn btn-default side-switch-btn" type="button">Смена сторон</button>
+          <button class="btn btn-default new-set-btn" type="button" style="margin-left:8px;">Новый сет</button>
         </div>
         <div class="col-xs-12 col-md-8 hidden"> <!-- BEGIN SCORE -->
           <div class="panel panel-default">
@@ -111,6 +112,20 @@
         </div>
       </div>
       <div class="row text-center">
+        <!-- BEACH MODE block moved below PERIOD block -->
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN PERIOD -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Period</h3>
+            </div>
+            <div class="panel-body">
+              <div class="score-field" id="period"></div>
+              <button class="period-btn btn btn-default" type="button">-1</button>
+              <button class="period-btn btn btn-info" type="button">+1</button>
+            </div>
+          </div>
+        </div> <!-- END PERIOD -->
+
         <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN BEACH MODE -->
           <div class="panel panel-default">
             <div class="panel-heading">
@@ -130,18 +145,6 @@
             </div>
           </div>
         </div> <!-- END BEACH MODE -->
-        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN PERIOD -->
-          <div class="panel panel-default">
-            <div class="panel-heading">
-              <h3 class="panel-title">Period</h3>
-            </div>
-            <div class="panel-body">
-              <div class="score-field" id="period"></div>
-              <button class="period-btn btn btn-default" type="button">-1</button>
-              <button class="period-btn btn btn-info" type="button">+1</button>
-            </div>
-          </div>
-        </div> <!-- END PERIOD -->
         <div class="col-xs-12 col-md-4"> <!-- BEGIN HOME -->
           <div class="panel panel-default">
             <div class="panel-heading">

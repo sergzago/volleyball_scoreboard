@@ -40,7 +40,8 @@ scoreboard_query.onSnapshot(
 
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
-    if(beachMode && reminder){
+    var classicSwitchNeeded = !!scoreboard_data['classic_switch_needed'];
+    if((beachMode && reminder) || classicSwitchNeeded){
       sideSwitchBtn.css('background-color', '#ff0000').css('color', '#ffffff');
     }else{
       sideSwitchBtn.css('background-color', '').css('color', '');
@@ -53,7 +54,51 @@ scoreboard_query.onSnapshot(
     }
     var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
     var matchFinished = beachFinished || classicFinished;
-    $(".score-btn").prop('disabled', !!matchFinished);
+    var pendingNewSet = !!scoreboard_data['pending_new_set'];
+    // Determine whether period controls should be enabled:
+    // - at the start of a set when score is 0:0 (allow changing period before play)
+    // - after a set finished and waiting for New Set (pendingNewSet)
+    // - after match finished (allow adjustments)
+    var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
+    var enablePeriodButtons = startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished'];
+    // Disable + buttons when match finished or when waiting for New Set.
+    $(".score-btn").filter(function(){
+      return parseInt($(this).text(),10) > 0;
+    }).prop('disabled', matchFinished || pendingNewSet);
+    // Disable - buttons only when match finished (allow revert during pending new set)
+    $(".score-btn").filter(function(){
+      return parseInt($(this).text(),10) < 0;
+    }).prop('disabled', matchFinished);
+    // Additionally, if waiting for New Set, disable the '-' button for the losing team
+    if(pendingNewSet){
+      // determine last set winner/loser from set_history or from current visible scores
+      var history = Array.isArray(scoreboard_data['set_history'])?scoreboard_data['set_history']:[];
+      var last = history.length? history[history.length-1] : null;
+      var loser = null;
+      if(last){
+        var h = ensureNumber(last.home);
+        var a = ensureNumber(last.away);
+        if(h>a) loser = 'away';
+        else if(a>h) loser = 'home';
+      } else {
+        // fallback to comparing displayed scores
+        var hs = ensureNumber(scoreboard_data['home_score']);
+        var as = ensureNumber(scoreboard_data['away_score']);
+        if(hs>as) loser = 'away';
+        else if(as>hs) loser = 'home';
+      }
+      if(loser){
+        // disable '-' button for the loser
+        $(".score-btn").filter(function(){
+          return parseInt($(this).text(),10) < 0 && $(this).data('team') === loser;
+        }).prop('disabled', true);
+      }
+    }
+    // New Set button enabled only when there's a pending new set
+    $(".new-set-btn").prop('disabled', !pendingNewSet || matchFinished);
+    // Period buttons: enable only at initial moment or after set/match end
+    var periodDisabled = beachMode || !enablePeriodButtons;
+    $(".period-btn").prop('disabled', periodDisabled);
 
     //$("#show").prop("checked",(scoreboard_data['show']));
     $('#away_score').html(scoreboard_data['away_score'])
@@ -72,6 +117,47 @@ scoreboard_query.onSnapshot(
 
 function update_db(data){
   scoreboard_query.update(data);
+}
+
+function performNewSetUpdate(){
+  var update = {
+    home_score: 0,
+    away_score: 0,
+    beach_switch_message: ''
+  };
+  if(isBeachMode()){
+    var nextSet = scoreboard_data['next_beach_set'];
+    if(!nextSet){
+      nextSet = ensureNumber(scoreboard_data['beach_current_set']) + 1;
+    }
+    update['beach_current_set'] = nextSet;
+    update['current_period'] = nextSet;
+    update['next_beach_set'] = firebase.firestore.FieldValue.delete();
+    update['pending_new_set'] = firebase.firestore.FieldValue.delete();
+    update_db(update);
+    return;
+  }
+  var nextPeriod = scoreboard_data['next_period'];
+  if(!nextPeriod){
+    nextPeriod = ensureNumber(scoreboard_data['current_period']) + 1;
+  }
+  update['current_period'] = nextPeriod;
+  if(typeof scoreboard_data['pending_home_side'] !== 'undefined' && scoreboard_data['pending_home_side'] !== null){
+    update['home_side'] = scoreboard_data['pending_home_side'];
+  }
+  if(typeof scoreboard_data['pending_away_side'] !== 'undefined' && scoreboard_data['pending_away_side'] !== null){
+    update['away_side'] = scoreboard_data['pending_away_side'];
+  }
+  if(typeof scoreboard_data['pending_classic_tiebreak_switch_done'] !== 'undefined' && scoreboard_data['pending_classic_tiebreak_switch_done'] !== null){
+    update['classic_tiebreak_switch_done'] = scoreboard_data['pending_classic_tiebreak_switch_done'];
+  }
+  // clear pending fields
+  update['next_period'] = firebase.firestore.FieldValue.delete();
+  update['pending_home_side'] = firebase.firestore.FieldValue.delete();
+  update['pending_away_side'] = firebase.firestore.FieldValue.delete();
+  update['pending_classic_tiebreak_switch_done'] = firebase.firestore.FieldValue.delete();
+  update['pending_new_set'] = firebase.firestore.FieldValue.delete();
+  update_db(update);
 }
 
 function ensureNumber(value){
@@ -130,8 +216,6 @@ function shouldClassicMidSwitch(homeAfter, awayAfter){
   if(isBeachMode())
     return false;
   if(ensureNumber(scoreboard_data['current_period'])!=5)
-    return false;
-  if(scoreboard_data['classic_tiebreak_switch_done'])
     return false;
   if(Math.max(homeAfter, awayAfter)<8)
     return false;
@@ -254,10 +338,12 @@ function applyBeachSetWin(team, homeScore, awayScore, baseUpdate){
     update['beach_current_set']=currentSet;
   }else{
     var nextSet=currentSet+1;
-    update['beach_current_set']=nextSet;
-    update['current_period']=nextSet;
-    update['home_score']=0;
-    update['away_score']=0;
+    // Оставляем финальный счёт видимым до нажатия "Новый сет"
+    update['home_score']=homeScore;
+    update['away_score']=awayScore;
+    // Не переключаем текущий сет автоматически — отложим переключение на кнопку "Новый сет"
+    update['next_beach_set']=nextSet;
+    update['pending_new_set']=true;
   }
   update['set_history']=nextSetHistory(homeScore, awayScore);
   update_db(update);
@@ -294,9 +380,12 @@ function toggleBeachMode(enabled){
 }
 
 function classicSetWon(teamScore, opponentScore){
-  if(teamScore<CLASSIC_POINTS_TO_WIN)
+  // In 5th period (deciding set) classic volleyball is played to 15 points
+  var period = ensureNumber(scoreboard_data['current_period']);
+  var target = (period === 5) ? 15 : CLASSIC_POINTS_TO_WIN;
+  if(teamScore < target)
     return false;
-  return (teamScore-opponentScore)>=2;
+  return (teamScore - opponentScore) >= 2;
 }
 
 function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
@@ -316,23 +405,27 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
   var update=Object.assign({}, baseUpdate, {
     home_fouls:homeFouls,
     away_fouls:awayFouls,
-    current_period:matchFinished?currentPeriod:nextPeriod,
+    // Не увеличиваем current_period автоматически — оставляем текущий номер сета
+    current_period: currentPeriod,
     classic_match_finished:matchFinished
   });
   if(!matchFinished){
-    Object.assign(update, flipSidesPayload({
+    // Не переключаем период автоматически — откладываем переключение и смену сторон
+    var flip = flipSidesPayload({
       classic_tiebreak_switch_done: nextPeriod==5 ? false : true
-    }));
+    });
+    update['pending_home_side'] = flip.home_side;
+    update['pending_away_side'] = flip.away_side;
+    update['pending_classic_tiebreak_switch_done'] = flip.classic_tiebreak_switch_done;
+    update['next_period'] = nextPeriod;
+    update['pending_new_set'] = true;
   }else{
     update['classic_tiebreak_switch_done']=true;
   }
-  if(matchFinished){
-    update['home_score']=homeFinal;
-    update['away_score']=awayFinal;
-  }else{
-    update['home_score']=0;
-    update['away_score']=0;
-  }
+  // После выигрыша сета оставляем текущий (финальный) счёт видимым.
+  // Сброс очков в новый сет происходит по нажатию кнопки "Новый сет".
+  update['home_score']=homeFinal;
+  update['away_score']=awayFinal;
   update['set_history']=nextSetHistory(homeFinal, awayFinal);
   update_db(update);
 }
@@ -348,13 +441,29 @@ function handleClassicScore(team, delta){
     return;
   var update={};
   update[scoreKey]=newScore;
-  if(delta>0){
-    var otherScore=ensureNumber(scoreboard_data[otherKey]);
-    var homeAfter=team=='home'?newScore:ensureNumber(scoreboard_data['home_score']);
-    var awayAfter=team=='home'?otherScore:newScore;
-    if(shouldClassicMidSwitch(homeAfter, awayAfter)){
-      Object.assign(update, flipSidesPayload({classic_tiebreak_switch_done:true}));
+  var otherScore=ensureNumber(scoreboard_data[otherKey]);
+  var homeAfter=team=='home'?newScore:ensureNumber(scoreboard_data['home_score']);
+  var awayAfter=team=='home'?otherScore:newScore;
+
+  // If condition for manual mid‑set switch is met, set the flag and message.
+  if(shouldClassicMidSwitch(homeAfter, awayAfter)){
+    // Only set the visual request once per match/set: if we haven't shown it yet
+    if(!scoreboard_data['classic_switch_shown']){
+      update['classic_switch_needed'] = true;
+      update['classic_switch_message'] = 'Смена площадок — 5-й сет, счёт '+formatScore(homeAfter, awayAfter);
+      update['classic_switch_shown'] = true;
     }
+  } else {
+    // If condition is no longer met, remove only the 'needed' visual flag/message
+    if(scoreboard_data['classic_switch_needed']){
+      var DEL = firebase.firestore.FieldValue.delete();
+      update['classic_switch_needed'] = DEL;
+      update['classic_switch_message'] = DEL;
+      // keep 'classic_switch_shown' to avoid re-triggering highlight again
+    }
+  }
+
+  if(delta>0){
     if(classicSetWon(newScore, otherScore)){
       applyClassicSetWin(team, newScore, otherScore, update);
       return;
@@ -374,6 +483,57 @@ $(document).ready(function(){
     var delta=parseInt(button.text(),10)
     if(isNaN(delta))
       delta=0;
+    var pendingNewSet = !!scoreboard_data['pending_new_set'];
+    // If waiting for New Set and operator presses - for the winning team => revert the set
+    if(delta < 0 && pendingNewSet){
+      var history = Array.isArray(scoreboard_data['set_history'])?scoreboard_data['set_history']:[];
+      var last = history.length? history[history.length-1] : null;
+      if(last){
+        var homeLast = ensureNumber(last.home);
+        var awayLast = ensureNumber(last.away);
+        var winner = (homeLast > awayLast)? 'home' : (awayLast > homeLast ? 'away' : null);
+        if(winner && button.data('team') === winner){
+          var update = {};
+          if(isBeachMode()){
+            // decrement beach sets
+            if(winner === 'home'){
+              update['home_sets'] = Math.max(0, ensureNumber(scoreboard_data['home_sets']) - 1);
+              update['home_score'] = Math.max(0, ensureNumber(scoreboard_data['home_score']) - 1);
+            }else{
+              update['away_sets'] = Math.max(0, ensureNumber(scoreboard_data['away_sets']) - 1);
+              update['away_score'] = Math.max(0, ensureNumber(scoreboard_data['away_score']) - 1);
+            }
+            // remove last history entry
+            var newHist = cloneSetHistory(); newHist.pop();
+            update['set_history'] = newHist;
+            // clear pending flags
+            update['next_beach_set'] = null;
+            update['pending_new_set'] = null;
+            update['beach_match_finished'] = false;
+          }else{
+            // classic revert: decrement sets counter stored in fouls field and reduce winner's score by 1
+            if(winner === 'home'){
+              update['home_fouls'] = Math.max(0, ensureNumber(scoreboard_data['home_fouls']) - 1);
+              update['home_score'] = Math.max(0, ensureNumber(scoreboard_data['home_score']) - 1);
+            }else{
+              update['away_fouls'] = Math.max(0, ensureNumber(scoreboard_data['away_fouls']) - 1);
+              update['away_score'] = Math.max(0, ensureNumber(scoreboard_data['away_score']) - 1);
+            }
+            var newHist2 = cloneSetHistory(); newHist2.pop();
+            update['set_history'] = newHist2;
+            // clear pending fields
+            update['next_period'] = null;
+            update['pending_home_side'] = null;
+            update['pending_away_side'] = null;
+            update['pending_classic_tiebreak_switch_done'] = null;
+            update['pending_new_set'] = null;
+            update['classic_match_finished'] = false;
+          }
+          update_db(update);
+          return;
+        }
+      }
+    }
     if(isBeachMode()){
       handleBeachScore(button.data('team'), delta);
       return;
@@ -452,6 +612,40 @@ $(document).ready(function(){
     var delta=parseInt(button.text(),10)
     if(isNaN(delta))
       return;
+    // If score in set is 0:0 (start of set), period buttons simply change the period number.
+    var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
+    if(startOfSet){
+      var currentPeriod=ensureNumber(scoreboard_data['current_period']);
+      var new_period=currentPeriod+delta
+      var max_period=ensureNumber(scoreboard_data['period_count'])||5
+      var hs=ensureNumber(scoreboard_data['home_score'])
+      var as=ensureNumber(scoreboard_data['away_score'])
+      var hf=ensureNumber(scoreboard_data['home_fouls'])
+      var af=ensureNumber(scoreboard_data['away_fouls'])
+      if(hs>as){hf++}
+      if(as>hs){af++}
+      if((new_period>0)&&(new_period<=max_period)){
+        var update={
+          current_period:new_period,
+          away_fouls:af,
+          home_fouls:hf,
+          home_score:0,
+          away_score:0
+        };
+        console.log(update);
+        update_db(update)
+      }else{
+        console.log("Period not allowed: "+new_period)
+      }
+      return;
+    }
+
+    // If not startOfSet: +1 behaves like New Set (apply pending new set and reset scores), -1 keeps previous behaviour
+    if(delta>0){
+      performNewSetUpdate();
+      return;
+    }
+    // -1 pressed: decrement period if allowed
     var currentPeriod=ensureNumber(scoreboard_data['current_period']);
     var new_period=currentPeriod+delta
     var max_period=ensureNumber(scoreboard_data['period_count'])||5
@@ -485,10 +679,68 @@ $(document).ready(function(){
   });
 
   $(".side-switch-btn").click(function(){
-    var update = {beach_switch_message: ''};
+    var update = {};
     Object.assign(update, flipSidesPayload());
+    // Clear classic switch flags and beach switch message by deleting fields
+    var DEL = firebase.firestore.FieldValue.delete();
+    update['classic_switch_needed'] = DEL;
+    update['classic_switch_message'] = DEL;
+    update['beach_switch_message'] = DEL;
+    scoreboard_query.update(update).then(function(){
+      // Немедленно возвращаем белый фон кнопки после успешной записи
+      $(".side-switch-btn").css('background-color', '').css('color', '');
+    }).catch(function(err){
+      console.error('Error updating side switch:', err);
+      // В любом случае сбросим визуально
+      $(".side-switch-btn").css('background-color', '').css('color', '');
+    });
+  });
+  $(".new-set-btn").click(function(){
+    // Сбросить счёт для начала нового сета. Остальные параметры (period/set number)
+    // уже устанавливаются при фиксации выигрыша сета.
+    var update = {
+      home_score: 0,
+      away_score: 0,
+      beach_switch_message: ''
+    };
+    // Если пляжный режим — выставляем следующий beach set, если он отложен
+    if(isBeachMode()){
+      var nextSet = scoreboard_data['next_beach_set'];
+      if(!nextSet){
+        nextSet = ensureNumber(scoreboard_data['beach_current_set']) + 1;
+      }
+      update['beach_current_set'] = nextSet;
+      update['current_period'] = nextSet;
+      // Убираем флаг ожидания
+      update['next_beach_set'] = null;
+      update['pending_new_set'] = null;
+      update_db(update);
+      return;
+    }
+
+    // Классический режим — применяем отложенное переключение периода/сторон, если есть
+    var nextPeriod = scoreboard_data['next_period'];
+    if(!nextPeriod){
+      nextPeriod = ensureNumber(scoreboard_data['current_period']) + 1;
+    }
+    update['current_period'] = nextPeriod;
+    // Применяем отложенную смену сторон и флаг tiebreak, если они записаны
+    if(typeof scoreboard_data['pending_home_side'] !== 'undefined' && scoreboard_data['pending_home_side'] !== null){
+      update['home_side'] = scoreboard_data['pending_home_side'];
+    }
+    if(typeof scoreboard_data['pending_away_side'] !== 'undefined' && scoreboard_data['pending_away_side'] !== null){
+      update['away_side'] = scoreboard_data['pending_away_side'];
+    }
+    if(typeof scoreboard_data['pending_classic_tiebreak_switch_done'] !== 'undefined' && scoreboard_data['pending_classic_tiebreak_switch_done'] !== null){
+      update['classic_tiebreak_switch_done'] = scoreboard_data['pending_classic_tiebreak_switch_done'];
+    }
+    // Очищаем отложенные поля
+    update['next_period'] = null;
+    update['pending_home_side'] = null;
+    update['pending_away_side'] = null;
+    update['pending_classic_tiebreak_switch_done'] = null;
+    update['pending_new_set'] = null;
+
     update_db(update);
-    // Немедленно возвращаем белый фон кнопки
-    $(".side-switch-btn").css('background-color', '').css('color', '');
   });
 });
