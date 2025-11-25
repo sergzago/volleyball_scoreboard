@@ -96,6 +96,12 @@ scoreboard_query.onSnapshot(
     }
     // New Set button enabled only when there's a pending new set
     $(".new-set-btn").prop('disabled', !pendingNewSet || matchFinished);
+    // Highlight button with red background when pending new set
+    if(pendingNewSet && !matchFinished){
+      $(".new-set-btn").css('background-color', '#ff0000').css('color', '#ffffff');
+    }else{
+      $(".new-set-btn").css('background-color', '').css('color', '');
+    }
     // Period buttons: enable only at initial moment or after set/match end
     var periodDisabled = beachMode || !enablePeriodButtons;
     $(".period-btn").prop('disabled', periodDisabled);
