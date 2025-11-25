@@ -37,6 +37,8 @@ scoreboard_query.onSnapshot(
     $(".period-btn").prop('disabled', beachMode);
     var invertTablo = !!scoreboard_data['invert_tablo'];
     $('#invert_tablo_toggle').prop('checked', invertTablo);
+    var unlimitedScore = !!scoreboard_data['unlimited_score'];
+    $('#unlimited_score_toggle').prop('checked', unlimitedScore);
 
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
@@ -59,8 +61,10 @@ scoreboard_query.onSnapshot(
     // - at the start of a set when score is 0:0 (allow changing period before play)
     // - after a set finished and waiting for New Set (pendingNewSet)
     // - after match finished (allow adjustments)
+    // - always enabled if unlimited_score mode is on
+    var unlimitedScore = !!scoreboard_data['unlimited_score'];
     var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
-    var enablePeriodButtons = startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished'];
+    var enablePeriodButtons = unlimitedScore || startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished'];
     // Disable + buttons when match finished or when waiting for New Set.
     $(".score-btn").filter(function(){
       return parseInt($(this).text(),10) > 0;
@@ -469,7 +473,9 @@ function handleClassicScore(team, delta){
     }
   }
 
-  if(delta>0){
+  // In unlimited score mode, don't auto-finalize sets; only update score
+  var unlimitedScore = !!scoreboard_data['unlimited_score'];
+  if(delta>0 && !unlimitedScore){
     if(classicSetWon(newScore, otherScore)){
       applyClassicSetWin(team, newScore, otherScore, update);
       return;
@@ -648,6 +654,20 @@ $(document).ready(function(){
 
     // If not startOfSet: +1 behaves like New Set (apply pending new set and reset scores), -1 keeps previous behaviour
     if(delta>0){
+      // In unlimited score mode, check if score meets threshold for auto-finalize
+      var unlimitedScore = !!scoreboard_data['unlimited_score'];
+      var homeScore = ensureNumber(scoreboard_data['home_score']);
+      var awayScore = ensureNumber(scoreboard_data['away_score']);
+      var currentPeriod = ensureNumber(scoreboard_data['current_period']);
+      var target = (currentPeriod === 5) ? 15 : 25;
+      
+      if(unlimitedScore && homeScore >= target && homeScore - awayScore >= 2){
+        // Home team wins with score homeScore:awayScore
+        applyClassicSetWin('home', homeScore, awayScore, {});
+      } else if(unlimitedScore && awayScore >= target && awayScore - homeScore >= 2){
+        // Away team wins with score homeScore:awayScore (but away is teamScore, home is opponentScore in function params)
+        applyClassicSetWin('away', awayScore, homeScore, {});
+      }
       performNewSetUpdate();
       return;
     }
@@ -682,6 +702,10 @@ $(document).ready(function(){
 
   $("#invert_tablo_toggle").change(function(){
     update_db({invert_tablo: $(this).is(':checked')});
+  });
+
+  $("#unlimited_score_toggle").change(function(){
+    update_db({unlimited_score: $(this).is(':checked')});
   });
 
   $(".side-switch-btn").click(function(){
