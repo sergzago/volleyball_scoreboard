@@ -39,11 +39,11 @@ scoreboard_query.onSnapshot(
     $('#invert_tablo_toggle').prop('checked', invertTablo);
 
     var reminder=scoreboard_data['beach_switch_message'];
+    var sideSwitchBtn=$(".side-switch-btn");
     if(beachMode && reminder){
-      $(".beach-switch-alert").removeClass("hidden");
-      $(".beach-switch-alert .switch-text").text(reminder);
+      sideSwitchBtn.css('background-color', '#ff0000').css('color', '#ffffff');
     }else{
-      $(".beach-switch-alert").addClass("hidden");
+      sideSwitchBtn.css('background-color', '').css('color', '');
     }
     var beachFinished = beachMode && scoreboard_data['beach_match_finished'];
     if(beachFinished){
@@ -484,15 +484,11 @@ $(document).ready(function(){
     update_db({invert_tablo: $(this).is(':checked')});
   });
 
-  $(".beach-switch-reset").click(function(){
-    var update={beach_switch_message:''};
-    if(isBeachMode()){
-      Object.assign(update, flipSidesPayload());
-    }
-    update_db(update);
-  });
-
   $(".side-switch-btn").click(function(){
-    update_db(flipSidesPayload());
+    var update = {beach_switch_message: ''};
+    Object.assign(update, flipSidesPayload());
+    update_db(update);
+    // Немедленно возвращаем белый фон кнопки
+    $(".side-switch-btn").css('background-color', '').css('color', '');
   });
 });
