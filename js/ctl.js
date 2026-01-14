@@ -491,14 +491,16 @@ function renderSetHistoryCtl(history){
   if(items.length>0){
     var homeTeam=scoreboard_data['home_team'] || 'Home';
     var awayTeam=scoreboard_data['away_team'] || 'Away';
-    var parts=[homeTeam + ' - ' + awayTeam + ':'];
+    var header=homeTeam + ' - ' + awayTeam + ':';
+    var scoresParts=[];
     for(var i=0;i<items.length;i++){
       var entry=items[i]||{};
       var homeScore=(entry.home!=null)?entry.home:'-';
       var awayScore=(entry.away!=null)?entry.away:'-';
-      parts.push(homeScore + ':' + awayScore);
+      scoresParts.push(homeScore + ':' + awayScore);
     }
-    text=parts.join(' ');
+    var scoresLine=scoresParts.join(' ');
+    text=header + '\n' + scoresLine;
   }
   var hasHistory = text.length>0;
   updateHistoryElementCtl('#set-history-ctl', hasHistory, text);
@@ -509,10 +511,10 @@ function updateHistoryElementCtl(selector, shouldShow, text){
   if(!el.length)
     return;
   if(!shouldShow){
-    el.css('display','none').text('');
+    el.css('display','none').html('');
     return;
   }
-  el.css('display', 'block').text(text);
+  el.css('display', 'block').html(text.replace(/\n/g, '<br>'));
 }
 
 $(document).ready(function(){
