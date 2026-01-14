@@ -123,6 +123,7 @@ scoreboard_query.onSnapshot(
     $('#period').html(scoreboard_data['current_period'])
     $('#custom_label').val(scoreboard_data['custom_label'])
     updateSideLayout();
+    renderSetHistoryCtl(scoreboard_data['set_history']);
   });
 
 function update_db(data){
@@ -482,6 +483,36 @@ function handleClassicScore(team, delta){
     }
   }
   update_db(update);
+}
+
+function renderSetHistoryCtl(history){
+  var items=Array.isArray(history)?history:[];
+  var text='';
+  if(items.length>0){
+    var homeTeam=scoreboard_data['home_team'] || 'Home';
+    var awayTeam=scoreboard_data['away_team'] || 'Away';
+    var parts=[homeTeam + ' - ' + awayTeam + ':'];
+    for(var i=0;i<items.length;i++){
+      var entry=items[i]||{};
+      var homeScore=(entry.home!=null)?entry.home:'-';
+      var awayScore=(entry.away!=null)?entry.away:'-';
+      parts.push(homeScore + ':' + awayScore);
+    }
+    text=parts.join(' ');
+  }
+  var hasHistory = text.length>0;
+  updateHistoryElementCtl('#set-history-ctl', hasHistory, text);
+}
+
+function updateHistoryElementCtl(selector, shouldShow, text){
+  var el=$(selector);
+  if(!el.length)
+    return;
+  if(!shouldShow){
+    el.css('display','none').text('');
+    return;
+  }
+  el.css('display', 'block').text(text);
 }
 
 $(document).ready(function(){

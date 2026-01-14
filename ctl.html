@@ -33,6 +33,21 @@
           font-size: 14px;
         }
       }
+      .set-history {
+        display: none;
+        background-color: #fff;
+        color: #000;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-radius: 4px;
+        padding: 4px 14px;
+        font-size: 12px;
+        min-height: 20px;
+        text-align: center;
+      }
+      .set-history-ctl {
+        width: auto;
+      }
     </style>
   </head>
   <body>
@@ -110,6 +125,16 @@
             </div>
           </div>
         </div>
+        <div class="col-xs-12 col-md-4 hidden"> <!-- BEGIN SET HISTORY -->
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">История сетов</h3>
+            </div>
+            <div class="panel-body">
+              <div id="set-history-ctl" class="set-history set-history-ctl">&nbsp;</div>
+            </div>
+          </div>
+        </div> <!-- END SET HISTORY -->
       </div>
       <div class="row text-center">
         <!-- BEACH MODE block moved below PERIOD block -->
