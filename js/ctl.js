@@ -127,6 +127,7 @@ scoreboard_query.onSnapshot(
   });
 
 function update_db(data){
+  data.lastEdited = firebase.firestore.FieldValue.serverTimestamp();
   scoreboard_query.update(data);
 }
 
@@ -647,7 +648,8 @@ $(document).ready(function(){
       home_side:'left',
       away_side:'right',
       classic_tiebreak_switch_done:true,
-      invert_tablo:invertTablo
+      invert_tablo:invertTablo,
+      lastEdited: firebase.firestore.FieldValue.serverTimestamp()
     });
   });
   $(".period-btn").click(function(){
@@ -749,6 +751,7 @@ $(document).ready(function(){
     update['classic_switch_needed'] = DEL;
     update['classic_switch_message'] = DEL;
     update['beach_switch_message'] = DEL;
+    update['lastEdited'] = firebase.firestore.FieldValue.serverTimestamp();
     scoreboard_query.update(update).then(function(){
       // Немедленно возвращаем белый фон кнопки после успешной записи
       $(".side-switch-btn").css('background-color', '').css('color', '');
