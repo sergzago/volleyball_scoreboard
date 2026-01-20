@@ -49,12 +49,12 @@ scoreboard_query.onSnapshot(
       sideSwitchBtn.css('background-color', '').css('color', '');
     }
     var beachFinished = beachMode && scoreboard_data['beach_match_finished'];
-    if(beachFinished){
+    var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
+    if(beachFinished || classicFinished){
       $(".beach-match-status").removeClass("hidden").text("Матч завершён");
     }else{
       $(".beach-match-status").addClass("hidden").text("");
     }
-    var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
     var matchFinished = beachFinished || classicFinished;
     var pendingNewSet = !!scoreboard_data['pending_new_set'];
     // Determine whether period controls should be enabled:
@@ -129,6 +129,36 @@ scoreboard_query.onSnapshot(
 function update_db(data){
   data.lastEdited = firebase.firestore.FieldValue.serverTimestamp();
   scoreboard_query.update(data);
+}
+
+function saveMatchResult(setHistory, overallHome, overallAway){
+  var isBeach = isBeachMode();
+
+  if(typeof overallHome === 'undefined' || typeof overallAway === 'undefined'){
+    if(isBeach){
+      overallHome = ensureNumber(scoreboard_data['home_sets']);
+      overallAway = ensureNumber(scoreboard_data['away_sets']);
+    }else{
+      overallHome = ensureNumber(scoreboard_data['home_fouls']);
+      overallAway = ensureNumber(scoreboard_data['away_fouls']);
+    }
+  }
+
+  var matchData = {
+    date_time: firebase.firestore.FieldValue.serverTimestamp(),
+    home_team: scoreboard_data['home_team'],
+    away_team: scoreboard_data['away_team'],
+    overall_score: overallHome + ':' + overallAway,
+    sets_score: setHistory || scoreboard_data['set_history'] || [],
+    game_type: isBeach ? 'beach' : 'classic',
+    game_id: game_id
+  };
+
+  matches_collection.add(matchData).then(function(docRef) {
+    console.log('Match result saved with ID: ', docRef.id);
+  }).catch(function(error) {
+    console.error('Error saving match result: ', error);
+  });
 }
 
 function performNewSetUpdate(){
@@ -357,7 +387,11 @@ function applyBeachSetWin(team, homeScore, awayScore, baseUpdate){
     update['next_beach_set']=nextSet;
     update['pending_new_set']=true;
   }
-  update['set_history']=nextSetHistory(homeScore, awayScore);
+  var updatedHistory = nextSetHistory(homeScore, awayScore);
+  update['set_history']=updatedHistory;
+  if(matchFinished) {
+    saveMatchResult(updatedHistory, homeSets, awaySets);
+  }
   update_db(update);
 }
 
@@ -438,7 +472,11 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
   // Сброс очков в новый сет происходит по нажатию кнопки "Новый сет".
   update['home_score']=homeFinal;
   update['away_score']=awayFinal;
-  update['set_history']=nextSetHistory(homeFinal, awayFinal);
+  var updatedHistory = nextSetHistory(homeFinal, awayFinal);
+  update['set_history']=updatedHistory;
+  if(matchFinished) {
+    saveMatchResult(updatedHistory, homeFouls, awayFouls);
+  }
   update_db(update);
 }
 
