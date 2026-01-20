@@ -116,6 +116,10 @@ scoreboard_query.onSnapshot(
     $('.home_team').html(scoreboard_data['home_team'])
     $('#in_home_team').val(scoreboard_data['home_team'])
     $('#in_away_team').val(scoreboard_data['away_team'])
+    $('#in_tournament').val(scoreboard_data['tournament_name'] || 'НВЛ');
+    if(typeof scoreboard_data['tournament_name'] === 'undefined'){
+      update_db({tournament_name: 'НВЛ'});
+    }
     $('#col_home_team').val(scoreboard_data['home_color'])
     $('#col_away_team').val(scoreboard_data['away_color'])
     $('#home_score').html(scoreboard_data['home_score'])
@@ -148,6 +152,7 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     date_time: firebase.firestore.FieldValue.serverTimestamp(),
     home_team: scoreboard_data['home_team'],
     away_team: scoreboard_data['away_team'],
+    tournament_name: scoreboard_data['tournament_name'] || 'НВЛ',
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
@@ -655,6 +660,7 @@ $(document).ready(function(){
       away_color: $("#col_away_team").val(),
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
+      tournament_name: $("#in_tournament").val() || "НВЛ",
     };
     console.log(update);
     update_db(update);
@@ -674,6 +680,7 @@ $(document).ready(function(){
       away_color: $("#col_away_team").val(),
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
+      tournament_name: $("#in_tournament").val(),
       home_sets:0,
       away_sets:0,
       beach_mode:beachEnabled,
