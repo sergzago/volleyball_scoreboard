@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Результаты матчей</title>
+    <script src="js/firebase-app.js"></script>
+    <script src="js/firebase-firestore.js"></script>
+    <link href="css/css.css" rel="stylesheet">
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+      .results-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        padding: 20px;
+      }
+      
+      .calendar-panel {
+        flex: 0 0 320px;
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      
+      .results-panel {
+        flex: 1;
+        min-width: 400px;
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      
+      /* Calendar Styles */
+      .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .today-button {
+        background: #225378;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .today-button:hover {
+        background: #1b415e;
+      }
+      
+      .calendar-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #225378;
+      }
+      
+      .calendar-nav {
+        display: flex;
+        gap: 5px;
+      }
+      
+      .calendar-nav button {
+        background: #1695A3;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      
+      .calendar-nav button:hover {
+        background: #137a86;
+      }
+      
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+      }
+      
+      .calendar-day-header {
+        text-align: center;
+        font-weight: bold;
+        padding: 8px 4px;
+        font-size: 12px;
+        color: #777;
+      }
+      
+      .calendar-day {
+        text-align: center;
+        padding: 8px 4px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+      
+      .calendar-day:hover {
+        background: #e0f7f8;
+      }
+      
+      .calendar-day.other-month {
+        color: #ccc;
+      }
+      
+      .calendar-day.today {
+        background: #ACF0F2;
+        font-weight: bold;
+      }
+      
+      .calendar-day.selected {
+        background: #1695A3;
+        color: #fff;
+      }
+      
+      .calendar-day.in-range {
+        background: #d4f4f5;
+      }
+      
+      .calendar-day.range-start,
+      .calendar-day.range-end {
+        background: #1695A3;
+        color: #fff;
+      }
+      
+      /* Date Range Inputs */
+      .date-inputs {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+      }
+      
+      .date-inputs label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+        color: #555;
+      }
+      
+      .date-inputs input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+      
+      .date-inputs button {
+        width: 100%;
+        background: #225378;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 10px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      
+      .date-inputs button:hover {
+        background: #1b415e;
+      }
+      
+      /* Results Table */
+      .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      
+      .results-header h2 {
+        margin: 0;
+        color: #225378;
+      }
+      
+      .results-count {
+        color: #777;
+        font-size: 14px;
+      }
+      
+      .results-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      
+      .results-table th {
+        background: #225378;
+        color: #fff;
+        padding: 12px 8px;
+        text-align: left;
+        font-size: 14px;
+      }
+
+      .game-type-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+
+      .game-type-classic {
+        background: #1695A3;
+        color: #fff;
+      }
+
+      .game-type-beach {
+        background: #EB7F00;
+        color: #fff;
+      }
+      
+      .results-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #eee;
+        font-size: 14px;
+      }
+      
+      .results-table tr:hover {
+        background: #f9f9f9;
+      }
+      
+      .tournament-group {
+        background: #f5f5f5;
+        font-weight: bold;
+        color: #225378;
+      }
+      
+      .tournament-group td {
+        padding: 8px;
+        font-size: 15px;
+        border-bottom: 2px solid #225378;
+      }
+      
+      .match-score {
+        font-weight: bold;
+        font-size: 16px;
+        color: #1695A3;
+      }
+      
+      .sets-score {
+        font-size: 12px;
+        color: #777;
+      }
+      
+      .match-date {
+        white-space: nowrap;
+        color: #555;
+      }
+      
+      .match-time {
+        font-size: 12px;
+        color: #999;
+      }
+      
+      .no-results {
+        text-align: center;
+        padding: 40px;
+        color: #777;
+      }
+      
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #777;
+      }
+      
+      /* Mobile Responsiveness */
+      @media (max-width: 768px) {
+        .results-container {
+          flex-direction: column;
+          padding: 10px;
+          gap: 15px;
+        }
+
+        .calendar-panel {
+          flex: none;
+          width: 100%;
+          order: 1;
+        }
+
+        .results-panel {
+          flex: none;
+          width: 100%;
+          min-width: auto;
+          order: 2;
+        }
+
+        .calendar-header {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .calendar-header h3 {
+          flex: 1;
+          min-width: 150px;
+        }
+
+        .calendar-nav {
+          order: 2;
+          flex: 0 0 auto;
+        }
+
+        .today-button {
+          order: 3;
+          flex: 0 0 100%;
+          margin-bottom: 10px;
+        }
+
+        .calendar-grid {
+          font-size: 14px;
+        }
+
+        .calendar-day {
+          padding: 6px 2px;
+          font-size: 14px;
+        }
+
+        .calendar-day-header {
+          padding: 6px 2px;
+          font-size: 11px;
+        }
+
+        .date-inputs {
+          margin-top: 10px;
+        }
+
+        .date-inputs input,
+        .date-inputs button {
+          font-size: 16px; /* Prevent zoom on iOS */
+        }
+
+        /* Table responsiveness */
+        .results-table {
+          font-size: 14px;
+        }
+
+        .results-table th,
+        .results-table td {
+          padding: 6px 4px;
+          font-size: 12px;
+        }
+
+        .tournament-group td {
+          padding: 6px 4px;
+          font-size: 13px;
+        }
+
+        .match-score {
+          font-size: 14px;
+        }
+
+        .game-type-badge {
+          font-size: 10px;
+          padding: 1px 4px;
+        }
+
+        /* Make table horizontally scrollable on very small screens */
+        .results-panel {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .results-table {
+          min-width: 600px; /* Ensure table doesn't shrink too much */
+        }
+      }
+
+      @media (max-width: 480px) {
+        .results-container {
+          padding: 5px;
+          gap: 10px;
+        }
+
+        .calendar-panel,
+        .results-panel {
+          padding: 10px;
+        }
+
+        .calendar-header h3 {
+          font-size: 16px;
+        }
+
+        .calendar-nav button,
+        .today-button {
+          padding: 4px 8px;
+          font-size: 12px;
+        }
+
+        .calendar-day,
+        .calendar-day-header {
+          padding: 4px 2px;
+          font-size: 12px;
+        }
+
+        .results-header h2 {
+          font-size: 18px;
+        }
+
+        .results-count {
+          font-size: 12px;
+        }
+
+        .results-table th,
+        .results-table td {
+          padding: 4px 2px;
+          font-size: 11px;
+        }
+
+        .tournament-group td {
+          padding: 4px 2px;
+          font-size: 12px;
+        }
+
+        .match-score {
+          font-size: 13px;
+        }
+
+        .game-type-badge {
+          font-size: 9px;
+          padding: 1px 3px;
+        }
+
+        .match-date {
+          font-size: 11px;
+        }
+
+        .match-time {
+          font-size: 10px;
+        }
+      }
+
+      @media (max-width: 320px) {
+        .calendar-header {
+          justify-content: center;
+        }
+
+        .calendar-nav {
+          order: 1;
+          margin-bottom: 5px;
+        }
+
+        .today-button {
+          order: 2;
+          flex: 0 0 auto;
+          margin-bottom: 0;
+        }
+
+        .calendar-header h3 {
+          order: 3;
+          text-align: center;
+          flex: 1;
+        }
+      }
+    </style>
+</head>
+<body>
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12">
+          <h1 class="text-center">Результаты матчей</h1>
+        </div>
+      </div>
+      
+      <div class="results-container">
+        <!-- Calendar Panel -->
+        <div class="calendar-panel">
+          <div class="calendar-header">
+            <button class="btn btn-sm" id="prevMonth">&lt;</button>
+            <h3 id="currentMonth"></h3>
+            <button class="btn btn-sm" id="nextMonth">&gt;</button>
+          </div>
+
+          <button class="today-button" id="todayButton">Сегодня</button>
+          
+          <div class="calendar-grid" id="calendarGrid">
+            <div class="calendar-day-header">Пн</div>
+            <div class="calendar-day-header">Вт</div>
+            <div class="calendar-day-header">Ср</div>
+            <div class="calendar-day-header">Чт</div>
+            <div class="calendar-day-header">Пт</div>
+            <div class="calendar-day-header">Сб</div>
+            <div class="calendar-day-header">Вс</div>
+          </div>
+          
+          <div class="date-inputs">
+            <label for="dateFrom">Дата начала:</label>
+            <input type="date" id="dateFrom">
+            
+            <label for="dateTo">Дата окончания:</label>
+            <input type="date" id="dateTo">
+            
+            <button id="loadResults">Загрузить результаты</button>
+          </div>
+        </div>
+        
+        <!-- Results Panel -->
+        <div class="results-panel">
+          <div class="results-header">
+            <h2>Результаты</h2>
+            <span class="results-count" id="resultsCount"></span>
+          </div>
+          
+          <div id="resultsContainer">
+            <div class="loading">Выберите период для просмотра результатов</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Firebase config
+      var config = {
+        apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
+        authDomain: "myvolleyscore.firebaseapp.com",
+        projectId: "myvolleyscore",
+        storageBucket: "myvolleyscore.firebasestorage.app",
+        messagingSenderId: "102858014506",
+        appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
+        measurementId: "G-6MQ6ZLE52N"
+      };
+      
+      firebase.initializeApp(config);
+      var db = firebase.firestore();
+      var matches_collection = db.collection('matches');
+      
+      // Calendar state
+      var currentDate = new Date();
+      var currentMonth = currentDate.getMonth();
+      var currentYear = currentDate.getFullYear();
+      var selectedStartDate = null;
+      var selectedEndDate = null;
+      var selectingStart = true;
+      
+      // Month names in Russian
+      var monthNames = [
+        'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+      ];
+      
+      // Initialize calendar
+      function initCalendar() {
+        renderCalendar();
+        
+        // Set default date range to current month
+        var firstDay = new Date(currentYear, currentMonth, 1);
+        var lastDay = new Date(currentYear, currentMonth + 1, 0);
+        
+        selectedStartDate = firstDay;
+        selectedEndDate = lastDay;
+        
+        updateDateInputs();
+        renderCalendar();
+      }
+      
+      function renderCalendar() {
+        var grid = document.getElementById('calendarGrid');
+        var monthLabel = document.getElementById('currentMonth');
+        
+        monthLabel.textContent = monthNames[currentMonth] + ' ' + currentYear;
+        
+        // Clear existing days (keep headers)
+        var days = grid.querySelectorAll('.calendar-day');
+        days.forEach(function(day) {
+          day.remove();
+        });
+        
+        // Get first day of month and number of days
+        var firstDay = new Date(currentYear, currentMonth, 1);
+        var lastDay = new Date(currentYear, currentMonth + 1, 0);
+        var numDays = lastDay.getDate();
+        
+        // Get day of week for first day (0=Sunday, adjust to Monday=0)
+        var startDayOfWeek = firstDay.getDay();
+        startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+        
+        // Days from previous month
+        var prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+        for (var i = startDayOfWeek - 1; i >= 0; i--) {
+          var dayNum = prevMonthLastDay - i;
+          var dayDate = new Date(currentYear, currentMonth - 1, dayNum);
+          createDayElement(grid, dayNum, dayDate, true);
+        }
+        
+        // Days of current month
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        for (var i = 1; i <= numDays; i++) {
+          var dayDate = new Date(currentYear, currentMonth, i);
+          var isToday = dayDate.getTime() === today.getTime();
+          createDayElement(grid, i, dayDate, false, isToday);
+        }
+        
+        // Days from next month
+        var totalCells = startDayOfWeek + numDays;
+        var remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+        for (var i = 1; i <= remainingCells; i++) {
+          var dayDate = new Date(currentYear, currentMonth + 1, i);
+          createDayElement(grid, i, dayDate, true);
+        }
+      }
+      
+      function createDayElement(grid, dayNum, date, isOtherMonth, isToday) {
+        var dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day';
+        dayEl.textContent = dayNum;
+        dayEl.dataset.date = date.toISOString();
+        
+        if (isOtherMonth) {
+          dayEl.classList.add('other-month');
+        }
+        
+        if (isToday) {
+          dayEl.classList.add('today');
+        }
+        
+        // Check if in range
+        if (selectedStartDate && selectedEndDate) {
+          var dateTime = date.getTime();
+          var startTime = selectedStartDate.getTime();
+          var endTime = selectedEndDate.getTime();
+          
+          if (dateTime === startTime) {
+            dayEl.classList.add('range-start');
+          } else if (dateTime === endTime) {
+            dayEl.classList.add('range-end');
+          } else if (dateTime > startTime && dateTime < endTime) {
+            dayEl.classList.add('in-range');
+          }
+        } else if (selectedStartDate) {
+          if (date.getTime() === selectedStartDate.getTime()) {
+            dayEl.classList.add('selected');
+          }
+        }
+        
+        dayEl.addEventListener('click', function() {
+          handleDayClick(date);
+        });
+        
+        grid.appendChild(dayEl);
+      }
+      
+      function handleDayClick(date) {
+        if (selectingStart || !selectedStartDate) {
+          selectedStartDate = date;
+          selectedEndDate = null;
+          selectingStart = false;
+        } else {
+          if (date < selectedStartDate) {
+            selectedEndDate = selectedStartDate;
+            selectedStartDate = date;
+          } else {
+            selectedEndDate = date;
+          }
+          selectingStart = true;
+        }
+        
+        updateDateInputs();
+        renderCalendar();
+      }
+      
+      function updateDateInputs() {
+        var fromInput = document.getElementById('dateFrom');
+        var toInput = document.getElementById('dateTo');
+        
+        if (selectedStartDate) {
+          fromInput.value = formatDateForInput(selectedStartDate);
+        }
+        
+        if (selectedEndDate) {
+          toInput.value = formatDateForInput(selectedEndDate);
+        }
+      }
+      
+      function formatDateForInput(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+      }
+      
+      function formatDateDisplay(date) {
+        var day = String(date.getDate()).padStart(2, '0');
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var year = date.getFullYear();
+        return day + '.' + month + '.' + year;
+      }
+      
+      function formatTimeDisplay(date) {
+        var hours = String(date.getHours()).padStart(2, '0');
+        var minutes = String(date.getMinutes()).padStart(2, '0');
+        return hours + ':' + minutes;
+      }
+      
+      // Navigation
+      document.getElementById('prevMonth').addEventListener('click', function() {
+        currentMonth--;
+        if (currentMonth < 0) {
+          currentMonth = 11;
+          currentYear--;
+        }
+        renderCalendar();
+      });
+      
+      document.getElementById('nextMonth').addEventListener('click', function() {
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+        renderCalendar();
+      });
+      
+      // Date inputs change
+      document.getElementById('dateFrom').addEventListener('change', function() {
+        var value = this.value;
+        if (value) {
+          selectedStartDate = new Date(value);
+          renderCalendar();
+        }
+      });
+      
+      document.getElementById('dateTo').addEventListener('change', function() {
+        var value = this.value;
+        if (value) {
+          selectedEndDate = new Date(value);
+          selectingStart = true;
+          renderCalendar();
+        }
+      });
+      
+      // Today button
+      document.getElementById('todayButton').addEventListener('click', function() {
+        goToToday();
+      });
+
+      // Load results
+      document.getElementById('loadResults').addEventListener('click', function() {
+        loadMatchResults();
+      });
+      
+      function loadMatchResults() {
+        if (!selectedStartDate || !selectedEndDate) {
+          alert('Выберите период');
+          return;
+        }
+        
+        var container = document.getElementById('resultsContainer');
+        container.innerHTML = '<div class="loading">Загрузка...</div>';
+        
+        // Set time to start and end of day
+        var startDate = new Date(selectedStartDate);
+        startDate.setHours(0, 0, 0, 0);
+        
+        var endDate = new Date(selectedEndDate);
+        endDate.setHours(23, 59, 59, 999);
+        
+        matches_collection
+          .where('date_time', '>=', startDate)
+          .where('date_time', '<=', endDate)
+          .get()
+          .then(function(querySnapshot) {
+            var matches = [];
+            querySnapshot.forEach(function(doc) {
+              var data = doc.data();
+              data.id = doc.id;
+              // Convert Firestore timestamp to Date
+              if (data.date_time && data.date_time.toDate) {
+                data.date_time = data.date_time.toDate();
+              }
+              matches.push(data);
+            });
+            
+            displayResults(matches);
+          })
+          .catch(function(error) {
+            console.error('Error loading matches:', error);
+            container.innerHTML = '<div class="no-results">Ошибка загрузки данных</div>';
+          });
+      }
+      
+      function displayResults(matches) {
+        var container = document.getElementById('resultsContainer');
+        var countEl = document.getElementById('resultsCount');
+        
+        if (matches.length === 0) {
+          container.innerHTML = '<div class="no-results">Нет матчей за выбранный период</div>';
+          countEl.textContent = '';
+          return;
+        }
+        
+        countEl.textContent = 'Найдено: ' + matches.length;
+        
+        // Sort matches by tournament, game type, date, time
+        matches.sort(function(a, b) {
+          // First by tournament name
+          var tournamentA = (a.tournament_name || 'Без турнира').toLowerCase();
+          var tournamentB = (b.tournament_name || 'Без турнира').toLowerCase();
+          if (tournamentA !== tournamentB) {
+            return tournamentA.localeCompare(tournamentB);
+          }
+
+          // Then by game type (classic before beach)
+          var gameTypeA = a.game_type || 'classic';
+          var gameTypeB = b.game_type || 'classic';
+          if (gameTypeA !== gameTypeB) {
+            if (gameTypeA === 'classic' && gameTypeB === 'beach') return -1;
+            if (gameTypeA === 'beach' && gameTypeB === 'classic') return 1;
+          }
+
+          // Then by date/time
+          var dateA = a.date_time ? a.date_time.getTime() : 0;
+          var dateB = b.date_time ? b.date_time.getTime() : 0;
+          return dateA - dateB;
+        });
+        
+        // Group by tournament
+        var tournaments = {};
+        matches.forEach(function(match) {
+          var tournament = match.tournament_name || 'Без турнира';
+          if (!tournaments[tournament]) {
+            tournaments[tournament] = [];
+          }
+          tournaments[tournament].push(match);
+        });
+        
+        // Build table
+        var html = '<table class="results-table">';
+        html += '<thead><tr>';
+        html += '<th>Дата</th>';
+        html += '<th>Тип игры</th>';
+        html += '<th>Домашняя команда</th>';
+        html += '<th>Счёт</th>';
+        html += '<th>Гостевая команда</th>';
+        html += '<th>По сетам</th>';
+        html += '</tr></thead>';
+        html += '<tbody>';
+        
+        Object.keys(tournaments).sort().forEach(function(tournamentName) {
+          // Tournament header row
+          html += '<tr class="tournament-group">';
+          html += '<td colspan="6">' + escapeHtml(tournamentName) + '</td>';
+          html += '</tr>';
+          
+          // Matches in tournament
+          tournaments[tournamentName].forEach(function(match) {
+            html += '<tr>';
+
+            // Date and time
+            html += '<td class="match-date">';
+            if (match.date_time) {
+              html += formatDateDisplay(match.date_time);
+              html += '<br><span class="match-time">' + formatTimeDisplay(match.date_time) + '</span>';
+            } else {
+              html += '-';
+            }
+            html += '</td>';
+
+            // Game type
+            var gameType = match.game_type || 'classic';
+            var gameTypeLabel = gameType === 'beach' ? 'Пляжный' : 'Классический';
+            var gameTypeClass = gameType === 'beach' ? 'game-type-beach' : 'game-type-classic';
+            html += '<td><span class="game-type-badge ' + gameTypeClass + '">' + gameTypeLabel + '</span></td>';
+
+            // Home team
+            html += '<td>' + escapeHtml(match.home_team || '-') + '</td>';
+
+            // Overall score
+            html += '<td class="match-score">' + escapeHtml(match.overall_score || '-') + '</td>';
+
+            // Away team
+            html += '<td>' + escapeHtml(match.away_team || '-') + '</td>';
+
+            // Sets score
+            html += '<td class="sets-score">';
+            if (match.sets_score && Array.isArray(match.sets_score)) {
+              var setsText = match.sets_score.map(function(set) {
+                return (set.home !== undefined ? set.home : '-') + ':' + (set.away !== undefined ? set.away : '-');
+              }).join(', ');
+              html += setsText || '-';
+            } else {
+              html += '-';
+            }
+            html += '</td>';
+
+            html += '</tr>';
+          });
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      }
+      
+      function escapeHtml(text) {
+        if (!text) return '';
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function goToToday() {
+        var today = new Date();
+        currentMonth = today.getMonth();
+        currentYear = today.getFullYear();
+
+        // Set today as both start and end date
+        selectedStartDate = new Date(today);
+        selectedEndDate = new Date(today);
+        selectingStart = true;
+
+        updateDateInputs();
+        renderCalendar();
+      }
+
+      // Initialize
+      initCalendar();
+    </script>
+</body>
+</html>

@@ -34,6 +34,10 @@
                 <a class="tablo-btn btn btn-info" target="_blank" href="#">Табло</a>
                 <br>
                 <span id="tablo_link"></span>
+                <hr />
+                <a class="results-btn btn btn-info" target="_blank" href="#">Результаты матчей</a>
+                <br>
+                <span id="results_link"></span>
               </div>
             </div>
           </div>
@@ -45,15 +49,18 @@
           var sb=window.location.href.replace(/\/[^\/]*$/,"/scoreboard.html?game="+$(this).val());
           var ctl=window.location.href.replace(/\/[^\/]*$/,"/ctl.html?game="+$(this).val());
           var tablo=window.location.href.replace(/\/[^\/]*$/,"/tablo.html?game="+$(this).val());
+          var results=window.location.href.replace(/\/[^\/]*$/,"/results.html");
           $(".ctl-btn").attr('href',ctl);
           $("#ctl_link").html(ctl);
           $(".scoreboard-btn").attr('href',sb);
           $("#scoreboard_link").html(sb);
           $(".tablo-btn").attr('href',tablo);
           $("#tablo_link").html(tablo);
+          $(".results-btn").attr('href',results);
+          $("#results_link").html(results);
         });
         $("#game_id").val(uuid()).change();
       </script>
-  
+
   </body>
 </html>
