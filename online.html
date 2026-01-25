@@ -312,64 +312,20 @@
             
             console.log('Loading games for date range:', today.toISOString(), 'to', tomorrow.toISOString());
             
-            // Query matches from today (including finished games)
-            matches_collection
-                .where('date_time', '>=', today)
-                .where('date_time', '<', tomorrow)
+            // Query scoreboard games that had changes today (active games)
+            scoreboard_collection
+                .where('lastEdited', '>=', today)
                 .get()
-                .then(function(matchSnapshot) {
-                    var finishedMatchIds = new Set();
-                    var finishedMatches = [];
-                    
-                    matchSnapshot.forEach(function(doc) {
-                        var data = doc.data();
-                        finishedMatchIds.add(doc.id);
-                        finishedMatches.push({
-                            id: doc.id,
-                            data: data,
-                            isFinished: true
-                        });
-                    });
-                    
-                    console.log('Found', matchSnapshot.size, 'finished matches today');
-                    
-                    // Query scoreboard games that had changes today (active games)
-                    return scoreboard_collection
-                        .where('lastEdited', '>=', today)
-                        .get()
-                        .then(function(scoreboardSnapshot) {
-                            return { scoreboardSnapshot, finishedMatches, finishedMatchIds };
-                        });
-                })
-                .then(function(data) {
-                    var scoreboardSnapshot = data.scoreboardSnapshot;
-                    var finishedMatches = data.finishedMatches;
-                    var finishedMatchIds = data.finishedMatchIds;
-                    
+                .then(function(scoreboardSnapshot) {
                     console.log('Found', scoreboardSnapshot.size, 'scoreboard games with changes today');
                     
                     var allGames = [];
-                    
-                    // Add finished matches
-                    finishedMatches.forEach(function(match) {
-                        allGames.push({
-                            id: match.id,
-                            data: match.data,
-                            isFinished: true,
-                            gameType: match.data.game_type || 'classic'
-                        });
-                    });
                     
                     // Add active games
                     scoreboardSnapshot.forEach(function(doc) {
                         var data = doc.data();
                         var gameId = doc.id;
                         
-                        // Skip if this game is already in finished matches
-                        if (finishedMatchIds.has(gameId)) {
-                            console.log('Skipping game', gameId, '- already in finished matches');
-                            return;
-                        }
                         
                         console.log('Processing active game:', gameId, data.home_team, 'vs', data.away_team);
                         
@@ -392,8 +348,41 @@
                                 if (updatedData.lastEdited && updatedData.lastEdited.toDate) {
                                     updatedData.lastEdited = updatedData.lastEdited.toDate();
                                 }
-                                // Update only the score, not the entire table
-                                updateGameScore(gameId, updatedData);
+                                
+                                // Check if game should be moved to finished
+                                var gameType = data.beach_mode ? 'beach' : 'classic';
+                                var setsWon = calculateSetsWon(updatedData, gameType);
+                                var isFinished = isGameFinished(updatedData, gameType);
+                                
+                                if (isFinished) {
+                                    console.log('Game', gameId, 'finished, moving to finished matches');
+                                    // Remove from active games
+                                    removeGame(gameId);
+                                    
+                                    // Add to finished matches (simulate match document)
+                                    var finishedGameData = {
+                                        home_team: updatedData.home_team,
+                                        away_team: updatedData.away_team,
+                                        tournament_name: updatedData.tournament_name,
+                                        game_type: gameType,
+                                        set_history: updatedData.set_history || [],
+                                        home_sets: setsWon.homeSets,
+                                        away_sets: setsWon.awaySets
+                                    };
+                                    
+                                    games[gameId] = {
+                                        id: gameId,
+                                        data: finishedGameData,
+                                        isFinished: true,
+                                        gameType: gameType
+                                    };
+                                    
+                                    lastGameStates[gameId] = JSON.parse(JSON.stringify(finishedGameData));
+                                    renderGames();
+                                } else {
+                                    // Update only the score, not the entire table
+                                    updateGameScore(gameId, updatedData);
+                                }
                             } else {
                                 // Game was deleted or moved to finished - remove it
                                 removeGame(gameId);
@@ -583,6 +572,11 @@
             
             // Filter games - show all games without filters
             var filteredGames = Object.values(games);
+            
+            console.log('Rendering', filteredGames.length, 'games');
+            filteredGames.forEach(function(game) {
+                console.log('Game:', game.id, game.data.home_team, 'vs', game.data.away_team, 'Type:', game.gameType, 'Finished:', game.isFinished);
+            });
             
             // Group by game type and tournament
             var groupedGames = {};
