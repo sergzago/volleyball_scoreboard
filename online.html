@@ -540,13 +540,13 @@
                     var maxSets = gameType === 'beach' ? 3 : 5;
                     var setHistory = updatedData.set_history || [];
                     
-                    // Update existing set cells
+                    // Update existing set cells (skip first two cells: current score and overall score)
                     for (var i = 0; i < maxSets && i < setCells.length - 2; i++) {
                         if (i < setHistory.length) {
                             var set = setHistory[i];
-                            setCells[i + 2].textContent = (set.home !== undefined ? set.home : '-') + ':' + (set.away !== undefined ? set.away : '-');
+                            setCells[i + 1].textContent = (set.home !== undefined ? set.home : '-') + ':' + (set.away !== undefined ? set.away : '-');
                         } else {
-                            setCells[i + 2].textContent = '-';
+                            setCells[i + 1].textContent = '-';
                         }
                     }
                     
