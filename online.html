@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Онлайн результаты</title>
+    <script src="js/firebase-app.js"></script>
+    <script src="js/firebase-firestore.js"></script>
+    <link href="css/css.css" rel="stylesheet">
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #225378;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #225378;
+            padding-bottom: 10px;
+        }
+        
+        
+        .refresh-btn {
+            background: #225378;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .refresh-btn:hover {
+            background: #1b415e;
+        }
+        
+        .games-container {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .game-section {
+            margin-bottom: 30px;
+        }
+        
+        .section-header {
+            background: #225378;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .game-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .game-table th {
+            background: #1695A3;
+            color: white;
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            border-right: 1px solid #e0f7f8;
+        }
+        
+        .game-table th:last-child {
+            border-right: none;
+        }
+        
+        .game-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+            border-right: 1px solid #f0f0f0;
+        }
+        
+        .game-table td:last-child {
+            border-right: none;
+        }
+        
+        .game-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .team-name {
+            font-weight: bold;
+            color: #333;
+            text-align: left;
+            padding-left: 15px;
+        }
+        
+        .score-current {
+            font-weight: bold;
+            color: #1695A3;
+            font-size: 18px;
+        }
+        
+        .score-set {
+            font-weight: bold;
+            color: #225378;
+            font-size: 16px;
+        }
+        
+        .game-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-right: 8px;
+        }
+        
+        .game-type-classic {
+            background: #1695A3;
+            color: #fff;
+        }
+        
+        .game-type-beach {
+            background: #EB7F00;
+            color: #fff;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background: #4caf50;
+            color: #fff;
+        }
+        
+        .status-finished {
+            background: #f44336;
+            color: #fff;
+        }
+        
+        .no-games {
+            text-align: center;
+            padding: 40px;
+            color: #777;
+            font-size: 16px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        
+        .last-update {
+            text-align: right;
+            color: #777;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #777;
+            font-size: 16px;
+        }
+        
+        /* Responsive styles */
+        @media (max-width: 768px) {
+            
+            .game-table {
+                font-size: 12px;
+            }
+            
+            .game-table th,
+            .game-table td {
+                padding: 8px 6px;
+            }
+            
+            .team-name {
+                padding-left: 8px;
+                font-size: 13px;
+            }
+            
+            .score-current {
+                font-size: 16px;
+            }
+            
+            .score-set {
+                font-size: 14px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .game-table {
+                font-size: 11px;
+            }
+            
+            .game-table th,
+            .game-table td {
+                padding: 6px 4px;
+            }
+            
+            .team-name {
+                font-size: 12px;
+            }
+            
+            .score-current {
+                font-size: 14px;
+            }
+            
+            .score-set {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Онлайн результаты матчей</h1>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="refresh-btn" id="refreshBtn">Обновить</button>
+        </div>
+        
+        <div id="gamesContainer">
+            <div class="loading">Загрузка игр...</div>
+        </div>
+        
+        <div class="last-update" id="lastUpdate"></div>
+    </div>
+
+    <script>
+        // Используем конфигурацию из common.js
+        var config = {
+            apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
+            authDomain: "myvolleyscore.firebaseapp.com",
+            projectId: "myvolleyscore",
+            storageBucket: "myvolleyscore.firebasestorage.app",
+            messagingSenderId: "102858014506",
+            appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
+            measurementId: "G-6MQ6ZLE52N"
+        };
+
+        firebase.initializeApp(config);
+        var db = firebase.firestore();
+        var scoreboard_collection = db.collection('volleyball');
+        var matches_collection = db.collection('matches');
+        
+        // State
+        var games = {};
+        var unsubscribeFunctions = [];
+        var lastGameStates = {}; // Для отслеживания предыдущих состояний игр
+        
+        // Initialize
+        function init() {
+            setupEventListeners();
+            loadGames();
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('refreshBtn').addEventListener('click', loadGames);
+        }
+        
+        function loadGames() {
+            // Show loading indicator
+            document.getElementById('gamesContainer').innerHTML = '<div class="loading">Загрузка игр...</div>';
+            
+            // Clear existing listeners
+            unsubscribeFunctions.forEach(unsub => unsub());
+            unsubscribeFunctions = [];
+            games = {};
+            lastGameStates = {};
+            
+            // Get today's date range
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+            var tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            console.log('Loading games for date range:', today.toISOString(), 'to', tomorrow.toISOString());
+            
+            // Query matches from today (including finished games)
+            matches_collection
+                .where('date_time', '>=', today)
+                .where('date_time', '<', tomorrow)
+                .get()
+                .then(function(matchSnapshot) {
+                    var finishedMatchIds = new Set();
+                    var finishedMatches = [];
+                    
+                    matchSnapshot.forEach(function(doc) {
+                        var data = doc.data();
+                        finishedMatchIds.add(doc.id);
+                        finishedMatches.push({
+                            id: doc.id,
+                            data: data,
+                            isFinished: true
+                        });
+                    });
+                    
+                    console.log('Found', matchSnapshot.size, 'finished matches today');
+                    
+                    // Query scoreboard games that had changes today (active games)
+                    return scoreboard_collection
+                        .where('lastEdited', '>=', today)
+                        .get()
+                        .then(function(scoreboardSnapshot) {
+                            return { scoreboardSnapshot, finishedMatches, finishedMatchIds };
+                        });
+                })
+                .then(function(data) {
+                    var scoreboardSnapshot = data.scoreboardSnapshot;
+                    var finishedMatches = data.finishedMatches;
+                    var finishedMatchIds = data.finishedMatchIds;
+                    
+                    console.log('Found', scoreboardSnapshot.size, 'scoreboard games with changes today');
+                    
+                    var allGames = [];
+                    
+                    // Add finished matches
+                    finishedMatches.forEach(function(match) {
+                        allGames.push({
+                            id: match.id,
+                            data: match.data,
+                            isFinished: true,
+                            gameType: match.data.game_type || 'classic'
+                        });
+                    });
+                    
+                    // Add active games
+                    scoreboardSnapshot.forEach(function(doc) {
+                        var data = doc.data();
+                        var gameId = doc.id;
+                        
+                        // Skip if this game is already in finished matches
+                        if (finishedMatchIds.has(gameId)) {
+                            console.log('Skipping game', gameId, '- already in finished matches');
+                            return;
+                        }
+                        
+                        console.log('Processing active game:', gameId, data.home_team, 'vs', data.away_team);
+                        
+                        // Convert Firestore timestamp to Date
+                        if (data.lastEdited && data.lastEdited.toDate) {
+                            data.lastEdited = data.lastEdited.toDate();
+                        }
+                        
+                        allGames.push({
+                            id: gameId,
+                            data: data,
+                            isFinished: false,
+                            gameType: data.beach_mode ? 'beach' : 'classic'
+                        });
+                        
+                        // Set up real-time listener for active games
+                        var unsub = scoreboard_collection.doc(gameId).onSnapshot(function(doc) {
+                            if (doc.exists) {
+                                var updatedData = doc.data();
+                                if (updatedData.lastEdited && updatedData.lastEdited.toDate) {
+                                    updatedData.lastEdited = updatedData.lastEdited.toDate();
+                                }
+                                // Update only the score, not the entire table
+                                updateGameScore(gameId, updatedData);
+                            } else {
+                                // Game was deleted or moved to finished - remove it
+                                removeGame(gameId);
+                            }
+                        });
+                        
+                        unsubscribeFunctions.push(unsub);
+                    });
+                    
+                    if (allGames.length === 0) {
+                        document.getElementById('gamesContainer').innerHTML = 
+                            '<div class="no-games">Нет матчей на сегодня</div>';
+                    } else {
+                        console.log('Successfully loaded', allGames.length, 'games (active + finished)');
+                        games = {};
+                        allGames.forEach(function(game) {
+                            games[game.id] = game;
+                            lastGameStates[game.id] = JSON.parse(JSON.stringify(game.data)); // Сохраняем начальное состояние
+                        });
+                        renderGames();
+                    }
+                    updateLastUpdateTime();
+                })
+                .catch(function(error) {
+                    console.error('Error loading games:', error);
+                    var errorMessage = 'Ошибка загрузки данных';
+                    if (error.code === 'permission-denied') {
+                        errorMessage = 'Ошибка доступа к базе данных. Проверьте настройки Firebase.';
+                    } else if (error.code === 'unavailable') {
+                        errorMessage = 'Нет подключения к интернету. Проверьте соединение.';
+                    } else if (error.code === 'not-found') {
+                        errorMessage = 'Игры не найдены. Возможно, нет матчей на сегодня.';
+                    } else if (error.code === 'failed-precondition') {
+                        errorMessage = 'Ошибка базы данных. Проверьте индексы в Firestore.';
+                    }
+                    document.getElementById('gamesContainer').innerHTML = 
+                        '<div class="no-games">' + errorMessage + '</div>';
+                });
+        }
+        
+        function calculateSetsWon(data, gameType) {
+            if (gameType === 'beach') {
+                // Для пляжного волейбола используем home_sets и away_sets
+                return {
+                    homeSets: data.home_sets || 0,
+                    awaySets: data.away_sets || 0
+                };
+            } else {
+                // Для классического волейбола считаем по сетам из set_history
+                var homeSets = 0;
+                var awaySets = 0;
+                var setHistory = data.set_history || [];
+                
+                setHistory.forEach(function(set) {
+                    if (set.home !== undefined && set.away !== undefined) {
+                        if (set.home > set.away) {
+                            homeSets++;
+                        } else if (set.away > set.home) {
+                            awaySets++;
+                        }
+                    }
+                });
+                
+                return {
+                    homeSets: homeSets,
+                    awaySets: awaySets
+                };
+            }
+        }
+        
+        function isGameFinished(data, gameType) {
+            if (gameType === 'beach') {
+                // Пляжный волейбол: игра окончена, когда одна из команд выиграла 2 сета
+                var setsWon = calculateSetsWon(data, gameType);
+                return setsWon.homeSets >= 2 || setsWon.awaySets >= 2;
+            } else {
+                // Классический волейбол: игра окончена, когда одна из команд выиграла 3 сета
+                var setsWon = calculateSetsWon(data, gameType);
+                return setsWon.homeSets >= 3 || setsWon.awaySets >= 3;
+            }
+        }
+        
+        function hasGameStateChanged(gameId, newData) {
+            // Проверяем, изменилось ли состояние игры (началась новая игра с тем же ID)
+            if (!lastGameStates[gameId]) {
+                return true; // Новая игра
+            }
+            
+            var lastData = lastGameStates[gameId];
+            
+            // Проверяем, изменились ли ключевые параметры
+            var hasChanged = (
+                lastData.home_team !== newData.home_team ||
+                lastData.away_team !== newData.away_team ||
+                lastData.tournament_name !== newData.tournament_name ||
+                (newData.set_history && newData.set_history.length === 0 && (lastData.set_history && lastData.set_history.length > 0))
+            );
+            
+            return hasChanged;
+        }
+        
+        function updateGameScore(gameId, updatedData) {
+            // Update only the score in the existing row, not the entire table
+            var row = document.querySelector('tr[data-game-id="' + gameId + '"]');
+            if (row) {
+                var game = games[gameId];
+                if (game) {
+                    // Проверяем, не началась ли новая игра с тем же ID
+                    if (hasGameStateChanged(gameId, updatedData)) {
+                        console.log('Game state changed for', gameId, '- reloading games');
+                        loadGames(); // Перезагружаем все игры
+                        return;
+                    }
+                    
+                    game.data = updatedData;
+                    var gameType = game.gameType || 'classic';
+                    
+                    // Calculate sets won
+                    var setsWon = calculateSetsWon(updatedData, gameType);
+                    
+                    // Update overall score (sets won)
+                    var overallScoreCell = row.querySelector('.score-current');
+                    if (overallScoreCell) {
+                        var overallScore = setsWon.homeSets + ':' + setsWon.awaySets;
+                        overallScoreCell.textContent = overallScore;
+                    }
+                    
+                    // Update current set score
+                    var currentScoreCell = row.querySelector('.score-set');
+                    if (currentScoreCell) {
+                        currentScoreCell.textContent = (updatedData.home_score || 0) + ':' + (updatedData.away_score || 0);
+                    }
+                    
+                    // Update status if game is finished
+                    var statusCell = row.querySelector('td:nth-child(2)');
+                    var statusBadge = statusCell ? statusCell.querySelector('.status-badge') : null;
+                    if (statusBadge) {
+                        var isFinished = isGameFinished(updatedData, gameType);
+                        if (isFinished) {
+                            statusBadge.textContent = 'Закончен';
+                            statusBadge.className = 'status-badge status-finished';
+                            game.isFinished = true;
+                            
+                            // Update current set score to "-" for finished games
+                            currentScoreCell.textContent = '-';
+                        } else {
+                            statusBadge.textContent = 'Активен';
+                            statusBadge.className = 'status-badge status-active';
+                            game.isFinished = false;
+                        }
+                    }
+                    
+                    // Update sets history
+                    var setCells = row.querySelectorAll('.score-set');
+                    var maxSets = gameType === 'beach' ? 3 : 5;
+                    var setHistory = updatedData.set_history || [];
+                    
+                    // Update existing set cells
+                    for (var i = 0; i < maxSets && i < setCells.length - 2; i++) {
+                        if (i < setHistory.length) {
+                            var set = setHistory[i];
+                            setCells[i + 2].textContent = (set.home !== undefined ? set.home : '-') + ':' + (set.away !== undefined ? set.away : '-');
+                        } else {
+                            setCells[i + 2].textContent = '-';
+                        }
+                    }
+                    
+                    // Сохраняем текущее состояние для сравнения в будущем
+                    lastGameStates[gameId] = JSON.parse(JSON.stringify(updatedData));
+                }
+            }
+        }
+        
+        function removeGame(gameId) {
+            // Удаляем игру из отображения
+            var row = document.querySelector('tr[data-game-id="' + gameId + '"]');
+            if (row) {
+                row.remove();
+            }
+            // Удаляем из состояния
+            delete games[gameId];
+            delete lastGameStates[gameId];
+        }
+        
+        function renderGames() {
+            var container = document.getElementById('gamesContainer');
+            
+            // Filter games - show all games without filters
+            var filteredGames = Object.values(games);
+            
+            // Group by game type and tournament
+            var groupedGames = {};
+            filteredGames.forEach(function(game) {
+                var gameType = game.gameType || 'classic';
+                var tournament = game.data.tournament_name || 'НВЛ';
+                var key = gameType + '|' + tournament;
+                
+                if (!groupedGames[key]) {
+                    groupedGames[key] = {
+                        gameType: gameType,
+                        tournament: tournament,
+                        games: []
+                    };
+                }
+                groupedGames[key].games.push(game);
+            });
+            
+            // Sort groups: classic first, then beach; within each, sort by tournament name
+            var sortedGroups = Object.values(groupedGames).sort(function(a, b) {
+                // First by game type (classic before beach)
+                if (a.gameType !== b.gameType) {
+                    return a.gameType === 'classic' ? -1 : 1;
+                }
+                // Then by tournament name
+                return a.tournament.localeCompare(b.tournament);
+            });
+            
+            if (sortedGroups.length === 0) {
+                container.innerHTML = '<div class="no-games">Нет матчей на сегодня</div>';
+                return;
+            }
+            
+            var html = '';
+            sortedGroups.forEach(function(group) {
+                html += '<div class="game-section">';
+                html += '<div class="section-header">';
+                html += '<span class="game-type-badge ' + 
+                    (group.gameType === 'classic' ? 'game-type-classic' : 'game-type-beach') + '">' +
+                    (group.gameType === 'classic' ? 'Классический' : 'Пляжный') + '</span>';
+                html += escapeHtml(group.tournament);
+                html += '</div>';
+                
+                html += '<table class="game-table">';
+                html += '<thead>';
+                html += '<tr>';
+                html += '<th>Команды</th>';
+                html += '<th>Статус</th>';
+                html += '<th>Общий счёт</th>';
+                html += '<th>Текущий сет</th>';
+                
+                // Add set columns (up to 5 sets for classic, 3 for beach)
+                var maxSets = group.gameType === 'beach' ? 3 : 5;
+                for (var i = 1; i <= maxSets; i++) {
+                    html += '<th>Сет ' + i + '</th>';
+                }
+                
+                html += '</tr>';
+                html += '</thead>';
+                html += '<tbody>';
+                
+                group.games.forEach(function(game) {
+                    html += renderGameRow(game, group.gameType);
+                });
+                
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function renderGameRow(game, gameType) {
+            var data = game.data;
+            var homeTeam = data.home_team || 'Команда 1';
+            var awayTeam = data.away_team || 'Команда 2';
+            var homeScore = data.home_score || 0;
+            var awayScore = data.away_score || 0;
+            var currentPeriod = data.current_period || 1;
+            var setHistory = data.set_history || [];
+            var isFinished = game.isFinished;
+            
+            // Calculate sets won for display
+            var setsWon = calculateSetsWon(data, gameType);
+            var homeSets = setsWon.homeSets;
+            var awaySets = setsWon.awaySets;
+            
+            var html = '<tr data-game-id="' + game.id + '">';
+            
+            // Teams column
+            html += '<td class="team-name">' + escapeHtml(homeTeam) + ' — ' + escapeHtml(awayTeam) + '</td>';
+            
+            // Status column
+            var statusText = isFinished ? 'Закончен' : 'Активен';
+            var statusClass = isFinished ? 'status-finished' : 'status-active';
+            html += '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
+            
+            // Overall score (sets won)
+            var overallScore = homeSets + ':' + awaySets;
+            html += '<td class="score-current">' + overallScore + '</td>';
+            
+            // Current set score (only for active games)
+            if (isFinished) {
+                html += '<td class="score-set">-</td>';
+            } else {
+                html += '<td class="score-set">' + homeScore + ':' + awayScore + '</td>';
+            }
+            
+            // Sets history
+            var maxSets = gameType === 'beach' ? 3 : 5;
+            for (var i = 0; i < maxSets; i++) {
+                if (i < setHistory.length) {
+                    var set = setHistory[i];
+                    html += '<td class="score-set">' + 
+                        (set.home !== undefined ? set.home : '-') + ':' + 
+                        (set.away !== undefined ? set.away : '-') + '</td>';
+                } else {
+                    html += '<td>-</td>';
+                }
+            }
+            
+            html += '</tr>';
+            return html;
+        }
+        
+        function updateTournamentOptions() {
+            var select = document.getElementById('tournamentFilter');
+            var existingOptions = Array.from(select.options).map(opt => opt.value);
+            var tournaments = new Set();
+            
+            Object.values(games).forEach(function(game) {
+                var tournament = game.data.tournament_name || 'НВЛ';
+                tournaments.add(tournament);
+            });
+            
+            // Clear existing options except "Все"
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            
+            // Add tournament options
+            Array.from(tournaments).sort().forEach(function(tournament) {
+                if (!existingOptions.includes(tournament)) {
+                    var option = document.createElement('option');
+                    option.value = tournament;
+                    option.textContent = tournament;
+                    select.appendChild(option);
+                }
+            });
+        }
+        
+        function updateLastUpdateTime() {
+            var now = new Date();
+            var timeString = now.toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('lastUpdate').textContent = 'Последнее обновление: ' + timeString;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Start the application
+        init();
+    </script>
+</body>
+</html>

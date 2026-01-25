@@ -38,6 +38,10 @@
                 <a class="results-btn btn btn-info" target="_blank" href="#">Результаты матчей</a>
                 <br>
                 <span id="results_link"></span>
+                <hr />
+                <a class="online-btn btn btn-info" target="_blank" href="#">Онлайн результаты</a>
+                <br>
+                <span id="online_link"></span>
               </div>
             </div>
           </div>
@@ -58,6 +62,9 @@
           $("#tablo_link").html(tablo);
           $(".results-btn").attr('href',results);
           $("#results_link").html(results);
+          var online=window.location.href.replace(/\/[^\/]*$/,"/online.html");
+          $(".online-btn").attr('href',online);
+          $("#online_link").html(online);
         });
         $("#game_id").val(uuid()).change();
       </script>
