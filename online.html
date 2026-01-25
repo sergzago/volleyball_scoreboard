@@ -471,8 +471,7 @@
                 return true; // Новая игра
             }
             
-            var lastData = lastGameStates[gameId];
-            
+            var lastData = lastGameStates[gameId
             // Проверяем, изменились ли ключевые параметры
             var hasChanged = (
                 lastData.home_team !== newData.home_team ||
@@ -667,8 +666,9 @@
             
             var html = '<tr data-game-id="' + game.id + '">';
             
-            // Teams column
-            html += '<td class="team-name">' + escapeHtml(homeTeam) + ' — ' + escapeHtml(awayTeam) + '</td>';
+            // Teams column with tablo link
+            var tabloUrl = window.location.href.replace(/\/[^\/]*$/, '/tablo.html?game=' + game.id);
+            html += '<td class="team-name"><a href="' + tabloUrl + '" target="_blank" style="color: inherit; text-decoration: none;">' + escapeHtml(homeTeam) + ' — ' + escapeHtml(awayTeam) + '</a></td>';
             
             // Status column
             var statusText = isFinished ? 'Закончен' : 'Активен';
