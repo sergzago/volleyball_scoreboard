@@ -79,6 +79,10 @@ scoreboard_query.onSnapshot(
     $('.home_score').html(scoreboard_data['home_score'])
     $('.home_fouls').html(beachMode ? homeSets : scoreboard_data['home_fouls'])
     $(".home_color").css("background-color",scoreboard_data['home_color'])
+    
+    // Обновляем общий счет по сетам на табло
+    $('.away_sets').html(awaySets);
+    $('.home_sets').html(homeSets);
     var currentPeriod = scoreboard_data['current_period'] || 1;
     $('.timeval').html(currentPeriod)
     var showTop = !!(scoreboard_data.show & 1);
@@ -97,13 +101,78 @@ function renderSetHistory(history, showTop, showBottom){
       var entry=items[i]||{};
       var home=(entry.home!=null)?entry.home:'-';
       var away=(entry.away!=null)?entry.away:'-';
-      parts.push(home+':'+away);
+      
+      // Проверяем текущее расположение команд для правильного отображения истории
+      var homeSide = scoreboard_data['home_side'] || 'left';
+      var invertTablo = !!scoreboard_data['invert_tablo'];
+      
+      if(homeSide === 'left' && !invertTablo){
+        // Домашняя команда слева, гостевая справа - стандартный порядок
+        parts.push(home+':'+away);
+      } else {
+        // Домашняя команда справа, гостевая слева - меняем порядок в истории
+        parts.push(away+':'+home);
+      }
     }
     text=parts.join(' ');
   }
   var hasHistory = text.length>0;
   updateHistoryElement('#set-history-top', showTop && hasHistory, text);
   updateHistoryElement('#set-history-bottom', showBottom && hasHistory, text);
+  
+  // Для табло прямое обновление текста и видимости
+  var tabloHistory = $('#set-history-bottom');
+  if(tabloHistory.length > 0){
+    // Прямое обновление текста
+    tabloHistory.text(text || '&nbsp;');
+    // Прямое управление видимостью
+    if(hasHistory && text.trim() !== ''){
+      tabloHistory.css('display', 'block');
+    } else {
+      tabloHistory.css('display', 'none');
+    }
+  }
+  
+  // Обновляем общий счет по сетам на табло на основе set_history
+  updateGeneralScoreFromHistory(history);
+}
+
+// Функция для подсчета сетов из истории и обновления общего счета
+function updateGeneralScoreFromHistory(history){
+  var items=Array.isArray(history)?history:[];
+  var homeSets = 0;
+  var awaySets = 0;
+  
+  // Подсчитываем выигранные сеты каждой командой
+  for(var i=0;i<items.length;i++){
+    var entry=items[i]||{};
+    var homeScore = parseInt(entry.home, 10);
+    var awayScore = parseInt(entry.away, 10);
+    
+    // Проверяем, что это числовые значения
+    if(!isNaN(homeScore) && !isNaN(awayScore)){
+      if(homeScore > awayScore){
+        homeSets++;
+      } else if(awayScore > homeScore){
+        awaySets++;
+      }
+    }
+  }
+  
+  // Обновляем отображение на табло в зависимости от текущего расположения команд
+  var homeSide = scoreboard_data['home_side'] || 'left';
+  var invertTablo = !!scoreboard_data['invert_tablo'];
+  
+  if(homeSide === 'left' && !invertTablo){
+    // Домашняя команда слева, гостевая справа
+    $('.home_sets').html(homeSets);
+    $('.away_sets').html(awaySets);
+  } else {
+    // Домашняя команда справа, гостевая слева (при смене сторон или инверсии)
+    // Меняем местами значения, чтобы счет соответствовал расположению команд
+    $('.home_sets').html(awaySets);
+    $('.away_sets').html(homeSets);
+  }
 }
 
 function updateHistoryElement(selector, shouldShow, text){
@@ -148,12 +217,30 @@ function updateTabloSides(){
   var teamContainer=$('.tablo-teams');
   if(teamContainer.length){
     teamContainer.css('display','flex');
-    teamContainer.find('.home_team').css('order', homeOrder);
-    teamContainer.find('.away_team').css('order', awayOrder);
+    // Обновляем порядок команд в зависимости от стороны
+    if(homeSide === 'left' && !invertTablo){
+      // Домашняя команда слева, гостевая справа
+      teamContainer.find('.home_team').css('order', 1);
+      teamContainer.find('.tablo-general-score').css('order', 2);
+      teamContainer.find('.away_team').css('order', 3);
+    } else {
+      // Домашняя команда справа, гостевая слева (при смене сторон или инверсии)
+      teamContainer.find('.away_team').css('order', 1);
+      teamContainer.find('.tablo-general-score').css('order', 2);
+      teamContainer.find('.home_team').css('order', 3);
+    }
     var teamSep = teamContainer.find('.teams-separator');
     if(teamSep.length){
       teamSep.css('order', separatorOrder);
     }
   }
+  
+  // Обновляем отображение общего счета и истории сетов в соответствии с текущим расположением
+  updateGeneralScoreFromHistory(scoreboard_data['set_history']);
+  
+  // При смене сторон обновляем историю сетов, чтобы она соответствовала текущему расположению команд
+  var showTop = !!(scoreboard_data.show & 1);
+  var showBottom = !!(scoreboard_data.show & 2);
+  renderSetHistory(scoreboard_data['set_history'], showTop, showBottom);
 }
 

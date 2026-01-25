@@ -19,6 +19,42 @@
             updateTabloSides();
           }
         }, 500);
+        
+        // Функция для обновления отображения истории сетов
+        function updateSetHistoryVisibility() {
+          const setHistory = $('#set-history-bottom');
+          if (setHistory.length > 0) {
+            const currentText = setHistory.text().trim();
+            // Показываем историю сетов, если есть данные (не пусто и не содержит только пробелы)
+            if (currentText && currentText !== '&nbsp;' && currentText !== '' && currentText !== '&') {
+              setHistory.show();
+            } else {
+              setHistory.hide();
+            }
+          }
+        }
+        
+        // Вызываем функцию при загрузке и при изменении счета
+        updateSetHistoryVisibility();
+        
+        // Наблюдаем за изменениями в истории сетов
+        const observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' || mutation.type === 'characterData') {
+              updateSetHistoryVisibility();
+            }
+          });
+        });
+        
+        // Наблюдаем за элементом set-history-bottom
+        const setHistoryElement = document.querySelector('#set-history-bottom');
+        if (setHistoryElement) {
+          observer.observe(setHistoryElement, {
+            childList: true,
+            characterData: true,
+            subtree: true
+          });
+        }
       });
     </script>
     <style>
@@ -48,18 +84,22 @@
         text-transform: uppercase;
         letter-spacing: 4px;
         margin-bottom: 0; /* Убран отступ снизу */
-        /*margin-top: clamp(10px, 2vh, 30px); /* Увеличен отступ сверху */
-        margin-top: 0
-       /* margin-bottom: clamp(32px, 5vh, 100px); */
+        margin-top: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: clamp(12px, 3vw, 60px);
         flex-wrap: wrap;
       }
+      
+      .tablo-general-score {
+        font-size: clamp(20px, 2.5vw, 32px);
+        font-weight: bold;
+        color: #333;
+        margin: 0 clamp(10px, 2vw, 30px);
+      }
       .tablo-score {
-         /* margin-top: auto; /* Располагаем снизу */
-        margin-top: clamp(150px,16vh, 300px); /* Увеличен отступ сверху */
+        margin-top: clamp(150px,16vh, 300px);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -73,6 +113,27 @@
         padding: 0 clamp(10px, 2vw, 30px);
         box-sizing: border-box;
       }
+      
+      .set-history {
+        display: none;
+        background-color: #fff;
+        color: #000;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-radius: 4px;
+        padding: 4px 14px;
+        font-size: clamp(18px, 2.5vw, 36px);
+        min-height: 20px;
+        text-align: center;
+        margin-top: clamp(60px, 10vh, 120px);
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .set-history-bottom {
+        position: relative;
+        width: 100%;
+        bottom: auto;
+      }
       .tablo-score span {
         display: inline-block;
         transform: scaleY(2);
@@ -83,15 +144,20 @@
   <body>
     <div class="tablo-screen">
       <div class="tablo-teams">
-        <span class="away_team">AWAY</span>
-        <span class="tablo-separator teams-separator">vs</span>
         <span class="home_team">HOME</span>
+        <span class="tablo-general-score">
+          <span class="home_sets">0</span>
+          <span class="tablo-separator">:</span>
+          <span class="away_sets">0</span>
+        </span>
+        <span class="away_team">AWAY</span>
       </div>
       <div class="tablo-score">
         <span class="away_score">0</span>
         <span class="tablo-separator score-separator">:</span>
         <span class="home_score">0</span>
       </div>
+      <div id="set-history-bottom" class="set-history set-history-bottom">&nbsp;</div>
     </div>
   </body>
 </html>
