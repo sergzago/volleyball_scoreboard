@@ -781,13 +781,13 @@
         }
         
         function loadFinishedGames(today, tomorrow) {
-            // Query finished games from volleyball collection for today
-            scoreboard_collection
-                .where('lastEdited', '>=', today)
-                .where('lastEdited', '<', tomorrow)
+            // Query finished games from matches collection for today
+            matches_collection
+                .where('date_time', '>=', today)
+                .where('date_time', '<', tomorrow)
                 .get()
                 .then(function(snapshot) {
-                    console.log('Found', snapshot.size, 'finished games for today');
+                    console.log('Found', snapshot.size, 'finished games in matches collection for today');
                     
                     var finishedGamesList = [];
                     
@@ -796,44 +796,41 @@
                         var gameId = doc.id;
                         
                         // Convert Firestore timestamp to Date
-                        if (data.lastEdited && data.lastEdited.toDate) {
-                            data.lastEdited = data.lastEdited.toDate();
+                        if (data.date_time && data.date_time.toDate) {
+                            data.date_time = data.date_time.toDate();
                         }
                         
-                        var gameType = data.beach_mode ? 'beach' : 'classic';
-                        var setsWon = calculateSetsWon(data, gameType);
-                        var isFinished = isGameFinished(data, gameType);
+                        var gameType = data.game_type || 'classic';
                         
-                        if (isFinished) {
-                            // Use overall_score for general result and sets_score for sets history if available
-                            var overallScore = data.overall_score || (setsWon.homeSets + ':' + setsWon.awaySets);
-                            var setsScore = data.sets_score || data.set_history || [];
-                            
-                            // Parse overall_score to get home_sets and away_sets
-                            var homeSets = 0;
-                            var awaySets = 0;
-                            if (overallScore && overallScore.includes(':')) {
-                                var scoreParts = overallScore.split(':');
-                                homeSets = parseInt(scoreParts[0], 10) || 0;
-                                awaySets = parseInt(scoreParts[1], 10) || 0;
-                            }
-                            
-                            finishedGamesList.push({
-                                id: gameId,
-                                data: {
-                                    home_team: data.home_team,
-                                    away_team: data.away_team,
-                                    tournament_name: data.tournament_name || 'НВЛ',
-                                    game_type: gameType,
-                                    set_history: setsScore,
-                                    home_sets: homeSets,
-                                    away_sets: awaySets,
-                                    lastEdited: data.lastEdited
-                                },
-                                isFinished: true,
-                                gameType: gameType
-                            });
+                        // Use data from matches collection
+                        var overallScore = data.overall_score || '0:0';
+                        var setsScore = data.sets_score || [];
+                        
+                        // Parse overall_score to get home_sets and away_sets
+                        var homeSets = 0;
+                        var awaySets = 0;
+                        if (overallScore && overallScore.includes(':')) {
+                            var scoreParts = overallScore.split(':');
+                            homeSets = parseInt(scoreParts[0], 10) || 0;
+                            awaySets = parseInt(scoreParts[1], 10) || 0;
                         }
+                        
+                        finishedGamesList.push({
+                            id: gameId,
+                            data: {
+                                home_team: data.home_team,
+                                away_team: data.away_team,
+                                tournament_name: data.tournament_name || 'НВЛ',
+                                game_type: gameType,
+                                set_history: setsScore, // Используем sets_score для истории сетов
+                                home_sets: homeSets,    // Используем распарсенные значения из overall_score
+                                away_sets: awaySets,
+                                lastEdited: data.date_time,
+                                overall_score: overallScore // Сохраняем original overall_score
+                            },
+                            isFinished: true,
+                            gameType: gameType
+                        });
                     });
                     
                     // Sort finished games by game type, tournament, and lastEdited time
