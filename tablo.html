@@ -13,6 +13,17 @@
     <script src="js/scoreboard.js"></script>
     <script>
       $(document).ready(function(){
+        // Переключение темы
+        var savedTheme = localStorage.getItem('tablo-theme');
+        if (savedTheme === 'dark') {
+          $('body').addClass('dark-theme');
+        }
+        $('#theme-toggle').on('click', function() {
+          $('body').toggleClass('dark-theme');
+          var isDark = $('body').hasClass('dark-theme');
+          localStorage.setItem('tablo-theme', isDark ? 'dark' : 'light');
+        });
+
         // Инициализация порядка при загрузке/
         setTimeout(function(){
           if(typeof updateTabloSides === 'function'){
@@ -66,6 +77,43 @@
         color: #000;
         font-family: 'Rubik Mono One', sans-serif;
         overflow: hidden;
+        transition: background 0.3s, color 0.3s;
+      }
+
+      /* Тёмная тема */
+      body.dark-theme {
+        background: #000000;
+        color: #ff0000;
+      }
+      body.dark-theme .tablo-general-score {
+        color: #cc0000;
+      }
+      body.dark-theme .set-history {
+        background-color: #000;
+        color: #ff0000;
+      }
+
+      /* Кнопка переключения темы */
+      #theme-toggle {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 9999;
+        background: rgba(128, 128, 128, 0.3);
+        border: 1px solid rgba(128, 128, 128, 0.5);
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 36px;
+        text-align: center;
+        padding: 0;
+        opacity: 0.15;
+        transition: opacity 0.3s;
+      }
+      #theme-toggle:hover {
+        opacity: 1;
       }
       .tablo-screen {
         min-height: 100vh;
@@ -142,6 +190,7 @@
     </style>
   </head>
   <body>
+    <button id="theme-toggle" title="Переключить тему">🌓</button>
     <div class="tablo-screen">
       <div class="tablo-teams">
         <span class="tablo-left-team">HOME</span>
