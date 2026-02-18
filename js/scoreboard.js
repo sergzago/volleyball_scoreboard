@@ -105,8 +105,9 @@ function renderSetHistory(history, showTop, showBottom){
       // Проверяем текущее расположение команд для правильного отображения истории
       var homeSide = scoreboard_data['home_side'] || 'left';
       var invertTablo = !!scoreboard_data['invert_tablo'];
-      
-      if(homeSide === 'left' && !invertTablo){
+      // XOR: home слева если (home физически слева) XOR (инверсия включена)
+      var homeIsLeft = (homeSide === 'left') !== invertTablo;
+      if(homeIsLeft){
         // Домашняя команда слева, гостевая справа - стандартный порядок
         parts.push(home+':'+away);
       } else {
@@ -163,12 +164,14 @@ function updateGeneralScoreFromHistory(history){
   var homeSide = scoreboard_data['home_side'] || 'left';
   var invertTablo = !!scoreboard_data['invert_tablo'];
   
-  if(homeSide === 'left' && !invertTablo){
+  // XOR: home слева если (home физически слева) XOR (инверсия включена)
+  var homeIsLeft = (homeSide === 'left') !== invertTablo;
+  if(homeIsLeft){
     // Домашняя команда слева, гостевая справа
     $('.home_sets').html(homeSets);
     $('.away_sets').html(awaySets);
   } else {
-    // Домашняя команда справа, гостевая слева (при смене сторон или инверсии)
+    // Домашняя команда справа, гостевая слева
     // Меняем местами значения, чтобы счет соответствовал расположению команд
     $('.home_sets').html(awaySets);
     $('.away_sets').html(homeSets);
@@ -216,22 +219,23 @@ function updateTabloSides(){
   }
   var teamContainer=$('.tablo-teams');
   if(teamContainer.length){
-    teamContainer.css('display','flex');
-    // Обновляем порядок команд в зависимости от стороны
-    if(homeSide === 'left' && !invertTablo){
-      // Домашняя команда слева, гостевая справа
-      teamContainer.find('.home_team').css('order', 1);
-      teamContainer.find('.tablo-general-score').css('order', 2);
-      teamContainer.find('.away_team').css('order', 3);
-    } else {
-      // Домашняя команда справа, гостевая слева (при смене сторон или инверсии)
-      teamContainer.find('.away_team').css('order', 1);
-      teamContainer.find('.tablo-general-score').css('order', 2);
-      teamContainer.find('.home_team').css('order', 3);
-    }
-    var teamSep = teamContainer.find('.teams-separator');
-    if(teamSep.length){
-      teamSep.css('order', separatorOrder);
+    var leftTeam = teamContainer.find('.tablo-left-team');
+    var rightTeam = teamContainer.find('.tablo-right-team');
+    if(leftTeam.length && rightTeam.length){
+      // homeIsLeft = true, если домашняя команда должна быть слева на табло.
+      // Логика: если home физически слева И тablo не инвертировано — home слева.
+      //         если home физически справа И tablo инвертировано — тоже home слева.
+      // Это XOR: (homeSide==='left') XOR invertTablo
+      var homeIsLeft = (homeSide === 'left') !== invertTablo;
+      if(homeIsLeft){
+        // Домашняя команда слева, гостевая справа
+        leftTeam.html(scoreboard_data['home_team'] || '');
+        rightTeam.html(scoreboard_data['away_team'] || '');
+      } else {
+        // Домашняя команда справа, гостевая слева
+        leftTeam.html(scoreboard_data['away_team'] || '');
+        rightTeam.html(scoreboard_data['home_team'] || '');
+      }
     }
   }
   
