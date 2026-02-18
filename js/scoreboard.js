@@ -239,6 +239,7 @@ function updateTabloSides(){
     }
   }
   
+  
   // Обновляем отображение общего счета и истории сетов в соответствии с текущим расположением
   updateGeneralScoreFromHistory(scoreboard_data['set_history']);
   
