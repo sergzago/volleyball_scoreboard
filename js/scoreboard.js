@@ -190,21 +190,18 @@ function updateScoreboard1History(history){
       var home=(entry.home!=null)?entry.home:'-';
       var away=(entry.away!=null)?entry.away:'-';
 
-      // Проверяем текущее расположение команд для правильного отображения истории
-      var homeSide = scoreboard_data['home_side'] || 'left';
-      var invertTablo = !!scoreboard_data['invert_tablo'];
-      var homeIsLeft = (homeSide === 'left') !== invertTablo;
-      if(homeIsLeft){
-        parts.push(home+':'+away);
-      } else {
-        parts.push(away+':'+home);
-      }
+      // Всегда сперва домашняя команда, затем гостевая
+      parts.push(home+':'+away);
     }
-    text=parts.join(' ');
+    text=parts.join('   ');
   }
   var el=$('#set-history-scoreboard1');
   if(el.length){
-    el.text(text || '\u00A0');
+    if(text.length > 0){
+      el.text(text).show();
+    }else{
+      el.text('').hide();
+    }
   }
 }
 
