@@ -163,10 +163,11 @@
         }
 
         /* Блок истории сетов под основным табло */
-        .set-history-container {
+        .set-history-wrapper {
             position: absolute;
-            bottom: -30px;
-            left: 0;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
             width: 100%;
             text-align: center;
         }
@@ -181,6 +182,7 @@
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 1px;
+            min-width: 100px;
         }
     </style>
 </head>
@@ -220,8 +222,8 @@
             </div>
         </div>
     </div>
-    <div class="set-history-container">
-        <div id="set-history-bottom" class="set-history-display">&nbsp;</div>
+    <div class="set-history-wrapper">
+        <div id="set-history-scoreboard1" class="set-history-display">&nbsp;</div>
     </div>
 </body>
 </html>

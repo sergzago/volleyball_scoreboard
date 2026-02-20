@@ -103,7 +103,7 @@ function renderSetHistory(history, showTop, showBottom){
       var entry=items[i]||{};
       var home=(entry.home!=null)?entry.home:'-';
       var away=(entry.away!=null)?entry.away:'-';
-      
+
       // Проверяем текущее расположение команд для правильного отображения истории
       var homeSide = scoreboard_data['home_side'] || 'left';
       var invertTablo = !!scoreboard_data['invert_tablo'];
@@ -122,20 +122,7 @@ function renderSetHistory(history, showTop, showBottom){
   var hasHistory = text.length>0;
   updateHistoryElement('#set-history-top', showTop && hasHistory, text);
   updateHistoryElement('#set-history-bottom', showBottom && hasHistory, text);
-  
-  // Для табло прямое обновление текста и видимости
-  var tabloHistory = $('#set-history-bottom');
-  if(tabloHistory.length > 0){
-    // Прямое обновление текста
-    tabloHistory.text(text || '&nbsp;');
-    // Прямое управление видимостью
-    if(hasHistory && text.trim() !== ''){
-      tabloHistory.css('display', 'block');
-    } else {
-      tabloHistory.css('display', 'none');
-    }
-  }
-  
+
   // Обновляем общий счет по сетам на табло на основе set_history
   updateGeneralScoreFromHistory(history);
 }
@@ -215,13 +202,9 @@ function updateScoreboard1History(history){
     }
     text=parts.join(' ');
   }
-  var el=$('#set-history-bottom');
+  var el=$('#set-history-scoreboard1');
   if(el.length){
-    if(text.length>0 && text.trim() !== ''){
-      el.css('display','inline-block').text(text);
-    } else {
-      el.css('display','none').text('&nbsp;');
-    }
+    el.text(text || '\u00A0');
   }
 }
 
