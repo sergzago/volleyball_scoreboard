@@ -161,6 +161,27 @@
         .total-score {
             background-color: #5aa0c4; /* Голубой цвет для общего счета (как у сетов) */
         }
+
+        /* Блок истории сетов под основным табло */
+        .set-history-container {
+            position: absolute;
+            bottom: -30px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+        }
+
+        .set-history-display {
+            display: inline-block;
+            background-color: #1a2b3c;
+            color: white;
+            border-radius: 4px;
+            padding: 5px 15px;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
@@ -198,6 +219,9 @@
                 <div class="away_score" style="text-align: left;"></div>
             </div>
         </div>
+    </div>
+    <div class="set-history-container">
+        <div id="set-history-bottom" class="set-history-display">&nbsp;</div>
     </div>
 </body>
 </html>

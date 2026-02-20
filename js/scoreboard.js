@@ -88,6 +88,8 @@ scoreboard_query.onSnapshot(
     var showTop = !!(scoreboard_data.show & 1);
     var showBottom = !!(scoreboard_data.show & 2);
     renderSetHistory(scoreboard_data['set_history'], showTop, showBottom);
+    // Обновляем историю сетов для scoreboard1.html
+    updateScoreboard1History(scoreboard_data['set_history']);
     // Обновляем порядок на табло (функция сама проверит наличие элементов)
     updateTabloSides();
   });
@@ -188,6 +190,39 @@ function updateHistoryElement(selector, shouldShow, text){
   }
   var displayValue = el.hasClass('set-history-top') ? 'inline-block' : 'block';
   el.css('display', displayValue).text(text);
+}
+
+// Обновление истории сетов для scoreboard1.html
+function updateScoreboard1History(history){
+  var items=Array.isArray(history)?history:[];
+  var text='';
+  if(items.length>0){
+    var parts=[];
+    for(var i=0;i<items.length;i++){
+      var entry=items[i]||{};
+      var home=(entry.home!=null)?entry.home:'-';
+      var away=(entry.away!=null)?entry.away:'-';
+
+      // Проверяем текущее расположение команд для правильного отображения истории
+      var homeSide = scoreboard_data['home_side'] || 'left';
+      var invertTablo = !!scoreboard_data['invert_tablo'];
+      var homeIsLeft = (homeSide === 'left') !== invertTablo;
+      if(homeIsLeft){
+        parts.push(home+':'+away);
+      } else {
+        parts.push(away+':'+home);
+      }
+    }
+    text=parts.join(' ');
+  }
+  var el=$('#set-history-bottom');
+  if(el.length){
+    if(text.length>0 && text.trim() !== ''){
+      el.css('display','inline-block').text(text);
+    } else {
+      el.css('display','none').text('&nbsp;');
+    }
+  }
 }
 
 function updateTabloSides(){
