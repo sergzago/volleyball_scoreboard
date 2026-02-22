@@ -96,7 +96,23 @@ scoreboard_query.onSnapshot(
 
 function renderSetHistory(history, showTop, showBottom){
   var items=Array.isArray(history)?history:[];
-  var text='';
+  
+  // История для scoreboard.html (верхняя панель) - всегда стандартный порядок
+  var topText='';
+  if(items.length>0){
+    var parts=[];
+    for(var i=0;i<items.length;i++){
+      var entry=items[i]||{};
+      var home=(entry.home!=null)?entry.home:'-';
+      var away=(entry.away!=null)?entry.away:'-';
+      // Всегда домашняя команда слева, гостевая справа
+      parts.push(home+':'+away);
+    }
+    topText=parts.join(' ');
+  }
+  
+  // История для tablo.html (нижняя панель) - с учетом invert_tablo
+  var bottomText='';
   if(items.length>0){
     var parts=[];
     for(var i=0;i<items.length;i++){
@@ -117,11 +133,14 @@ function renderSetHistory(history, showTop, showBottom){
         parts.push(away+':'+home);
       }
     }
-    text=parts.join(' ');
+    bottomText=parts.join(' ');
   }
-  var hasHistory = text.length>0;
-  updateHistoryElement('#set-history-top', showTop && hasHistory, text);
-  updateHistoryElement('#set-history-bottom', showBottom && hasHistory, text);
+  
+  var hasTopHistory = topText.length>0;
+  var hasBottomHistory = bottomText.length>0;
+  updateHistoryElement('#set-history-top', showTop && hasTopHistory, topText);
+  // set-history-bottom обновляется всегда (используется в tablo.html), видимость управляется через CSS/JS в tablo.html
+  updateHistoryElement('#set-history-bottom', hasBottomHistory, bottomText);
 
   // Обновляем общий счет по сетам на табло на основе set_history
   updateGeneralScoreFromHistory(history);
