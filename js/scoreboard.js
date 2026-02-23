@@ -222,6 +222,16 @@ function updateScoreboard1History(history){
       el.text('').hide();
     }
   }
+
+  // Вызываем функцию обновления истории сетов в столбик
+  if (typeof updateScoreboard1HistoryColumn === 'function') {
+    updateScoreboard1HistoryColumn(history);
+  }
+
+  // Вызываем функцию обновления отображения для scoreboard1.html
+  if (typeof updateScoreboard1Display === 'function') {
+    updateScoreboard1Display();
+  }
 }
 
 function updateTabloSides(){
