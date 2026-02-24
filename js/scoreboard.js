@@ -94,6 +94,10 @@ scoreboard_query.onSnapshot(
     if (typeof updateScoreboard1Display === 'function') {
       updateScoreboard1Display();
     }
+    // Обновляем блоки счета по сетам для sb.html
+    if (typeof updateBottomSetsDisplay === 'function') {
+      updateBottomSetsDisplay(scoreboard_data['set_history']);
+    }
     // Обновляем порядок на табло (функция сама проверит наличие элементов)
     updateTabloSides();
   });
