@@ -90,6 +90,10 @@ scoreboard_query.onSnapshot(
     renderSetHistory(scoreboard_data['set_history'], showTop, showBottom);
     // Обновляем историю сетов для scoreboard1.html
     updateScoreboard1History(scoreboard_data['set_history']);
+    // Обновляем отображение для scoreboard1.html (top_label, show/hide табло)
+    if (typeof updateScoreboard1Display === 'function') {
+      updateScoreboard1Display();
+    }
     // Обновляем порядок на табло (функция сама проверит наличие элементов)
     updateTabloSides();
   });
