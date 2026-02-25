@@ -26,6 +26,8 @@
                 <a class="scoreboard-btn btn btn-info" target="_blank" href="#">Scoreboard</a>
                 <br>
                 <span id="scoreboard_link"></span>
+                <br>(New Design):
+                <span id="sb_link"></span>
                 <hr />
                 <a class="ctl-btn btn btn-info" target="_blank" href="#">Control panel</a>
                 <br>
@@ -51,6 +53,7 @@
         $("#game_id").change(function(){
           console.log($(this).val());
           var sb=window.location.href.replace(/\/[^\/]*$/,"/scoreboard.html?game="+$(this).val());
+          var sb_new=window.location.href.replace(/\/[^\/]*$/,"/sb.html?game="+$(this).val());
           var ctl=window.location.href.replace(/\/[^\/]*$/,"/ctl.html?game="+$(this).val());
           var tablo=window.location.href.replace(/\/[^\/]*$/,"/tablo.html?game="+$(this).val());
           var results=window.location.href.replace(/\/[^\/]*$/,"/results.html");
@@ -58,6 +61,7 @@
           $("#ctl_link").html(ctl);
           $(".scoreboard-btn").attr('href',sb);
           $("#scoreboard_link").html(sb);
+          $("#sb_link").html(sb_new);
           $(".tablo-btn").attr('href',tablo);
           $("#tablo_link").html(tablo);
           $(".results-btn").attr('href',results);
