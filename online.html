@@ -5,19 +5,41 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Онлайн результаты</title>
-    <script src="js/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="js/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/auth.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background-color: #f5f5f5;
         }
-        
+
+        .auth-header {
+            background: #225378;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .auth-header a {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+        }
+
+        .auth-header a:hover {
+            text-decoration: underline;
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -258,6 +280,30 @@
     </style>
 </head>
 <body>
+    <div class="auth-header">
+        <span>🏐 Volleyball Scoreboard - Онлайн результаты</span>
+        <div id="authLinks">
+            <a href="login.html">Войти</a>
+        </div>
+    </div>
+    <script>
+        // Проверка авторизации
+        window.addEventListener('DOMContentLoaded', async () => {
+            await AuthModule.checkAuth('user', null); // Не перенаправлять если не авторизован
+            
+            const user = AuthModule.getCurrentUser();
+            if (user) {
+                const role = AuthModule.getCurrentRole();
+                let html = `<span>${user.email} (${role === 'admin' ? 'Админ' : 'Пользователь'})</span>`;
+                html += '<a href="ctl.html">Управление</a>';
+                if (role === 'admin') {
+                    html += '<a href="admin.html">Админ-панель</a>';
+                }
+                html += '<a href="#" onclick="AuthModule.logout(); return false;">Выйти</a>';
+                document.getElementById('authLinks').innerHTML = html;
+            }
+        });
+    </script>
     <div class="container">
         <h1>Онлайн результаты матчей</h1>
         

@@ -4,13 +4,48 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control scoreboard</title>
-    <script src="js/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="js/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/common.js"></script>
     <script src="js/ctl.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+        .auth-header {
+            background: #225378;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .auth-header a {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+        }
+        .auth-header a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <script>
+        // Проверка авторизации при загрузке страницы
+        window.addEventListener('DOMContentLoaded', async () => {
+            const authorized = await AuthModule.checkAuth('user');
+            if (!authorized) {
+                return; // Перенаправление выполнится автоматически
+            }
+            
+            // Отображение информации о пользователе
+            const user = AuthModule.getCurrentUser();
+            const role = AuthModule.getCurrentRole();
+            document.getElementById('userInfo').textContent = `${user.email} (${role === 'admin' ? 'Админ' : 'Пользователь'})`;
+        });
+    </script>
     <style>
       .score-row {
         display: flex;
@@ -53,6 +88,21 @@
     </style>
   </head>
   <body>
+    <div class="auth-header">
+        <span>🏐 Volleyball Scoreboard - Управление табло</span>
+        <div>
+            <span id="userInfo">Загрузка...</span>
+            <a href="admin.html" id="adminLink" style="display:none;">Админ-панель</a>
+            <a href="online.html">Результаты</a>
+            <a href="#" onclick="AuthModule.logout(); return false;">Выйти</a>
+        </div>
+    </div>
+    <script>
+        // Показываем ссылку на админку если администратор
+        if (AuthModule.getCurrentRole() === 'admin') {
+            document.getElementById('adminLink').style.display = 'inline';
+        }
+    </script>
     <div class="container">
       <div class="row text-center">
         <div class="col-xs-12 col-md-4 hidden">

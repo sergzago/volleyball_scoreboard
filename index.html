@@ -4,13 +4,110 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Scoreboard creator</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="js/auth.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.8/uuid.min.js" integrity="sha384-ojT96dIkO5uDUptuYUBcwQK3flLsTlH0IH2eqFDFzvsvyWu+Uj6z6kjaCUzanmkf" crossorigin="anonymous"></script>
     <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+        .auth-header {
+            background: #225378;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .auth-header a {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+        }
+        .auth-header a:hover {
+            text-decoration: underline;
+        }
+        .login-prompt {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin: 50px auto;
+            max-width: 400px;
+        }
+        .login-prompt h2 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .login-prompt p {
+            color: #856404;
+            margin-bottom: 20px;
+        }
+        .login-prompt .btn {
+            background: #225378;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .login-prompt .btn:hover {
+            background: #1b415e;
+        }
+        #authContent {
+            display: none;
+        }
+    </style>
+    <script>
+        // Проверка авторизации при загрузке страницы
+        window.addEventListener('DOMContentLoaded', async () => {
+            const authorized = await AuthModule.checkAuth('user');
+            
+            if (!authorized) {
+                // Показать форму с просьбой войти
+                document.getElementById('loginPrompt').style.display = 'block';
+                document.getElementById('authContent').style.display = 'none';
+            } else {
+                // Показать основной контент
+                document.getElementById('loginPrompt').style.display = 'none';
+                document.getElementById('authContent').style.display = 'block';
+                
+                // Отобразить информацию о пользователе
+                const user = AuthModule.getCurrentUser();
+                const role = AuthModule.getCurrentRole();
+                document.getElementById('userInfo').textContent = `${user.email} (${role === 'admin' ? 'Админ' : 'Пользователь'})`;
+                
+                // Показать ссылку на админку если админ
+                if (role === 'admin') {
+                    document.getElementById('adminLink').style.display = 'inline';
+                }
+            }
+        });
+    </script>
   </head>
   <body>
-    <div class="container">
+    <div class="auth-header">
+        <span>🏐 Volleyball Scoreboard - Создание игр</span>
+        <div>
+            <span id="userInfo">Загрузка...</span>
+            <a href="admin.html" id="adminLink" style="display:none;">Админ-панель</a>
+            <a href="online.html">Результаты</a>
+            <a href="#" onclick="AuthModule.logout(); return false;">Выйти</a>
+        </div>
+    </div>
+
+    <!-- Блок для неавторизованных пользователей -->
+    <div id="loginPrompt" class="login-prompt" style="display: none;">
+        <h2>🔐 Требуется авторизация</h2>
+        <p>Для создания и управления играми необходимо войти в систему</p>
+        <a href="login.html" class="btn">Войти в систему</a>
+    </div>
+
+    <!-- Основной контент для авторизованных пользователей -->
+    <div id="authContent" class="container">
       <div class="row text-center">
         <div class="col-xs-12 col-md-4">
           <div class="panel panel-default">
@@ -72,6 +169,7 @@
         });
         $("#game_id").val(uuid()).change();
       </script>
+    </div>
 
   </body>
 </html>

@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Админ-панель - Управление пользователями</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <link href="css/css.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background: #225378;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .btn-primary {
+            background: #1695A3;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #117a8b;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .card-header h2 {
+            margin: 0;
+            color: #225378;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #225378;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #225378;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .role-admin {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .role-user {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #1565c0;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #225378;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #225378;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 8px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🔧 Админ-панель</h1>
+        <div class="navbar-right">
+            <span class="user-info" id="userInfo">Загрузка...</span>
+            <button class="btn btn-secondary" onclick="logout()">Выйти</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Форма добавления пользователя -->
+        <div class="card">
+            <div class="card-header">
+                <h2>➕ Добавить нового пользователя</h2>
+            </div>
+            <form id="addUserForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="newUsername">Имя пользователя *</label>
+                        <input type="text" id="newUsername" required placeholder="admin" pattern="[a-zA-Z0-9_]+" title="Только буквы, цифры и подчеркивание">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Пароль *</label>
+                        <input type="password" id="newPassword" required placeholder="Минимум 6 символов" minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="newDisplayName">Отображаемое имя</label>
+                        <input type="text" id="newDisplayName" placeholder="Имя для отображения">
+                    </div>
+                    <div class="form-group">
+                        <label for="newRole">Роль</label>
+                        <select id="newRole">
+                            <option value="user">Пользователь</option>
+                            <option value="admin">Администратор</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Создать пользователя</button>
+            </form>
+        </div>
+
+        <!-- Список пользователей -->
+        <div class="card">
+            <div class="card-header">
+                <h2>👥 Пользователи системы</h2>
+            </div>
+            <div id="usersTableContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Загрузка пользователей...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✏️ Редактирование пользователя</h3>
+            </div>
+            <form id="editUserForm">
+                <input type="hidden" id="editUid">
+                <div class="form-group">
+                    <label for="editEmail">Email</label>
+                    <input type="email" id="editEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPassword">Новый пароль</label>
+                    <input type="password" id="editPassword" placeholder="Оставьте пустым для сохранения текущего" minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="editDisplayName">Имя</label>
+                    <input type="text" id="editDisplayName">
+                </div>
+                <div class="form-group">
+                    <label for="editRole">Роль</label>
+                    <select id="editRole">
+                        <option value="user">Пользователь</option>
+                        <option value="admin">Администратор</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Firebase конфигурация
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
+            authDomain: "myvolleyscore.firebaseapp.com",
+            projectId: "myvolleyscore",
+            storageBucket: "myvolleyscore.firebasestorage.app",
+            messagingSenderId: "102858014506",
+            appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
+            measurementId: "G-6MQ6ZLE52N"
+        };
+
+        // Инициализация Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            console.log('✅ Firebase initialized');
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        console.log('✅ Firestore initialized, projectId:', firebaseConfig.projectId);
+
+        // Глобальные переменные
+        let currentUser = null;
+        let usersList = [];
+
+        // Проверка авторизации при загрузке
+        auth.onAuthStateChanged(async (user) => {
+            console.log('Auth state changed:', user ? user.email : 'no user');
+            if (!user) {
+                console.log('No user, redirecting to login.html');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            currentUser = user;
+
+            try {
+                // Проверяем роль через claims без сервера
+                const idTokenResult = await user.getIdTokenResult();
+                const claims = idTokenResult.claims || {};
+                const role = claims.admin ? 'admin' : 'user';
+                
+                console.log('User role:', role, 'Claims:', claims);
+
+                if (role !== 'admin') {
+                    console.log('User is not admin, redirecting to ctl.html');
+                    showAlert('Доступ запрещен. Требуются права администратора.', 'error');
+                    setTimeout(() => {
+                        window.location.href = 'ctl.html';
+                    }, 2000);
+                    return;
+                }
+
+                // Загружаем список пользователей
+                document.getElementById('userInfo').textContent = `${user.email} (Администратор)`;
+                console.log('Loading users from Firestore...');
+                loadUsers();
+
+            } catch (error) {
+                console.error('Auth error:', error);
+                showAlert('Ошибка проверки авторизации: ' + error.message, 'error');
+            }
+        });
+
+        // Загрузка пользователей
+        async function loadUsers() {
+            console.log('=== loadUsers() started ===');
+            try {
+                console.log('Fetching users from Firestore...');
+                const snapshot = await db.collection('users').get();
+                console.log('✅ Users fetched:', snapshot.size);
+
+                if (snapshot.empty) {
+                    console.log('No users found in Firestore');
+                    usersList = [];
+                } else {
+                    usersList = snapshot.docs.map(doc => {
+                        const data = doc.data();
+                        console.log('User doc:', doc.id, data);
+                        return {
+                            uid: doc.id,
+                            ...data
+                        };
+                    });
+                }
+
+                console.log('usersList:', usersList);
+                renderUsersTable();
+
+            } catch (error) {
+                console.error('❌ Load users error:', error);
+                console.error('Error code:', error.code);
+                console.error('Error message:', error.message);
+                
+                let detailedError = error.message;
+                if (error.code === 'permission-denied') {
+                    detailedError = 'Нет доступа к Firestore. Проверьте правила безопасности в Firebase Console.';
+                }
+                
+                showAlert('Ошибка загрузки: ' + detailedError, 'error');
+            }
+            console.log('=== loadUsers() finished ===');
+        }
+
+        // Рендеринг таблицы пользователей
+        function renderUsersTable() {
+            const container = document.getElementById('usersTableContainer');
+
+            if (usersList.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Пользователи не найдены</p>
+                        <p>Создайте первого пользователя</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Имя</th>
+                            <th>Роль</th>
+                            <th>Дата создания</th>
+                            <th>Последний вход</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            usersList.forEach(user => {
+                const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ru-RU') : 'N/A';
+                const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('ru-RU') : 'N/A';
+                const roleClass = user.role === 'admin' ? 'role-admin' : 'role-user';
+                const roleText = user.role === 'admin' ? 'Администратор' : 'Пользователь';
+                const isCurrentUser = user.uid === currentUser.uid;
+                const username = user.username || user.email.split('@')[0];
+
+                html += `
+                    <tr>
+                        <td><strong>@${escapeHtml(username)}</strong></td>
+                        <td>${escapeHtml(user.displayName || '-')}</td>
+                        <td><span class="role-badge ${roleClass}">${roleText}</span></td>
+                        <td>${createdAt}</td>
+                        <td>${lastLogin}</td>
+                        <td class="actions">
+                            <button class="btn btn-primary btn-sm" onclick="openEditModal('${user.uid}')" ${isCurrentUser ? 'disabled' : ''}>
+                                ${isCurrentUser ? 'Текущий' : '✏️'}
+                            </button>
+                            ${!isCurrentUser ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${user.uid}', '@${escapeHtml(username)}')">🗑️</button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        // Добавление пользователя
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const displayName = document.getElementById('newDisplayName').value.trim();
+            const role = document.getElementById('newRole').value;
+
+            try {
+                // Генерируем email из username
+                const email = username.toLowerCase() + '@volleyball.local';
+
+                // Создаем пользователя через Firebase Auth
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const newUser = userCredential.user;
+
+                // Обновляем displayName
+                await newUser.updateProfile({ displayName: displayName || username });
+
+                // Получаем токен текущего пользователя (админа) для установки claims
+                // Примечание: Установка custom claims возможна только через Admin SDK
+                // Поэтому создаем пользователя с базовой ролью 'user'
+                // Админ может установить роль через Firebase Console или серверный скрипт
+                
+                showAlert(
+                    `Пользователь ${username} успешно создан!\n\n` +
+                    `⚠️ Примечание: Для установки роли администратора используйте ` +
+                    `скрипт server/scripts/create-admin-full.js или Firebase Console.`,
+                    'success'
+                );
+                
+                // Сохраняем информацию о пользователе в Firestore (опционально)
+                try {
+                    const db = firebase.firestore();
+                    await db.collection('users').doc(username.toLowerCase()).set({
+                        uid: newUser.uid,
+                        email: email,
+                        username: username.toLowerCase(),
+                        displayName: displayName || username,
+                        role: role,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLoginAt: null
+                    });
+                } catch (firestoreError) {
+                    console.warn('Не удалось сохранить в Firestore:', firestoreError.message);
+                }
+                
+                // Очистка формы
+                document.getElementById('addUserForm').reset();
+                
+                // Перезагрузка списка
+                loadUsers();
+
+            } catch (error) {
+                console.error('Create user error:', error);
+                let errorMsg = error.message || 'Ошибка создания пользователя';
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMsg = 'Пользователь с таким именем уже существует';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMsg = 'Слишком слабый пароль. Минимум 6 символов';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMsg = 'Неверное имя пользователя';
+                }
+                
+                showAlert(errorMsg, 'error');
+            }
+        });
+
+        // Открытие модального окна редактирования
+        function openEditModal(uid) {
+            const user = usersList.find(u => u.uid === uid);
+            if (!user) return;
+
+            document.getElementById('editUid').value = uid;
+            document.getElementById('editEmail').value = user.email;
+            document.getElementById('editDisplayName').value = user.displayName || '';
+            document.getElementById('editRole').value = user.role;
+            document.getElementById('editPassword').value = '';
+
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        // Закрытие модального окна
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        // Редактирование пользователя
+        document.getElementById('editUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const uid = document.getElementById('editUid').value;
+            const email = document.getElementById('editEmail').value.trim();
+            const password = document.getElementById('editPassword').value;
+            const displayName = document.getElementById('editDisplayName').value.trim();
+            const role = document.getElementById('editRole').value;
+
+            try {
+                // Находим пользователя в Firebase Auth
+                // Примечание: Прямое редактирование пользователей возможно только через Admin SDK
+                // Поэтому обновляем только Firestore и показываем инструкцию
+                
+                const db = firebase.firestore();
+                const userRef = db.collection('users').doc(uid);
+                const userDoc = await userRef.get();
+                
+                if (!userDoc.exists) {
+                    throw new Error('Пользователь не найден');
+                }
+                
+                const userData = userDoc.data();
+                const username = userData.username;
+
+                // Обновляем Firestore
+                await userRef.update({
+                    displayName: displayName || userData.displayName,
+                    role: role
+                });
+
+                // Если указан пароль, показываем инструкцию
+                if (password) {
+                    showAlert(
+                        `Данные обновлены в Firestore.\n\n` +
+                        `⚠️ Для смены пароля используйте Firebase Console:\n` +
+                        `Authentication → Users → Найдите ${email} → Reset password`,
+                        'success'
+                    );
+                } else {
+                    showAlert('Пользователь успешно обновлен', 'success');
+                }
+                
+                closeEditModal();
+                loadUsers();
+
+            } catch (error) {
+                console.error('Update user error:', error);
+                showAlert('Ошибка обновления пользователя: ' + error.message, 'error');
+            }
+        });
+
+        // Удаление пользователя
+        async function deleteUser(uid, username) {
+            if (!confirm(`Вы уверены, что хотите удалить пользователя ${username}?`)) {
+                return;
+            }
+
+            try {
+                const db = firebase.firestore();
+                
+                // Удаляем из Firestore
+                await db.collection('users').doc(uid).delete();
+                
+                // Примечание: Удаление из Firebase Auth возможно только через Admin SDK
+                // Показываем инструкцию
+                showAlert(
+                    `Пользователь удален из Firestore.\n\n` +
+                    `⚠️ Для полного удаления используйте Firebase Console:\n` +
+                    `Authentication → Users → Найдите пользователя → Delete`,
+                    'success'
+                );
+                
+                loadUsers();
+
+            } catch (error) {
+                console.error('Delete user error:', error);
+                showAlert('Ошибка удаления пользователя: ' + error.message, 'error');
+            }
+        }
+
+        // Выход
+        async function logout() {
+            try {
+                await auth.signOut();
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                showAlert('Ошибка выхода', 'error');
+            }
+        }
+
+        // Утилиты
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alertClass = type === 'success' ? 'alert-success' : 
+                              type === 'error' ? 'alert-error' : 'alert-info';
+            
+            container.innerHTML = `
+                <div class="alert ${alertClass}">
+                    ${escapeHtml(message)}
+                </div>
+            `;
+
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Закрытие модального окна по клику вне его
+        document.getElementById('editModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('editModal')) {
+                closeEditModal();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Вход в систему - Volleyball Scoreboard</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <link href="css/css.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #225378 0%, #1695A3 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            color: #225378;
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+
+        .login-header p {
+            color: #666;
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .logo {
+            max-width: 80px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #225378;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: #225378;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .login-btn:hover {
+            background: #1b415e;
+        }
+
+        .login-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .links {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .links a {
+            color: #225378;
+            text-decoration: none;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 10px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #225378;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .role-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+
+        .role-info strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <img src="logo_nvl.png" alt="Volleyball" class="logo" onerror="this.style.display='none'">
+            <h1>Volleyball Scoreboard</h1>
+            <p>Войдите для продолжения</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <form id="loginFormElement">
+            <div id="loginForm">
+                <div class="form-group">
+                    <label for="username">Имя пользователя</label>
+                    <input type="text" id="username" placeholder="admin" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" placeholder="Введите пароль" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="login-btn" id="loginBtn">Войти</button>
+
+                <div class="role-info">
+                    <strong>Роли пользователей:</strong>
+                    📊 <b>Пользователь</b> - просмотр результатов и управление табло<br>
+                    🔧 <b>Администратор</b> - управление пользователями и полный доступ
+                </div>
+
+                <div class="links">
+                    <a href="online.html">← Назад к результатам</a>
+                </div>
+            </div>
+        </form>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Вход в систему...</p>
+        </div>
+    </div>
+
+    <script>
+        // Firebase конфигурация
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
+            authDomain: "myvolleyscore.firebaseapp.com",
+            projectId: "myvolleyscore",
+            storageBucket: "myvolleyscore.firebasestorage.app",
+            messagingSenderId: "102858014506",
+            appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
+            measurementId: "G-6MQ6ZLE52N"
+        };
+
+        // Инициализация Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+
+        // Элементы DOM
+        let loginFormElement, loginBtn, usernameInput, passwordInput, errorMessage, successMessage, loadingDiv;
+
+        // Ждем загрузки DOM
+        document.addEventListener('DOMContentLoaded', () => {
+            loginFormElement = document.getElementById('loginFormElement');
+            loginBtn = document.getElementById('loginBtn');
+            usernameInput = document.getElementById('username');
+            passwordInput = document.getElementById('password');
+            errorMessage = document.getElementById('errorMessage');
+            successMessage = document.getElementById('successMessage');
+            loadingDiv = document.getElementById('loading');
+
+            console.log('DOM loaded, elements:', {
+                form: !!loginFormElement,
+                btn: !!loginBtn,
+                username: !!usernameInput,
+                password: !!passwordInput
+            });
+
+            // Проверка: если уже авторизован, перенаправляем
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    console.log('User authenticated:', user.email);
+                    showLoading();
+                    try {
+                        // Получаем токен и проверяем claims без сервера
+                        const idTokenResult = await user.getIdTokenResult();
+                        const claims = idTokenResult.claims || {};
+                        const role = claims.admin ? 'admin' : 'user';
+                        console.log('User role:', role, 'Claims:', claims);
+                        
+                        // Перенаправляем в зависимости от роли
+                        if (role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'ctl.html';
+                        }
+                    } catch (error) {
+                        console.error('Auth error:', error);
+                        hideLoading();
+                        showError('Ошибка проверки авторизации: ' + error.message);
+                    }
+                }
+            });
+
+            // Обработка формы входа
+            loginFormElement.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+
+                console.log('Login attempt:', { username, passwordLength: password.length });
+
+                if (!username || !password) {
+                    showError('Введите имя пользователя и пароль');
+                    return;
+                }
+
+                showLoading();
+                hideError();
+
+                try {
+                    // Генерируем email из username
+                    const email = username.toLowerCase() + '@volleyball.local';
+                    console.log('Attempting login with email:', email);
+
+                    // Вход через Firebase Auth с email
+                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    console.log('Login successful:', user.email);
+
+                    // Получаем токен и проверяем роль
+                    const idTokenResult = await user.getIdTokenResult();
+                    const claims = idTokenResult.claims || {};
+                    const role = claims.admin ? 'admin' : 'user';
+                    console.log('User role:', role, 'Claims:', claims);
+
+                    showSuccess('Успешный вход! Перенаправление...');
+
+                    // Перенаправляем в зависимости от роли
+                    setTimeout(() => {
+                        if (role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'ctl.html';
+                        }
+                    }, 1000);
+
+                } catch (error) {
+                    console.error('Login error:', error);
+                    hideLoading();
+                    
+                    let errorMsg = 'Ошибка входа. Проверьте credentials.';
+                    
+                    if (error.code === 'auth/user-not-found') {
+                        errorMsg = 'Пользователь не найден';
+                    } else if (error.code === 'auth/wrong-password') {
+                        errorMsg = 'Неверный пароль';
+                    } else if (error.code === 'auth/too-many-requests') {
+                        errorMsg = 'Слишком много попыток входа. Попробуйте позже';
+                    } else if (error.code === 'auth/user-disabled') {
+                        errorMsg = 'Учетная запись заблокирована';
+                    } else if (error.code === 'auth/invalid-email') {
+                        errorMsg = 'Неверное имя пользователя';
+                    } else if (error.code === 'auth/network-request-failed') {
+                        errorMsg = 'Ошибка сети. Проверьте интернет-соединение.';
+                    }
+
+                    showError(errorMsg);
+                }
+            });
+
+            // Вход по Enter
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    loginBtn.click();
+                }
+            });
+
+            // Функции
+            function showLoading() {
+                loginFormElement.style.display = 'none';
+                loadingDiv.style.display = 'block';
+            }
+
+            function hideLoading() {
+                loadingDiv.style.display = 'none';
+                loginFormElement.style.display = 'block';
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                successMessage.style.display = 'none';
+            }
+
+            function hideError() {
+                errorMessage.style.display = 'none';
+            }
+
+            function showSuccess(message) {
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

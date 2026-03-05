@@ -6,13 +6,17 @@ const { initializeFirebase } = require('./config/firebase');
 const { errorHandler } = require('./middleware/validators');
 const scoreboardRouter = require('./routes/scoreboard');
 const matchesRouter = require('./routes/matches');
+const authRouter = require('./routes/auth');
 
 // Инициализация Firebase
-const { admin } = initializeFirebase();
+const { admin, db } = initializeFirebase();
 
 // Создание Express приложения
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Сохраняем Firebase инстансы в app.locals для доступа в маршрутах
+app.locals.firebase = { admin, db };
 
 // Middleware
 app.use(helmet()); // Безопасность HTTP заголовков
@@ -30,6 +34,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Маршруты
+app.use('/api/auth', authRouter);
 app.use('/api/scoreboard', scoreboardRouter);
 app.use('/api/matches', matchesRouter);
 
