@@ -4,18 +4,36 @@ var CLASSIC_POINTS_TO_WIN = 25;
 var CLASSIC_SETS_TO_WIN = 3;
 var MAX_CLASSIC_SETS = 5;
 
-scoreboard_query.onSnapshot(
-  function(documentSnapshot){
-    if(!documentSnapshot.exists)
-      return;
-    $(".hidden").removeClass("hidden");
-    scoreboard_data=documentSnapshot.data();
-    console.log(scoreboard_data);
-    $('.away_team').html(scoreboard_data['away_team'])
-    var disp=scoreboard_data['show'];
-    if(disp == false) disp=0; else if(disp == true) disp=1;
+// scoreboard_data определена в common.js
 
-    $(".show-select").removeClass("btn-info");
+// Получение информации о текущем пользователе
+function getCurrentUserInfo() {
+  const user = firebase.auth().currentUser;
+  if (!user) return {};
+  
+  const username = user.email.split('@')[0];
+  return {
+    username: username,
+    displayname: user.displayName || username
+  };
+}
+
+// Подписка на изменения в Firestore после загрузки DOM
+$(document).ready(function() {
+  scoreboard_query.onSnapshot(
+    function(documentSnapshot){
+      if(!documentSnapshot.exists) {
+        console.warn('Document does not exist:', scoreboard_query.id);
+        return;
+      }
+      $(".hidden").removeClass("hidden");
+      scoreboard_data=documentSnapshot.data();
+      $('.away_team').html(scoreboard_data['away_team'])
+      $('.home_team').html(scoreboard_data['home_team'])
+      var disp=scoreboard_data['show'];
+      if(disp == false) disp=0; else if(disp == true) disp=1;
+
+      $(".show-select").removeClass("btn-info");
     if(disp == 0){
       $(".show-select[data-val='0']").addClass("btn-info");
     }else if(disp == 1){
@@ -33,8 +51,7 @@ scoreboard_query.onSnapshot(
     var beachMode=isBeachMode();
     $('#beach_mode_toggle').prop('checked', beachMode);
     $('.beach-hint').toggleClass('hidden', !beachMode);
-    $(".foul-btn").prop('disabled', beachMode);
-    $(".period-btn").prop('disabled', beachMode);
+    // Кнопки foul и period доступны всегда
     var invertTablo = !!scoreboard_data['invert_tablo'];
     $('#invert_tablo_toggle').prop('checked', invertTablo);
     var unlimitedScore = !!scoreboard_data['unlimited_score'];
@@ -57,47 +74,28 @@ scoreboard_query.onSnapshot(
     }
     var matchFinished = beachFinished || classicFinished;
     var pendingNewSet = !!scoreboard_data['pending_new_set'];
-    // Determine whether period controls should be enabled:
-    // - at the start of a set when score is 0:0 (allow changing period before play)
-    // - after a set finished and waiting for New Set (pendingNewSet)
-    // - after match finished (allow adjustments)
-    // - always enabled if unlimited_score mode is on
-    var unlimitedScore = !!scoreboard_data['unlimited_score'];
     var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
-    var enablePeriodButtons = unlimitedScore || startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished'];
-    // Disable + buttons when match finished or when waiting for New Set.
-    $(".score-btn").filter(function(){
+
+    // Блокировка кнопок в блоке "Сет" (очки) после завершения сета
+    // Кнопки доступны только когда сет идет (не pendingNewSet и не matchFinished)
+    var scoreButtonsDisabled = pendingNewSet || matchFinished;
+
+    // Блокировка кнопок в блоке "Счёт" (фолы) в середине сета
+    // Кнопки доступны только в начале сета (0:0) или при ожидании нового сета
+    var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
+
+    // Disable score buttons after set finished (pending new set)
+    $(".score-btn").prop('disabled', scoreButtonsDisabled);
+
+    // Disable foul buttons in middle of set
+    $(".foul-btn").filter(function(){
       return parseInt($(this).text(),10) > 0;
-    }).prop('disabled', matchFinished || pendingNewSet);
-    // Disable - buttons only when match finished (allow revert during pending new set)
-    $(".score-btn").filter(function(){
+    }).prop('disabled', matchFinished || pendingNewSet || foulButtonsDisabled);
+
+    $(".foul-btn").filter(function(){
       return parseInt($(this).text(),10) < 0;
-    }).prop('disabled', matchFinished);
-    // Additionally, if waiting for New Set, disable the '-' button for the losing team
-    if(pendingNewSet){
-      // determine last set winner/loser from set_history or from current visible scores
-      var history = Array.isArray(scoreboard_data['set_history'])?scoreboard_data['set_history']:[];
-      var last = history.length? history[history.length-1] : null;
-      var loser = null;
-      if(last){
-        var h = ensureNumber(last.home);
-        var a = ensureNumber(last.away);
-        if(h>a) loser = 'away';
-        else if(a>h) loser = 'home';
-      } else {
-        // fallback to comparing displayed scores
-        var hs = ensureNumber(scoreboard_data['home_score']);
-        var as = ensureNumber(scoreboard_data['away_score']);
-        if(hs>as) loser = 'away';
-        else if(as>hs) loser = 'home';
-      }
-      if(loser){
-        // disable '-' button for the loser
-        $(".score-btn").filter(function(){
-          return parseInt($(this).text(),10) < 0 && $(this).data('team') === loser;
-        }).prop('disabled', true);
-      }
-    }
+    }).prop('disabled', matchFinished || foulButtonsDisabled);
+    
     // New Set button enabled only when there's a pending new set
     $(".new-set-btn").prop('disabled', !pendingNewSet || matchFinished);
     // Highlight button with red background when pending new set
@@ -107,7 +105,9 @@ scoreboard_query.onSnapshot(
       $(".new-set-btn").css('background-color', '').css('color', '');
     }
     // Period buttons: enable only at initial moment or after set/match end
-    var periodDisabled = beachMode || !enablePeriodButtons;
+    var unlimitedScore = !!scoreboard_data['unlimited_score'];
+    var enablePeriodButtons = unlimitedScore || startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished'];
+    var periodDisabled = !enablePeriodButtons;
     $(".period-btn").prop('disabled', periodDisabled);
 
     //$("#show").prop("checked",(scoreboard_data['show']));
@@ -128,15 +128,25 @@ scoreboard_query.onSnapshot(
     $('#custom_label').val(scoreboard_data['custom_label'])
     updateSideLayout();
     renderSetHistoryCtl(scoreboard_data['set_history']);
+  }, function(error) {
+    console.error('Error listening to scoreboard:', error);
   });
+});
 
 function update_db(data){
+  // Добавляем информацию о пользователе, который редактирует
+  var userInfo = getCurrentUserInfo();
+  if (userInfo.username) {
+    data.username = userInfo.username;
+    data.displayname = userInfo.displayname;
+  }
   data.lastEdited = firebase.firestore.FieldValue.serverTimestamp();
   scoreboard_query.update(data);
 }
 
 function saveMatchResult(setHistory, overallHome, overallAway){
   var isBeach = isBeachMode();
+  var userInfo = getCurrentUserInfo();
 
   if(typeof overallHome === 'undefined' || typeof overallAway === 'undefined'){
     if(isBeach){
@@ -156,7 +166,9 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
-    game_id: game_id
+    game_id: game_id,
+    username: userInfo.username || '',
+    displayname: userInfo.displayname || ''
   };
 
   matches_collection.add(matchData).then(function(docRef) {
@@ -325,7 +337,8 @@ function nextSetHistory(homeScore, awayScore){
 }
 
 function handleBeachScore(team, delta){
-  if(scoreboard_data['beach_match_finished'])
+  // Проверка завершенности матча для обоих режимов
+  if(scoreboard_data['beach_match_finished'] || scoreboard_data['classic_match_finished'])
     return;
   var scoreKey=team+'_score';
   var otherKey=team=='home'?'away_score':'home_score';
@@ -354,50 +367,92 @@ function handleBeachScore(team, delta){
   var homeAfterScore=team=='home'?newScore:otherScore;
   var awayAfterScore=team=='home'?otherScore:newScore;
   if(delta>0 && hasTeamWonSet(team, homeAfterScore, awayAfterScore, target)){
-    applyBeachSetWin(team, homeAfterScore, awayAfterScore, update);
+    applySetWin(team, homeAfterScore, awayAfterScore, update);
   }else{
     update_db(update);
   }
 }
 
-function applyBeachSetWin(team, homeScore, awayScore, baseUpdate){
-  var homeSets=ensureNumber(scoreboard_data['home_sets']);
-  var awaySets=ensureNumber(scoreboard_data['away_sets']);
-  if(team=='home'){
-    homeSets++;
-  }else{
-    awaySets++;
-  }
-  var matchFinished=(homeSets>=BEACH_SETS_TO_WIN)||(awaySets>=BEACH_SETS_TO_WIN);
-  var currentSet=getBeachSetNumber();
-  var update=Object.assign({}, baseUpdate || {});
-  update['home_sets']=homeSets;
-  update['away_sets']=awaySets;
-  if(!('beach_switch_message' in update)){
-    update['beach_switch_message']='';
-  }
+function applySetWin(team, homeScore, awayScore, baseUpdate){
+  var beachMode = !!scoreboard_data['beach_mode'];
+  
+  if(beachMode) {
+    // Логика пляжного волейбола
+    var homeSets=ensureNumber(scoreboard_data['home_sets']);
+    var awaySets=ensureNumber(scoreboard_data['away_sets']);
+    if(team=='home'){
+      homeSets++;
+    }else{
+      awaySets++;
+    }
+    var matchFinished=(homeSets>=BEACH_SETS_TO_WIN)||(awaySets>=BEACH_SETS_TO_WIN);
+    var currentSet=getBeachSetNumber();
+    var update=Object.assign({}, baseUpdate || {});
+    update['home_sets']=homeSets;
+    update['away_sets']=awaySets;
+    if(!('beach_switch_message' in update)){
+      update['beach_switch_message']='';
+    }
 
-  if(matchFinished || currentSet>=BEACH_MAX_SETS){
-    update['beach_match_finished']=true;
+    if(matchFinished || currentSet>=BEACH_MAX_SETS){
+      update['beach_match_finished']=true;
+      update['home_score']=homeScore;
+      update['away_score']=awayScore;
+      update['current_period']=currentSet;
+      update['beach_current_set']=currentSet;
+    }else{
+      var nextSet=currentSet+1;
+      update['home_score']=homeScore;
+      update['away_score']=awayScore;
+      update['next_beach_set']=nextSet;
+      update['pending_new_set']=true;
+    }
+    var updatedHistory = nextSetHistory(homeScore, awayScore);
+    update['set_history']=updatedHistory;
+    if(matchFinished) {
+      saveMatchResult(updatedHistory, homeSets, awaySets);
+    }
+    update_db(update);
+  } else {
+    // Логика классического волейбола - используем fouls для подсчета сетов
+    var homeFouls=ensureNumber(scoreboard_data['home_fouls']);
+    var awayFouls=ensureNumber(scoreboard_data['away_fouls']);
+    if(team=='home'){
+      homeFouls++;
+    }else{
+      awayFouls++;
+    }
+    var matchFinished=(homeFouls>=CLASSIC_SETS_TO_WIN)||(awayFouls>=CLASSIC_SETS_TO_WIN);
+    var currentPeriod=ensureNumber(scoreboard_data['current_period'])||1;
+    var maxPeriod=ensureNumber(scoreboard_data['period_count'])||5;
+    var nextPeriod=currentPeriod<maxPeriod?currentPeriod+1:currentPeriod;
+    var update=Object.assign({}, baseUpdate, {
+      home_fouls:homeFouls,
+      away_fouls:awayFouls,
+      current_period: currentPeriod,
+      classic_match_finished:matchFinished
+    });
+    if(!matchFinished){
+      var flip = flipSidesPayload({
+        classic_tiebreak_switch_done: nextPeriod==5 ? false : true
+      });
+      update['pending_home_side'] = flip.home_side;
+      update['pending_away_side'] = flip.away_side;
+      update['pending_classic_tiebreak_switch_done'] = flip.classic_tiebreak_switch_done;
+      update['next_period'] = nextPeriod;
+      update['pending_new_set'] = true;
+    }else{
+      update['classic_tiebreak_switch_done']=true;
+    }
     update['home_score']=homeScore;
     update['away_score']=awayScore;
-    update['current_period']=currentSet;
-    update['beach_current_set']=currentSet;
-  }else{
-    var nextSet=currentSet+1;
-    // Оставляем финальный счёт видимым до нажатия "Новый сет"
-    update['home_score']=homeScore;
-    update['away_score']=awayScore;
-    // Не переключаем текущий сет автоматически — отложим переключение на кнопку "Новый сет"
-    update['next_beach_set']=nextSet;
-    update['pending_new_set']=true;
+    var updatedHistory = nextSetHistory(homeScore, awayScore);
+    update['set_history']=updatedHistory;
+    if(matchFinished) {
+      saveMatchResult(updatedHistory, homeFouls, awayFouls);
+    }
+    update_db(update);
   }
-  var updatedHistory = nextSetHistory(homeScore, awayScore);
-  update['set_history']=updatedHistory;
-  if(matchFinished) {
-    saveMatchResult(updatedHistory, homeSets, awaySets);
-  }
-  update_db(update);
 }
 
 function toggleBeachMode(enabled){
@@ -623,15 +678,10 @@ $(document).ready(function(){
         }
       }
     }
-    if(isBeachMode()){
-      handleBeachScore(button.data('team'), delta);
-      return;
-    }
-    handleClassicScore(button.data('team'), delta);
+    // Всегда используем логику пляжного волейбола для кнопок счета
+    handleBeachScore(button.data('team'), delta);
   });
   $(".foul-btn").click(function(){
-    if(isBeachMode())
-      return;
     var button=$(this);
     var delta=parseInt(button.text(),10)
     if(isNaN(delta))
@@ -668,6 +718,7 @@ $(document).ready(function(){
   $(".reset-btn").click(function(){
     var beachEnabled=isBeachMode();
     var invertTablo = !!scoreboard_data['invert_tablo'];
+    var userInfo = getCurrentUserInfo();
     scoreboard_collection.doc(game_id).set({
       show:0,
       home_score:0,
@@ -694,12 +745,12 @@ $(document).ready(function(){
       away_side:'right',
       classic_tiebreak_switch_done:true,
       invert_tablo:invertTablo,
-      lastEdited: firebase.firestore.FieldValue.serverTimestamp()
+      lastEdited: firebase.firestore.FieldValue.serverTimestamp(),
+      username: userInfo.username || '',
+      displayname: userInfo.displayname || ''
     });
   });
   $(".period-btn").click(function(){
-    if(isBeachMode())
-      return;
     var button=$(this);
     var delta=parseInt(button.text(),10)
     if(isNaN(delta))
@@ -743,10 +794,10 @@ $(document).ready(function(){
       
       if(unlimitedScore && homeScore >= target && homeScore - awayScore >= 2){
         // Home team wins with score homeScore:awayScore
-        applyClassicSetWin('home', homeScore, awayScore, {});
+        applySetWin('home', homeScore, awayScore, {});
       } else if(unlimitedScore && awayScore >= target && awayScore - homeScore >= 2){
-        // Away team wins with score homeScore:awayScore (but away is teamScore, home is opponentScore in function params)
-        applyClassicSetWin('away', awayScore, homeScore, {});
+        // Away team wins with score homeScore:awayScore
+        applySetWin('away', awayScore, homeScore, {});
       }
       performNewSetUpdate();
       return;

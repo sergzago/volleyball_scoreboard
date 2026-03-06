@@ -20,11 +20,15 @@ var config = {
 
 
 var scoreboard_data={};
-firebase.initializeApp(config);
+
+// Инициализация Firebase (если ещё не инициализирован)
+if (!firebase.apps.length) {
+    firebase.initializeApp(config);
+}
 db=firebase.firestore();
 scoreboard_collection=db.collection('volleyball')
 matches_collection=db.collection('matches')
 var game_id=getParameterByName('game');
 if(!game_id) game_id='test1';
-console.log(game_id);
+console.log('game_id:', game_id);
 scoreboard_query=scoreboard_collection.doc(game_id)

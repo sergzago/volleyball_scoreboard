@@ -28,41 +28,42 @@ window.AuthModule = (function() {
     /**
      * Проверка авторизации пользователя
      * @param {string} requiredRole - Требуемая роль ('user' или 'admin')
-     * @param {string} redirectUrl - URL для перенаправления если не авторизован
+     * @param {string} redirectUrl - URL для перенаправления если не авторизован (null для возврата false)
      * @returns {Promise<boolean>} - true если авторизован
      */
     async function checkAuth(requiredRole = 'user', redirectUrl = 'login.html') {
         return new Promise((resolve, reject) => {
             auth.onAuthStateChanged(async (user) => {
                 if (!user) {
-                    window.location.href = redirectUrl;
+                    if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                    }
                     resolve(false);
                     return;
                 }
 
                 currentUser = user;
-                
+
                 try {
                     idToken = await user.getIdToken();
+
+                    // Получаем роль из Firestore
+                    const db = firebase.firestore();
+                    const username = user.email.split('@')[0];
+                    const userDoc = await db.collection('users').doc(username).get();
                     
-                    // Получаем информацию о пользователе с сервера
-                    const response = await fetch('/api/auth/me', {
-                        headers: {
-                            'Authorization': `Bearer ${idToken}`
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('Ошибка проверки авторизации');
+                    currentRole = 'user';
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        currentRole = userData.role === 'admin' ? 'admin' : 'user';
                     }
-
-                    const data = await response.json();
-                    currentRole = data.user.role;
 
                     // Проверяем роль
                     if (requiredRole === 'admin' && currentRole !== 'admin') {
                         // Если требуется админ, а у пользователя роль user
-                        window.location.href = 'ctl.html';
+                        if (redirectUrl) {
+                            window.location.href = 'ctl.html';
+                        }
                         resolve(false);
                         return;
                     }
@@ -70,7 +71,9 @@ window.AuthModule = (function() {
                     resolve(true);
                 } catch (error) {
                     console.error('Auth check error:', error);
-                    window.location.href = redirectUrl;
+                    if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                    }
                     resolve(false);
                 }
             });

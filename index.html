@@ -64,27 +64,49 @@
     <script>
         // Проверка авторизации при загрузке страницы
         window.addEventListener('DOMContentLoaded', async () => {
-            const authorized = await AuthModule.checkAuth('user');
+            const auth = AuthModule.auth;
             
-            if (!authorized) {
-                // Показать форму с просьбой войти
-                document.getElementById('loginPrompt').style.display = 'block';
-                document.getElementById('authContent').style.display = 'none';
-            } else {
-                // Показать основной контент
-                document.getElementById('loginPrompt').style.display = 'none';
-                document.getElementById('authContent').style.display = 'block';
-                
-                // Отобразить информацию о пользователе
-                const user = AuthModule.getCurrentUser();
-                const role = AuthModule.getCurrentRole();
-                document.getElementById('userInfo').textContent = `${user.email} (${role === 'admin' ? 'Админ' : 'Пользователь'})`;
-                
-                // Показать ссылку на админку если админ
-                if (role === 'admin') {
-                    document.getElementById('adminLink').style.display = 'inline';
+            // Сохраняем текущий URL для возврата после авторизации
+            const currentPath = window.location.pathname + window.location.search;
+
+            auth.onAuthStateChanged(async (user) => {
+                if (!user) {
+                    // Показать форму с просьбой войти
+                    document.getElementById('loginPrompt').style.display = 'block';
+                    document.getElementById('authContent').style.display = 'none';
+                    return;
                 }
-            }
+
+                // Получаем токен и проверяем роль через Firestore
+                try {
+                    const db = firebase.firestore();
+                    const username = user.email.split('@')[0];
+                    const userDoc = await db.collection('users').doc(username).get();
+                    
+                    let role = 'user';
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        role = userData.role === 'admin' ? 'admin' : 'user';
+                    }
+
+                    // Показать основной контент
+                    document.getElementById('loginPrompt').style.display = 'none';
+                    document.getElementById('authContent').style.display = 'block';
+
+                    // Отобразить информацию о пользователе
+                    document.getElementById('userInfo').textContent = `${user.email} (${role === 'admin' ? 'Админ' : 'Пользователь'})`;
+
+                    // Показать ссылку на админку если админ
+                    if (role === 'admin') {
+                        document.getElementById('adminLink').style.display = 'inline';
+                    }
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    // Не перенаправляем при ошибке, показываем контент
+                    document.getElementById('loginPrompt').style.display = 'none';
+                    document.getElementById('authContent').style.display = 'block';
+                }
+            });
         });
     </script>
   </head>
@@ -103,7 +125,7 @@
     <div id="loginPrompt" class="login-prompt" style="display: none;">
         <h2>🔐 Требуется авторизация</h2>
         <p>Для создания и управления играми необходимо войти в систему</p>
-        <a href="login.html" class="btn">Войти в систему</a>
+        <a href="login.html?redirect=index.html" class="btn">Войти в систему</a>
     </div>
 
     <!-- Основной контент для авторизованных пользователей -->

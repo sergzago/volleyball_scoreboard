@@ -7,6 +7,7 @@
     <title>Админ-панель - Управление пользователями</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
@@ -425,26 +426,44 @@
             console.log('Auth state changed:', user ? user.email : 'no user');
             if (!user) {
                 console.log('No user, redirecting to login.html');
-                window.location.href = 'login.html';
+                const currentPath = window.location.pathname + window.location.search;
+                window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
                 return;
             }
 
             currentUser = user;
 
             try {
-                // Проверяем роль через claims без сервера
-                const idTokenResult = await user.getIdTokenResult();
-                const claims = idTokenResult.claims || {};
-                const role = claims.admin ? 'admin' : 'user';
+                // Получаем токен
+                console.log('Getting ID token...');
+                const idToken = await user.getIdToken();
+
+                // Проверяем роль из Firestore
+                const db = firebase.firestore();
+                const userDoc = await db.collection('users').doc(user.email.split('@')[0]).get();
                 
-                console.log('User role:', role, 'Claims:', claims);
+                let role = 'user';
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    role = userData.role === 'admin' ? 'admin' : 'user';
+                    console.log('User role from Firestore:', role, userData);
+                } else {
+                    // Если документа нет, пробуем найти по uid
+                    const usersByUid = await db.collection('users').where('uid', '==', user.uid).get();
+                    if (!usersByUid.empty) {
+                        const userData = usersByUid.docs[0].data();
+                        role = userData.role === 'admin' ? 'admin' : 'user';
+                        console.log('User role from Firestore (by uid):', role, userData);
+                    }
+                }
+
+                console.log('User role:', role);
 
                 if (role !== 'admin') {
-                    console.log('User is not admin, redirecting to ctl.html');
+                    console.log('User is not admin');
                     showAlert('Доступ запрещен. Требуются права администратора.', 'error');
-                    setTimeout(() => {
-                        window.location.href = 'ctl.html';
-                    }, 2000);
+                    document.getElementById('userInfo').textContent = `${user.email} (Пользователь)`;
+                    // Не перенаправляем, остаемся на странице
                     return;
                 }
 
@@ -464,8 +483,12 @@
             console.log('=== loadUsers() started ===');
             try {
                 console.log('Fetching users from Firestore...');
+                const startTime = Date.now();
+                
                 const snapshot = await db.collection('users').get();
-                console.log('✅ Users fetched:', snapshot.size);
+                
+                const duration = Date.now() - startTime;
+                console.log(`✅ Users fetched in ${duration}ms:`, snapshot.size);
 
                 if (snapshot.empty) {
                     console.log('No users found in Firestore');
@@ -488,12 +511,12 @@
                 console.error('❌ Load users error:', error);
                 console.error('Error code:', error.code);
                 console.error('Error message:', error.message);
-                
+
                 let detailedError = error.message;
                 if (error.code === 'permission-denied') {
                     detailedError = 'Нет доступа к Firestore. Проверьте правила безопасности в Firebase Console.';
                 }
-                
+
                 showAlert('Ошибка загрузки: ' + detailedError, 'error');
             }
             console.log('=== loadUsers() finished ===');
@@ -529,8 +552,33 @@
             `;
 
             usersList.forEach(user => {
-                const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ru-RU') : 'N/A';
-                const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('ru-RU') : 'N/A';
+                // Конвертация Firestore Timestamp в Date
+                let createdAt = 'N/A';
+                let lastLogin = 'N/A';
+                
+                if (user.createdAt) {
+                    if (user.createdAt.toDate) {
+                        // Firestore Timestamp
+                        createdAt = user.createdAt.toDate().toLocaleDateString('ru-RU');
+                    } else if (user.createdAt.seconds) {
+                        // Unix timestamp
+                        createdAt = new Date(user.createdAt.seconds * 1000).toLocaleDateString('ru-RU');
+                    } else {
+                        // String or other format
+                        createdAt = new Date(user.createdAt).toLocaleDateString('ru-RU');
+                    }
+                }
+                
+                if (user.lastLoginAt) {
+                    if (user.lastLoginAt.toDate) {
+                        lastLogin = user.lastLoginAt.toDate().toLocaleDateString('ru-RU');
+                    } else if (user.lastLoginAt.seconds) {
+                        lastLogin = new Date(user.lastLoginAt.seconds * 1000).toLocaleDateString('ru-RU');
+                    } else {
+                        lastLogin = new Date(user.lastLoginAt).toLocaleDateString('ru-RU');
+                    }
+                }
+                
                 const roleClass = user.role === 'admin' ? 'role-admin' : 'role-user';
                 const roleText = user.role === 'admin' ? 'Администратор' : 'Пользователь';
                 const isCurrentUser = user.uid === currentUser.uid;
@@ -577,37 +625,36 @@
                 // Обновляем displayName
                 await newUser.updateProfile({ displayName: displayName || username });
 
-                // Получаем токен текущего пользователя (админа) для установки claims
-                // Примечание: Установка custom claims возможна только через Admin SDK
-                // Поэтому создаем пользователя с базовой ролью 'user'
-                // Админ может установить роль через Firebase Console или серверный скрипт
-                
+                // Сохраняем информацию о пользователе в Firestore
+                const db = firebase.firestore();
+                await db.collection('users').doc(username.toLowerCase()).set({
+                    uid: newUser.uid,
+                    email: email,
+                    username: username.toLowerCase(),
+                    displayName: displayName || username,
+                    role: role,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLoginAt: null
+                });
+
+                // Выходим из-под созданного пользователя
+                await auth.signOut();
+
                 showAlert(
                     `Пользователь ${username} успешно создан!\n\n` +
-                    `⚠️ Примечание: Для установки роли администратора используйте ` +
-                    `скрипт server/scripts/create-admin-full.js или Firebase Console.`,
+                    `Роль: ${role === 'admin' ? 'Администратор' : 'Пользователь'}\n\n` +
+                    `⚠️ Для продолжения работы необходимо войти повторно под своей учетной записью.`,
                     'success'
                 );
-                
-                // Сохраняем информацию о пользователе в Firestore (опционально)
-                try {
-                    const db = firebase.firestore();
-                    await db.collection('users').doc(username.toLowerCase()).set({
-                        uid: newUser.uid,
-                        email: email,
-                        username: username.toLowerCase(),
-                        displayName: displayName || username,
-                        role: role,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        lastLoginAt: null
-                    });
-                } catch (firestoreError) {
-                    console.warn('Не удалось сохранить в Firestore:', firestoreError.message);
-                }
-                
+
+                // Перенаправляем на страницу входа через 2 секунды
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+
                 // Очистка формы
                 document.getElementById('addUserForm').reset();
-                
+
                 // Перезагрузка списка
                 loadUsers();
 
@@ -707,10 +754,21 @@
 
             try {
                 const db = firebase.firestore();
+
+                // Находим документ пользователя по uid
+                const usersSnapshot = await db.collection('users').where('uid', '==', uid).get();
                 
-                // Удаляем из Firestore
-                await db.collection('users').doc(uid).delete();
-                
+                if (usersSnapshot.empty) {
+                    // Пробуем найти по username (для совместимости)
+                    const usernameDocId = username.replace('@', '');
+                    await db.collection('users').doc(usernameDocId).delete();
+                } else {
+                    // Удаляем найденный документ
+                    usersSnapshot.forEach(async doc => {
+                        await db.collection('users').doc(doc.id).delete();
+                    });
+                }
+
                 // Примечание: Удаление из Firebase Auth возможно только через Admin SDK
                 // Показываем инструкцию
                 showAlert(
@@ -719,7 +777,7 @@
                     `Authentication → Users → Найдите пользователя → Delete`,
                     'success'
                 );
-                
+
                 loadUsers();
 
             } catch (error) {
