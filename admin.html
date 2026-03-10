@@ -498,7 +498,8 @@
                         const data = doc.data();
                         console.log('User doc:', doc.id, data);
                         return {
-                            uid: doc.id,
+                            docId: doc.id,  // ID документа Firestore (username)
+                            uid: data.uid || doc.id,  // Настоящий UID из Firebase Auth или fallback на doc.id
                             ...data
                         };
                     });
@@ -581,7 +582,7 @@
                 
                 const roleClass = user.role === 'admin' ? 'role-admin' : 'role-user';
                 const roleText = user.role === 'admin' ? 'Администратор' : 'Пользователь';
-                const isCurrentUser = user.uid === currentUser.uid;
+                const isCurrentUser = user.email === currentUser.email;
                 const username = user.username || user.email.split('@')[0];
 
                 html += `
@@ -592,10 +593,10 @@
                         <td>${createdAt}</td>
                         <td>${lastLogin}</td>
                         <td class="actions">
-                            <button class="btn btn-primary btn-sm" onclick="openEditModal('${user.uid}')" ${isCurrentUser ? 'disabled' : ''}>
+                            <button class="btn btn-primary btn-sm" onclick="openEditModal('${user.docId}')" ${isCurrentUser ? 'disabled' : ''}>
                                 ${isCurrentUser ? 'Текущий' : '✏️'}
                             </button>
-                            ${!isCurrentUser ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${user.uid}', '@${escapeHtml(username)}')">🗑️</button>` : ''}
+                            ${!isCurrentUser ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${user.docId}', '@${escapeHtml(username)}')">🗑️</button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -675,11 +676,15 @@
         });
 
         // Открытие модального окна редактирования
-        function openEditModal(uid) {
-            const user = usersList.find(u => u.uid === uid);
-            if (!user) return;
+        function openEditModal(docId) {
+            const user = usersList.find(u => u.docId === docId);
+            if (!user) {
+                console.error('Пользователь не найден с docId:', docId);
+                showAlert('Пользователь не найден', 'error');
+                return;
+            }
 
-            document.getElementById('editUid').value = uid;
+            document.getElementById('editUid').value = docId;
             document.getElementById('editEmail').value = user.email;
             document.getElementById('editDisplayName').value = user.displayName || '';
             document.getElementById('editRole').value = user.role;
@@ -747,7 +752,7 @@
         });
 
         // Удаление пользователя
-        async function deleteUser(uid, username) {
+        async function deleteUser(docId, username) {
             if (!confirm(`Вы уверены, что хотите удалить пользователя ${username}?`)) {
                 return;
             }
@@ -755,19 +760,8 @@
             try {
                 const db = firebase.firestore();
 
-                // Находим документ пользователя по uid
-                const usersSnapshot = await db.collection('users').where('uid', '==', uid).get();
-                
-                if (usersSnapshot.empty) {
-                    // Пробуем найти по username (для совместимости)
-                    const usernameDocId = username.replace('@', '');
-                    await db.collection('users').doc(usernameDocId).delete();
-                } else {
-                    // Удаляем найденный документ
-                    usersSnapshot.forEach(async doc => {
-                        await db.collection('users').doc(doc.id).delete();
-                    });
-                }
+                // Удаляем документ по docId (который является username)
+                await db.collection('users').doc(docId).delete();
 
                 // Примечание: Удаление из Firebase Auth возможно только через Admin SDK
                 // Показываем инструкцию
