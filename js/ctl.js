@@ -678,8 +678,12 @@ $(document).ready(function(){
         }
       }
     }
-    // Всегда используем логику пляжного волейбола для кнопок счета
-    handleBeachScore(button.data('team'), delta);
+    // Используем логику пляжного или классического волейбола в зависимости от режима
+    if(isBeachMode()){
+      handleBeachScore(button.data('team'), delta);
+    }else{
+      handleClassicScore(button.data('team'), delta);
+    }
   });
   $(".foul-btn").click(function(){
     var button=$(this);
