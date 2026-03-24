@@ -9,9 +9,10 @@
 
 const admin = require('firebase-admin');
 const path = require('path');
+const { COLLECTIONS } = require('../../js/firebase-config');
 require('dotenv').config();
 
-const KEY_FILE_PATH = process.env.FIREBASE_KEY_FILE_PATH || 
+const KEY_FILE_PATH = process.env.FIREBASE_KEY_FILE_PATH ||
                       path.join(__dirname, '..', 'serviceAccountKey.json');
 
 async function checkFirestoreUsers() {
@@ -30,9 +31,9 @@ async function checkFirestoreUsers() {
   const db = admin.firestore();
 
   try {
-    const snapshot = await db.collection('users').get();
-    
-    console.log(`📊 Найдено документов в коллекции 'users': ${snapshot.size}\n`);
+    const snapshot = await db.collection(COLLECTIONS.USERS).get();
+
+    console.log(`📊 Найдено документов в коллекции '${COLLECTIONS.USERS}': ${snapshot.size}\n`);
     
     if (snapshot.empty) {
       console.log('⚠️ Коллекция "users" пуста\n');

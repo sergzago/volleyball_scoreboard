@@ -8,6 +8,7 @@
 
 const admin = require('firebase-admin');
 const path = require('path');
+const { COLLECTIONS } = require('../../js/firebase-config');
 
 // Проверка аргументов командной строки
 const args = process.argv.slice(2);
@@ -87,7 +88,7 @@ async function createAdmin(username, password, displayName) {
         // Сохранение пользователя в Firestore с username
         console.log('📁 Сохранение пользователя в Firestore...');
         const db = admin.firestore();
-        await db.collection('users').doc(username.toLowerCase()).set({
+        await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).set({
             uid: userRecord.uid,
             email: email,
             username: username.toLowerCase(),

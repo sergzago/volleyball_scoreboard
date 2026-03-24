@@ -5,16 +5,6 @@
 
 // Глобальные переменные
 window.AuthModule = (function() {
-    const firebaseConfig = {
-        apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-        authDomain: "myvolleyscore.firebaseapp.com",
-        projectId: "myvolleyscore",
-        storageBucket: "myvolleyscore.firebasestorage.app",
-        messagingSenderId: "102858014506",
-        appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-        measurementId: "G-6MQ6ZLE52N"
-    };
-
     // Инициализация Firebase
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
@@ -50,7 +40,7 @@ window.AuthModule = (function() {
                     // Получаем роль из Firestore
                     const db = firebase.firestore();
                     const username = user.email.split('@')[0];
-                    const userDoc = await db.collection('users').doc(username).get();
+                    const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
                     
                     currentRole = 'user';
                     if (userDoc.exists) {

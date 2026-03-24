@@ -6,6 +6,7 @@
     <title>Scoreboard creator</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="js/firebase-config.js"></script>
     <script src="js/auth.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/node-uuid/1.4.8/uuid.min.js" integrity="sha384-ojT96dIkO5uDUptuYUBcwQK3flLsTlH0IH2eqFDFzvsvyWu+Uj6z6kjaCUzanmkf" crossorigin="anonymous"></script>
     <link href="css/css.css" rel="stylesheet">
@@ -81,7 +82,7 @@
                 try {
                     const db = firebase.firestore();
                     const username = user.email.split('@')[0];
-                    const userDoc = await db.collection('users').doc(username).get();
+                    const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
                     
                     let role = 'user';
                     if (userDoc.exists) {

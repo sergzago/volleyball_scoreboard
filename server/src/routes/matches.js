@@ -1,5 +1,6 @@
 const express = require('express');
 const { ScoreboardService } = require('../services/scoreboardService');
+const { COLLECTIONS } = require('../../../js/firebase-config');
 
 const router = express.Router();
 const scoreboardService = new ScoreboardService();
@@ -11,20 +12,20 @@ const scoreboardService = new ScoreboardService();
 router.post('/', async (req, res, next) => {
   try {
     const { game_id, setHistory, overallHome, overallAway } = req.body;
-    
+
     if (!game_id) {
       return res.status(400).json({
         error: 'Bad Request',
         message: 'game_id is required',
       });
     }
-    
+
     const result = await scoreboardService.saveMatchResult(game_id, {
       setHistory,
       overallHome,
       overallAway,
     });
-    
+
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -38,8 +39,8 @@ router.post('/', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const { tournament, game_type, limit = 50 } = req.query;
-    
-    let query = require('../config/firebase').db.collection('matches');
+
+    let query = require('../config/firebase').db.collection(COLLECTIONS.MATCHES);
     
     if (tournament) {
       query = query.where('tournament_name', '==', tournament);
@@ -71,8 +72,8 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    
-    const doc = await require('../config/firebase').db.collection('matches').doc(id).get();
+
+    const doc = await require('../config/firebase').db.collection(COLLECTIONS.MATCHES).doc(id).get();
     
     if (!doc.exists) {
       return res.status(404).json({

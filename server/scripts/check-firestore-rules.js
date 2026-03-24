@@ -9,9 +9,10 @@
 
 const admin = require('firebase-admin');
 const path = require('path');
+const { COLLECTIONS } = require('../../js/firebase-config');
 require('dotenv').config();
 
-const KEY_FILE_PATH = process.env.FIREBASE_KEY_FILE_PATH || 
+const KEY_FILE_PATH = process.env.FIREBASE_KEY_FILE_PATH ||
                       path.join(__dirname, '..', 'serviceAccountKey.json');
 
 async function checkFirestoreRules() {
@@ -32,13 +33,13 @@ async function checkFirestoreRules() {
   try {
     // Тестовое чтение из коллекции users
     console.log('📝 Тест: Чтение коллекции users...\n');
-    
-    const snapshot = await db.collection('users').get();
+
+    const snapshot = await db.collection(COLLECTIONS.USERS).get();
     console.log(`✅ Чтение успешно! Найдено документов: ${snapshot.size}\n`);
-    
+
     // Тестовая запись
     console.log('📝 Тест: Запись тестового документа...\n');
-    const testRef = db.collection('users').doc('_test_rule_check');
+    const testRef = db.collection(COLLECTIONS.USERS).doc('_test_rule_check');
     await testRef.set({
       test: true,
       timestamp: admin.firestore.FieldValue.serverTimestamp()

@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
+    <script src="js/firebase-config.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         body {
@@ -213,17 +214,6 @@
     </div>
 
     <script>
-        // Firebase конфигурация
-        const firebaseConfig = {
-            apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-            authDomain: "myvolleyscore.firebaseapp.com",
-            projectId: "myvolleyscore",
-            storageBucket: "myvolleyscore.firebasestorage.app",
-            messagingSenderId: "102858014506",
-            appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-            measurementId: "G-6MQ6ZLE52N"
-        };
-
         // Инициализация Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
@@ -265,7 +255,7 @@
                         // Проверяем роль из Firestore
                         const db = firebase.firestore();
                         const username = user.email.split('@')[0];
-                        const userDoc = await db.collection('users').doc(username).get();
+                        const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
 
                         let role = 'user';
                         if (userDoc.exists) {
@@ -318,12 +308,12 @@
 
                     // Обновляем lastLoginAt в Firestore
                     const db = firebase.firestore();
-                    await db.collection('users').doc(username.toLowerCase()).update({
+                    await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).update({
                         lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
                     }).catch(err => console.warn('Failed to update lastLoginAt:', err));
 
                     // Проверяем роль из Firestore
-                    const userDoc = await db.collection('users').doc(username.toLowerCase()).get();
+                    const userDoc = await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).get();
                     
                     let role = 'user';
                     if (userDoc.exists) {

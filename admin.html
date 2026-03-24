@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
+    <script src="js/firebase-config.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         body {
@@ -397,17 +398,6 @@
     </div>
 
     <script>
-        // Firebase конфигурация
-        const firebaseConfig = {
-            apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-            authDomain: "myvolleyscore.firebaseapp.com",
-            projectId: "myvolleyscore",
-            storageBucket: "myvolleyscore.firebasestorage.app",
-            messagingSenderId: "102858014506",
-            appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-            measurementId: "G-6MQ6ZLE52N"
-        };
-
         // Инициализация Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
@@ -440,8 +430,8 @@
 
                 // Проверяем роль из Firestore
                 const db = firebase.firestore();
-                const userDoc = await db.collection('users').doc(user.email.split('@')[0]).get();
-                
+                const userDoc = await db.collection(COLLECTIONS.USERS).doc(user.email.split('@')[0]).get();
+
                 let role = 'user';
                 if (userDoc.exists) {
                     const userData = userDoc.data();
@@ -449,7 +439,7 @@
                     console.log('User role from Firestore:', role, userData);
                 } else {
                     // Если документа нет, пробуем найти по uid
-                    const usersByUid = await db.collection('users').where('uid', '==', user.uid).get();
+                    const usersByUid = await db.collection(COLLECTIONS.USERS).where('uid', '==', user.uid).get();
                     if (!usersByUid.empty) {
                         const userData = usersByUid.docs[0].data();
                         role = userData.role === 'admin' ? 'admin' : 'user';
@@ -485,7 +475,7 @@
                 console.log('Fetching users from Firestore...');
                 const startTime = Date.now();
                 
-                const snapshot = await db.collection('users').get();
+                const snapshot = await db.collection(COLLECTIONS.USERS).get();
                 
                 const duration = Date.now() - startTime;
                 console.log(`✅ Users fetched in ${duration}ms:`, snapshot.size);
@@ -628,7 +618,7 @@
 
                 // Сохраняем информацию о пользователе в Firestore
                 const db = firebase.firestore();
-                await db.collection('users').doc(username.toLowerCase()).set({
+                await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).set({
                     uid: newUser.uid,
                     email: email,
                     username: username.toLowerCase(),
@@ -714,7 +704,7 @@
                 // Поэтому обновляем только Firestore и показываем инструкцию
                 
                 const db = firebase.firestore();
-                const userRef = db.collection('users').doc(uid);
+                const userRef = db.collection(COLLECTIONS.USERS).doc(uid);
                 const userDoc = await userRef.get();
                 
                 if (!userDoc.exists) {
@@ -761,7 +751,7 @@
                 const db = firebase.firestore();
 
                 // Удаляем документ по docId (который является username)
-                await db.collection('users').doc(docId).delete();
+                await db.collection(COLLECTIONS.USERS).doc(docId).delete();
 
                 // Примечание: Удаление из Firebase Auth возможно только через Admin SDK
                 // Показываем инструкцию

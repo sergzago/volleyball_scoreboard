@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="js/firebase-config.js"></script>
     <style>
         body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #eee; }
         .log { background: #16213e; padding: 10px; margin: 10px 0; border-radius: 4px; }
@@ -26,16 +27,6 @@
     <div id="log" class="log"></div>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-            authDomain: "myvolleyscore.firebaseapp.com",
-            projectId: "myvolleyscore",
-            storageBucket: "myvolleyscore.firebasestorage.app",
-            messagingSenderId: "102858014506",
-            appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-            measurementId: "G-6MQ6ZLE52N"
-        };
-
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
@@ -89,8 +80,8 @@
             try {
                 log('Запрос к коллекции users...', 'info');
                 const startTime = Date.now();
-                
-                const snapshot = await db.collection('users').get();
+
+                const snapshot = await db.collection(COLLECTIONS.USERS).get();
                 
                 const duration = Date.now() - startTime;
                 log(`✅ Получено за ${duration}мс`, 'success');

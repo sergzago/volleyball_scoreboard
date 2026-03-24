@@ -2,16 +2,17 @@
 
 /**
  * Диагностика Firebase для admin.html
- * 
+ *
  * Использование:
  *   node scripts/diagnose-firebase.js
  */
 
 const admin = require('firebase-admin');
 const path = require('path');
+const { COLLECTIONS } = require('../../js/firebase-config');
 require('dotenv').config();
 
-const KEY_FILE_PATH = process.env.FIREBASE_KEY_FILE_PATH || 
+const KEY_FILE_PATH = process.env.FIREBASE_KEY_FILE_PATH ||
                       path.join(__dirname, '..', 'serviceAccountKey.json');
 
 async function diagnose() {
@@ -26,7 +27,7 @@ async function diagnose() {
     process.exit(1);
   }
   console.log(`   ✅ Файл найден: ${KEY_FILE_PATH}`);
-  
+
   let serviceAccount;
   try {
     serviceAccount = require(KEY_FILE_PATH);
@@ -56,7 +57,7 @@ async function diagnose() {
   try {
     const listUsersResult = await admin.auth().listUsers();
     console.log(`   ✅ Найдено: ${listUsersResult.users.length}`);
-    
+
     for (const user of listUsersResult.users) {
       const hasAdmin = user.customClaims?.admin === true;
       console.log(`   • ${user.email} (${user.displayName || 'N/A'}) - ${hasAdmin ? '✅ ADMIN' : '⚠️ USER'}`);
@@ -68,7 +69,7 @@ async function diagnose() {
   // 4. Проверка Firestore
   console.log('\n4️⃣ Коллекция Firestore "users"...');
   try {
-    const snapshot = await db.collection('users').get();
+    const snapshot = await db.collection(COLLECTIONS.USERS).get();
     console.log(`   ✅ Найдено документов: ${snapshot.size}`);
     
     if (snapshot.empty) {
@@ -87,7 +88,7 @@ async function diagnose() {
   console.log('\n5️⃣ Синхронизация Auth ↔ Firestore...');
   try {
     const listUsersResult = await admin.auth().listUsers();
-    const snapshot = await db.collection('users').get();
+    const snapshot = await db.collection(COLLECTIONS.USERS).get();
     
     const authUids = new Set(listUsersResult.users.map(u => u.uid));
     const firestoreUids = new Set(snapshot.docs.map(d => d.data().uid));

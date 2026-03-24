@@ -1,15 +1,13 @@
 const { db } = require('../config/firebase');
 const admin = require('firebase-admin');
-
-const VOLLEYBALL_COLLECTION = 'volleyball';
-const MATCHES_COLLECTION = 'matches';
+const { VOLLEYBALL_COLLECTION, MATCHES_COLLECTION, GAME_CONSTANTS } = require('../../../js/firebase-config');
 
 // Константы из ctl.js
-const BEACH_SETS_TO_WIN = 2;
-const BEACH_MAX_SETS = 3;
-const CLASSIC_POINTS_TO_WIN = 25;
-const CLASSIC_SETS_TO_WIN = 3;
-const MAX_CLASSIC_SETS = 5;
+const BEACH_SETS_TO_WIN = GAME_CONSTANTS.BEACH_SETS_TO_WIN;
+const BEACH_MAX_SETS = GAME_CONSTANTS.BEACH_MAX_SETS;
+const CLASSIC_POINTS_TO_WIN = GAME_CONSTANTS.CLASSIC_POINTS_TO_WIN;
+const CLASSIC_SETS_TO_WIN = GAME_CONSTANTS.CLASSIC_SETS_TO_WIN;
+const MAX_CLASSIC_SETS = GAME_CONSTANTS.CLASSIC_MAX_SETS;
 
 /**
  * Проверка доступности Firestore

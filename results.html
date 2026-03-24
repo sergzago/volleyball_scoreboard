@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/firebase-config.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
       .results-container {
@@ -522,20 +523,9 @@
     </div>
 
     <script>
-      // Firebase config
-      var config = {
-        apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-        authDomain: "myvolleyscore.firebaseapp.com",
-        projectId: "myvolleyscore",
-        storageBucket: "myvolleyscore.firebasestorage.app",
-        messagingSenderId: "102858014506",
-        appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-        measurementId: "G-6MQ6ZLE52N"
-      };
-      
-      firebase.initializeApp(config);
+      firebase.initializeApp(firebaseConfig);
       var db = firebase.firestore();
-      var matches_collection = db.collection('matches');
+      var matches_collection = db.collection(COLLECTIONS.MATCHES);
       
       // Calendar state
       var currentDate = new Date();

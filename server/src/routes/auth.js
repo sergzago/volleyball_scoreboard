@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { COLLECTIONS } = require('../../../js/firebase-config');
 
 /**
  * POST /api/auth/me
@@ -145,7 +146,7 @@ router.post('/users', requireAdmin, async (req, res) => {
     });
 
     // Сохраняем пользователя в Firestore
-    await db.collection('users').doc(finalUsername.toLowerCase()).set({
+    await db.collection(COLLECTIONS.USERS).doc(finalUsername.toLowerCase()).set({
       uid: userRecord.uid,
       email: finalEmail,
       username: finalUsername.toLowerCase(),

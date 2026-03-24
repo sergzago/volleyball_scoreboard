@@ -8,26 +8,15 @@ function getParameterByName(name, url) {
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
-var config = {
-  apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-  authDomain: "myvolleyscore.firebaseapp.com",
-  projectId: "myvolleyscore",
-  storageBucket: "myvolleyscore.firebasestorage.app",
-  messagingSenderId: "102858014506",
-  appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-  measurementId: "G-6MQ6ZLE52N"
-};
-
-
 var scoreboard_data={};
 
 // Инициализация Firebase (если ещё не инициализирован)
 if (!firebase.apps.length) {
-    firebase.initializeApp(config);
+    firebase.initializeApp(firebaseConfig);
 }
 db=firebase.firestore();
-scoreboard_collection=db.collection('volleyball')
-matches_collection=db.collection('matches')
+scoreboard_collection=db.collection(COLLECTIONS.VOLLEYBALL)
+matches_collection=db.collection(COLLECTIONS.MATCHES)
 var game_id=getParameterByName('game');
 if(!game_id) game_id='test1';
 console.log('game_id:', game_id);
