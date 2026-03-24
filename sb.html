@@ -626,6 +626,15 @@
 
     // Вызываем updateScoreboard1Display после загрузки страницы
     $(document).ready(function() {
+        // Загружаем и устанавливаем логотип из файла
+        if (typeof loadLogo === 'function') {
+            loadLogo(function(logoData) {
+                if (logoData) {
+                    $('.logo-img').attr('src', logoData);
+                }
+            });
+        }
+        
         if (typeof updateScoreboard1Display === 'function') {
             updateScoreboard1Display();
         }
