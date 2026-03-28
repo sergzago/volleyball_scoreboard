@@ -222,16 +222,8 @@
         const redirectParam = urlParams.get('redirect');
         const isAdminPage = redirectParam && redirectParam.includes('admin.html');
 
-        console.log('Login page:', {
-            ENABLE_AUTH: ENABLE_AUTH,
-            isAuthEnabled: isAuthEnabled,
-            redirectParam: redirectParam,
-            isAdminPage: isAdminPage
-        });
-
         // Если авторизация отключена и это не admin.html, перенаправляем на главную
         if (!isAuthEnabled && !isAdminPage) {
-            console.log('Auth disabled, redirecting to index.html');
             window.location.href = 'index.html';
         }
 

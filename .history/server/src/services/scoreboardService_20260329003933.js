@@ -390,7 +390,6 @@ class ScoreboardService {
       update.current_period = 1;
       update.beach_switch_message = '';
       update.period_count = 3;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
     } else {
       update.beach_switch_message = '';
       update.home_sets = 0;
@@ -399,7 +398,6 @@ class ScoreboardService {
       update.period_count = 5;
       update.home_score = 0;
       update.away_score = 0;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
     }
 
     return this.updateScoreboard(gameId, update);
@@ -418,7 +416,6 @@ class ScoreboardService {
 
     const data = snapshot.data();
     const beachEnabled = !!data.beach_mode;
-    const twoWinsMode = !!data.two_wins_mode;
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
@@ -440,13 +437,12 @@ class ScoreboardService {
       beach_current_set: 1,
       beach_switch_message: '',
       beach_match_finished: false,
-      period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
+      period_count: beachEnabled ? 3 : 5,
       set_history: [],
       classic_match_finished: false,
       home_side: 'left',
       away_side: 'right',
       classic_tiebreak_switch_done: true,
-      two_wins_mode: twoWinsMode,
       invert_tablo: invertTablo,
       lastEdited: admin.firestore.FieldValue.serverTimestamp(),
     };

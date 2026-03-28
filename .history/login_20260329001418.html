@@ -222,16 +222,8 @@
         const redirectParam = urlParams.get('redirect');
         const isAdminPage = redirectParam && redirectParam.includes('admin.html');
 
-        console.log('Login page:', {
-            ENABLE_AUTH: ENABLE_AUTH,
-            isAuthEnabled: isAuthEnabled,
-            redirectParam: redirectParam,
-            isAdminPage: isAdminPage
-        });
-
         // Если авторизация отключена и это не admin.html, перенаправляем на главную
         if (!isAuthEnabled && !isAdminPage) {
-            console.log('Auth disabled, redirecting to index.html');
             window.location.href = 'index.html';
         }
 
@@ -350,14 +342,6 @@
                         role = userData.role === 'admin' ? 'admin' : 'user';
                     }
                     console.log('User role:', role);
-
-                    // Для admin.html проверяем права администратора
-                    if (isAdminPage && role !== 'admin') {
-                        hideLoading();
-                        showError('Доступ запрещен. Требуются права администратора.');
-                        await auth.signOut();
-                        return;
-                    }
 
                     showSuccess('Успешный вход! Перенаправление...');
 

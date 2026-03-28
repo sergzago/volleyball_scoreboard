@@ -398,11 +398,6 @@
     </div>
 
     <script>
-        // Логирование для отладки
-        console.log('Admin page loading...', {
-            ENABLE_AUTH: typeof ENABLE_AUTH !== 'undefined' ? ENABLE_AUTH : 'undefined'
-        });
-
         // Инициализация Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
@@ -815,6 +810,9 @@
                 closeEditModal();
             }
         });
+
+        // Инициализация при загрузке
+        window.addEventListener('DOMContentLoaded', checkAuthAndInit);
     </script>
 </body>
 </html>

@@ -398,10 +398,8 @@
     </div>
 
     <script>
-        // Логирование для отладки
-        console.log('Admin page loading...', {
-            ENABLE_AUTH: typeof ENABLE_AUTH !== 'undefined' ? ENABLE_AUTH : 'undefined'
-        });
+        // Проверка включена ли авторизация
+        const isAuthEnabled = (typeof ENABLE_AUTH !== 'undefined') ? ENABLE_AUTH === 1 : true;
 
         // Инициализация Firebase
         if (!firebase.apps.length) {
@@ -416,15 +414,26 @@
         let currentUser = null;
         let usersList = [];
 
-        // Проверка авторизации при загрузке - ВСЕГДА обязательна для админ-панели
-        auth.onAuthStateChanged(async (user) => {
-            console.log('Auth state changed:', user ? user.email : 'no user');
-            if (!user) {
-                console.log('No user, redirecting to login.html');
-                const currentPath = window.location.pathname + window.location.search;
-                window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
+        // Проверка авторизации при загрузке
+        async function checkAuthAndInit() {
+            // Если авторизация отключена, работаем без проверки
+            if (!isAuthEnabled) {
+                console.log('⚠️ Авторизация отключена (ENABLE_AUTH=0)');
+                currentUser = { email: 'guest@local', uid: 'guest' };
+                document.getElementById('userInfo').textContent = 'Гость (авторизация отключена)';
+                document.getElementById('adminLink').style.display = 'none';
+                loadUsers();
                 return;
             }
+
+            auth.onAuthStateChanged(async (user) => {
+                console.log('Auth state changed:', user ? user.email : 'no user');
+                if (!user) {
+                    console.log('No user, redirecting to login.html');
+                    const currentPath = window.location.pathname + window.location.search;
+                    window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
+                    return;
+                }
 
             currentUser = user;
 
@@ -815,6 +824,9 @@
                 closeEditModal();
             }
         });
+
+        // Инициализация при загрузке
+        window.addEventListener('DOMContentLoaded', checkAuthAndInit);
     </script>
 </body>
 </html>

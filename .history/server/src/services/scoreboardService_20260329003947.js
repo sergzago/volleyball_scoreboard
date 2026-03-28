@@ -418,7 +418,6 @@ class ScoreboardService {
 
     const data = snapshot.data();
     const beachEnabled = !!data.beach_mode;
-    const twoWinsMode = !!data.two_wins_mode;
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
@@ -440,13 +439,12 @@ class ScoreboardService {
       beach_current_set: 1,
       beach_switch_message: '',
       beach_match_finished: false,
-      period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
+      period_count: beachEnabled ? 3 : 5,
       set_history: [],
       classic_match_finished: false,
       home_side: 'left',
       away_side: 'right',
       classic_tiebreak_switch_done: true,
-      two_wins_mode: twoWinsMode,
       invert_tablo: invertTablo,
       lastEdited: admin.firestore.FieldValue.serverTimestamp(),
     };

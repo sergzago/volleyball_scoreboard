@@ -65,16 +65,8 @@
     <script>
         // Проверка авторизации при загрузке страницы
         window.addEventListener('DOMContentLoaded', async () => {
-            // Если авторизация отключена, сразу показываем контент
-            if (typeof ENABLE_AUTH !== 'undefined' && ENABLE_AUTH === 0) {
-                document.getElementById('loginPrompt').style.display = 'none';
-                document.getElementById('authContent').style.display = 'block';
-                document.getElementById('userInfo').textContent = 'Гость (авторизация отключена)';
-                return;
-            }
-
             const auth = AuthModule.auth;
-
+            
             // Сохраняем текущий URL для возврата после авторизации
             const currentPath = window.location.pathname + window.location.search;
 

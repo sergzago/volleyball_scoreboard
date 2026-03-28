@@ -108,12 +108,6 @@ window.AuthModule = (function() {
      * @returns {Promise<void>}
      */
     async function logout() {
-        // Если авторизация отключена, просто перенаправляем на главную
-        if (!isAuthEnabled) {
-            window.location.href = 'index.html';
-            return;
-        }
-
         try {
             await auth.signOut();
             currentUser = null;

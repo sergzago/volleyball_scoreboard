@@ -3,10 +3,6 @@ var BEACH_MAX_SETS = 3;
 var CLASSIC_POINTS_TO_WIN = 25;
 var CLASSIC_SETS_TO_WIN = 3;
 var MAX_CLASSIC_SETS = 5;
-// Константы для режима до двух побед
-var CLASSIC_SETS_TO_WIN_TWO = 2;
-var CLASSIC_MAX_SETS_TWO = 3;
-var CLASSIC_TIEBREAK_POINTS_TO_WIN = 15;
 
 // scoreboard_data определена в common.js
 
@@ -60,16 +56,6 @@ $(document).ready(function() {
     $('#invert_tablo_toggle').prop('checked', invertTablo);
     var unlimitedScore = !!scoreboard_data['unlimited_score'];
     $('#unlimited_score_toggle').prop('checked', unlimitedScore);
-    var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-    $('#two_wins_mode_toggle').prop('checked', twoWinsMode);
-    
-    // Блокировка чекбоксов: beach_mode и two_wins_mode не могут быть выбраны одновременно
-    $('#two_wins_mode_toggle').prop('disabled', beachMode);
-    $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    
-    // Добавляем класс для стилизации заблокированных label
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
 
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
@@ -160,7 +146,6 @@ function update_db(data){
 
 function saveMatchResult(setHistory, overallHome, overallAway){
   var isBeach = isBeachMode();
-  var twoWinsMode = !!scoreboard_data['two_wins_mode'];
   var userInfo = getCurrentUserInfo();
 
   if(typeof overallHome === 'undefined' || typeof overallAway === 'undefined'){
@@ -181,7 +166,6 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
-    two_wins_mode: twoWinsMode, // Режим до двух побед
     game_id: game_id,
     username: userInfo.username || '',
     displayname: userInfo.displayname || ''
@@ -290,14 +274,7 @@ function updateSideLayout(){
 function shouldClassicMidSwitch(homeAfter, awayAfter){
   if(isBeachMode())
     return false;
-  
-  var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-  var currentPeriod = ensureNumber(scoreboard_data['current_period']);
-  
-  // Определяем номер сета, в котором нужна смена сторон
-  var tiebreakSet = twoWinsMode ? 3 : 5;
-  
-  if(currentPeriod != tiebreakSet)
+  if(ensureNumber(scoreboard_data['current_period'])!=5)
     return false;
   if(Math.max(homeAfter, awayAfter)<8)
     return false;
@@ -496,7 +473,6 @@ function toggleBeachMode(enabled){
     update['beach_switch_message']='';
     update['period_count']=3;
     update['classic_match_finished']=false;
-    update['two_wins_mode']=false; // Отключаем режим до 2 побед если включили пляжный
   }else{
     update['beach_switch_message']='';
     update['home_sets']=0;
@@ -509,49 +485,10 @@ function toggleBeachMode(enabled){
   update_db(update);
 }
 
-function toggleTwoWinsMode(enabled){
-  var update={
-    two_wins_mode:enabled,
-    classic_match_finished:false,
-    set_history:[],
-    beach_match_finished:false
-  };
-  if(enabled){
-    update['home_fouls']=0;
-    update['away_fouls']=0;
-    update['home_score']=0;
-    update['away_score']=0;
-    update['current_period']=1;
-    update['period_count']=3; // Максимум 3 сета
-    update['classic_tiebreak_switch_done']=true;
-    update['beach_mode']=false; // Отключаем пляжный режим если включили до 2 побед
-  }else{
-    update['home_fouls']=0;
-    update['away_fouls']=0;
-    update['home_score']=0;
-    update['away_score']=0;
-    update['current_period']=1;
-    update['period_count']=5; // Возвращаем к стандартным 5 сетам
-  }
-  update_db(update);
-}
-
 function classicSetWon(teamScore, opponentScore){
-  // В режиме до 2 побед играем до 2 сетов (максимум 3 сета)
-  // В 3-м сете (тай-брейк) игра идет до 15 очков
+  // In 5th period (deciding set) classic volleyball is played to 15 points
   var period = ensureNumber(scoreboard_data['current_period']);
-  var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-  
-  // Определяем целевое количество очков для текущего сета
-  var target;
-  if (twoWinsMode) {
-    // Режим до 2 побед: 3-й сет (тай-брейк) играется до 15
-    target = (period === 3) ? CLASSIC_TIEBREAK_POINTS_TO_WIN : CLASSIC_POINTS_TO_WIN;
-  } else {
-    // Стандартный режим: 5-й сет (тай-брейк) играется до 15
-    target = (period === 5) ? 15 : CLASSIC_POINTS_TO_WIN;
-  }
-  
+  var target = (period === 5) ? 15 : CLASSIC_POINTS_TO_WIN;
   if(teamScore < target)
     return false;
   return (teamScore - opponentScore) >= 2;
@@ -567,15 +504,10 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
   }
   var currentPeriod=ensureNumber(scoreboard_data['current_period'])||1;
   var maxPeriod=ensureNumber(scoreboard_data['period_count'])||5;
-  var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-  
-  // Определяем условие завершения матча
-  var setsToWin = twoWinsMode ? CLASSIC_SETS_TO_WIN_TWO : CLASSIC_SETS_TO_WIN;
-  var matchFinished=(homeFouls>=setsToWin)||(awayFouls>=setsToWin);
-  
   var nextPeriod=currentPeriod<maxPeriod?currentPeriod+1:currentPeriod;
   var homeFinal = team=='home'?teamScore:opponentScore;
   var awayFinal = team=='home'?opponentScore:teamScore;
+  var matchFinished=(homeFouls>=CLASSIC_SETS_TO_WIN)||(awayFouls>=CLASSIC_SETS_TO_WIN);
   var update=Object.assign({}, baseUpdate, {
     home_fouls:homeFouls,
     away_fouls:awayFouls,
@@ -585,10 +517,8 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
   });
   if(!matchFinished){
     // Не переключаем период автоматически — откладываем переключение и смену сторон
-    // В режиме до 2 побед тай-брейк это 3-й сет
-    var tiebreakSet = twoWinsMode ? 3 : 5;
     var flip = flipSidesPayload({
-      classic_tiebreak_switch_done: nextPeriod==tiebreakSet ? false : true
+      classic_tiebreak_switch_done: nextPeriod==5 ? false : true
     });
     update['pending_home_side'] = flip.home_side;
     update['pending_away_side'] = flip.away_side;
@@ -629,10 +559,8 @@ function handleClassicScore(team, delta){
   if(shouldClassicMidSwitch(homeAfter, awayAfter)){
     // Only set the visual request once per match/set: if we haven't shown it yet
     if(!scoreboard_data['classic_switch_shown']){
-      var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-      var tiebreakSet = twoWinsMode ? 3 : 5;
       update['classic_switch_needed'] = true;
-      update['classic_switch_message'] = 'Смена площадок — ' + tiebreakSet + '-й сет, счёт '+formatScore(homeAfter, awayAfter);
+      update['classic_switch_message'] = 'Смена площадок — 5-й сет, счёт '+formatScore(homeAfter, awayAfter);
       update['classic_switch_shown'] = true;
     }
   } else {
@@ -904,11 +832,7 @@ $(document).ready(function(){
   });
 
   $("#beach_mode_toggle").change(function(){
-    var beachMode = $(this).is(':checked');
-    toggleBeachMode(beachMode);
-    // Блокируем/разблокируем чекбокс two_wins_mode
-    $('#two_wins_mode_toggle').prop('disabled', beachMode);
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
+    toggleBeachMode($(this).is(':checked'));
   });
 
   $("#invert_tablo_toggle").change(function(){
@@ -920,11 +844,7 @@ $(document).ready(function(){
   });
 
   $("#two_wins_mode_toggle").change(function(){
-    var twoWinsMode = $(this).is(':checked');
-    toggleTwoWinsMode(twoWinsMode);
-    // Блокируем/разблокируем чекбокс beach_mode
-    $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
+    toggleTwoWinsMode($(this).is(':checked'));
   });
 
   $(".side-switch-btn").click(function(){

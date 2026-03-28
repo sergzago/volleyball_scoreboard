@@ -398,11 +398,6 @@
     </div>
 
     <script>
-        // Логирование для отладки
-        console.log('Admin page loading...', {
-            ENABLE_AUTH: typeof ENABLE_AUTH !== 'undefined' ? ENABLE_AUTH : 'undefined'
-        });
-
         // Инициализация Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
@@ -416,7 +411,7 @@
         let currentUser = null;
         let usersList = [];
 
-        // Проверка авторизации при загрузке - ВСЕГДА обязательна для админ-панели
+        // Проверка авторизации при загрузке
         auth.onAuthStateChanged(async (user) => {
             console.log('Auth state changed:', user ? user.email : 'no user');
             if (!user) {

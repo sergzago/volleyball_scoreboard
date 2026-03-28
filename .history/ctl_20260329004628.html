@@ -33,24 +33,15 @@
             text-decoration: underline;
         }
         /* Стили для заблокированных чекбоксов */
+        .checkbox-inline input:disabled + span,
         .checkbox-inline input:disabled {
-            cursor: not-allowed;
-        }
-        .checkbox-inline input:disabled + span {
             opacity: 0.5;
             cursor: not-allowed;
             color: #999;
         }
-        .checkbox-inline:has(input:disabled),
-        label.checkbox-inline:has(input:disabled) {
+        .checkbox-inline:has(input:disabled) {
             opacity: 0.6;
             cursor: not-allowed;
-        }
-        /* Fallback для браузеров без поддержки :has() */
-        .checkbox-inline.disabled-label {
-            opacity: 0.6;
-            cursor: not-allowed;
-            color: #999;
         }
     </style>
     <style>

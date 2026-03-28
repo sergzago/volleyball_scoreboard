@@ -164,13 +164,13 @@ router.put('/:game_id/teams', validateGameId, async (req, res, next) => {
 
 /**
  * @route   PATCH /api/scoreboard/:game_id/settings
- * @desc    Обновить настройки (invert_tablo, unlimited_score, two_wins_mode)
+ * @desc    Обновить настройки (invert_tablo, unlimited_score)
  */
 router.patch('/:game_id/settings', validateGameId, async (req, res, next) => {
   try {
     const { game_id } = req.params;
     const settings = req.body;
-
+    
     const result = await scoreboardService.updateSettings(game_id, settings);
     res.json(result);
   } catch (err) {

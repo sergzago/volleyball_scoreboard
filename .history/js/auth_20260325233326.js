@@ -5,14 +5,11 @@
 
 // Глобальные переменные
 window.AuthModule = (function() {
-    // Проверка включена ли авторизация
-    const isAuthEnabled = (typeof ENABLE_AUTH !== 'undefined') ? ENABLE_AUTH === 1 : true;
-
     // Инициализация Firebase
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
     }
-
+    
     const auth = firebase.auth();
     let currentUser = null;
     let currentRole = null;
@@ -25,12 +22,6 @@ window.AuthModule = (function() {
      * @returns {Promise<boolean>} - true если авторизован
      */
     async function checkAuth(requiredRole = 'user', redirectUrl = 'login.html') {
-        // Если авторизация отключена, всегда возвращаем true
-        if (!isAuthEnabled) {
-            currentRole = requiredRole === 'admin' ? 'admin' : 'user';
-            return true;
-        }
-
         return new Promise((resolve, reject) => {
             auth.onAuthStateChanged(async (user) => {
                 if (!user) {
@@ -108,12 +99,6 @@ window.AuthModule = (function() {
      * @returns {Promise<void>}
      */
     async function logout() {
-        // Если авторизация отключена, просто перенаправляем на главную
-        if (!isAuthEnabled) {
-            window.location.href = 'index.html';
-            return;
-        }
-
         try {
             await auth.signOut();
             currentUser = null;

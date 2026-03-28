@@ -908,7 +908,6 @@ $(document).ready(function(){
     toggleBeachMode(beachMode);
     // Блокируем/разблокируем чекбокс two_wins_mode
     $('#two_wins_mode_toggle').prop('disabled', beachMode);
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
   });
 
   $("#invert_tablo_toggle").change(function(){
@@ -924,7 +923,6 @@ $(document).ready(function(){
     toggleTwoWinsMode(twoWinsMode);
     // Блокируем/разблокируем чекбокс beach_mode
     $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
   });
 
   $(".side-switch-btn").click(function(){

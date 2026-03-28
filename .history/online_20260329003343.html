@@ -849,7 +849,6 @@
                                 away_team: data.away_team,
                                 tournament_name: data.tournament_name || 'НВЛ',
                                 game_type: gameType,
-                                two_wins_mode: !!data.two_wins_mode,
                                 set_history: setsScore, // Используем sets_score для истории сетов
                                 home_sets: homeSets,    // Используем распарсенные значения из overall_score
                                 away_sets: awaySets,
@@ -857,8 +856,7 @@
                                 overall_score: overallScore // Сохраняем original overall_score
                             },
                             isFinished: true,
-                            gameType: gameType,
-                            twoWinsMode: !!data.two_wins_mode
+                            gameType: gameType
                         });
                     });
                     

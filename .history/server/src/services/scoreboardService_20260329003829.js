@@ -344,26 +344,13 @@ class ScoreboardService {
    * Обновить настройки
    */
   async updateSettings(gameId, settings) {
-    const allowedSettings = ['invert_tablo', 'unlimited_score', 'two_wins_mode'];
+    const allowedSettings = ['invert_tablo', 'unlimited_score'];
     const update = {};
-
+    
     for (const key of allowedSettings) {
       if (settings[key] !== undefined) {
         update[key] = !!settings[key];
       }
-    }
-
-    // Если включаем two_wins_mode, отключаем beach_mode
-    if (settings.two_wins_mode === true) {
-      update.beach_mode = false;
-      update.two_wins_mode = true;
-      update.period_count = 3; // Максимум 3 сета
-    }
-    
-    // Если выключаем two_wins_mode, включаем стандартный режим (5 сетов)
-    if (settings.two_wins_mode === false) {
-      update.two_wins_mode = false;
-      update.period_count = 5;
     }
 
     return this.updateScoreboard(gameId, update);
@@ -390,7 +377,6 @@ class ScoreboardService {
       update.current_period = 1;
       update.beach_switch_message = '';
       update.period_count = 3;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
     } else {
       update.beach_switch_message = '';
       update.home_sets = 0;
@@ -399,7 +385,6 @@ class ScoreboardService {
       update.period_count = 5;
       update.home_score = 0;
       update.away_score = 0;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
     }
 
     return this.updateScoreboard(gameId, update);
@@ -418,7 +403,6 @@ class ScoreboardService {
 
     const data = snapshot.data();
     const beachEnabled = !!data.beach_mode;
-    const twoWinsMode = !!data.two_wins_mode;
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
@@ -440,13 +424,12 @@ class ScoreboardService {
       beach_current_set: 1,
       beach_switch_message: '',
       beach_match_finished: false,
-      period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
+      period_count: beachEnabled ? 3 : 5,
       set_history: [],
       classic_match_finished: false,
       home_side: 'left',
       away_side: 'right',
       classic_tiebreak_switch_done: true,
-      two_wins_mode: twoWinsMode,
       invert_tablo: invertTablo,
       lastEdited: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -491,7 +474,6 @@ class ScoreboardService {
       overall_score: `${overallHome}:${overallAway}`,
       sets_score: overrideData?.setHistory || data.set_history || [],
       game_type: isBeach ? 'beach' : 'classic',
-      two_wins_mode: !!data.two_wins_mode,
       game_id: gameId,
     };
 

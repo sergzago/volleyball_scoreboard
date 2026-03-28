@@ -7,9 +7,6 @@ const BEACH_SETS_TO_WIN = GAME_CONSTANTS.BEACH_SETS_TO_WIN;
 const BEACH_MAX_SETS = GAME_CONSTANTS.BEACH_MAX_SETS;
 const CLASSIC_POINTS_TO_WIN = GAME_CONSTANTS.CLASSIC_POINTS_TO_WIN;
 const CLASSIC_SETS_TO_WIN = GAME_CONSTANTS.CLASSIC_SETS_TO_WIN;
-const CLASSIC_SETS_TO_WIN_TWO = GAME_CONSTANTS.CLASSIC_SETS_TO_WIN_TWO;
-const CLASSIC_MAX_SETS_TWO = GAME_CONSTANTS.CLASSIC_MAX_SETS_TWO;
-const CLASSIC_TIEBREAK_POINTS_TO_WIN = GAME_CONSTANTS.CLASSIC_TIEBREAK_POINTS_TO_WIN;
 const MAX_CLASSIC_SETS = GAME_CONSTANTS.CLASSIC_MAX_SETS;
 
 /**
@@ -146,13 +143,11 @@ class ScoreboardService {
     const homeAfter = team === 'home' ? newScore : this._ensureNumber(data.home_score);
     const awayAfter = team === 'home' ? otherScore : newScore;
 
-    // Смена сторон в тай-брейке при 8 очках
-    if (this._shouldClassicMidSwitch(homeAfter, awayAfter, data)) {
+    // Смена сторон в 5-м сете при 8 очках
+    if (this._shouldClassicMidSwitch(homeAfter, awayAfter)) {
       if (!data.classic_switch_shown) {
-        const twoWinsMode = !!data.two_wins_mode;
-        const tiebreakSet = twoWinsMode ? 3 : 5;
         update.classic_switch_needed = true;
-        update.classic_switch_message = `Смена площадок — ${tiebreakSet}-й сет, счёт ${homeAfter}:${awayAfter}`;
+        update.classic_switch_message = `Смена площадок — 5-й сет, счёт ${homeAfter}:${awayAfter}`;
         update.classic_switch_shown = true;
       }
     } else {
@@ -344,26 +339,13 @@ class ScoreboardService {
    * Обновить настройки
    */
   async updateSettings(gameId, settings) {
-    const allowedSettings = ['invert_tablo', 'unlimited_score', 'two_wins_mode'];
+    const allowedSettings = ['invert_tablo', 'unlimited_score'];
     const update = {};
-
+    
     for (const key of allowedSettings) {
       if (settings[key] !== undefined) {
         update[key] = !!settings[key];
       }
-    }
-
-    // Если включаем two_wins_mode, отключаем beach_mode
-    if (settings.two_wins_mode === true) {
-      update.beach_mode = false;
-      update.two_wins_mode = true;
-      update.period_count = 3; // Максимум 3 сета
-    }
-    
-    // Если выключаем two_wins_mode, включаем стандартный режим (5 сетов)
-    if (settings.two_wins_mode === false) {
-      update.two_wins_mode = false;
-      update.period_count = 5;
     }
 
     return this.updateScoreboard(gameId, update);
@@ -390,7 +372,6 @@ class ScoreboardService {
       update.current_period = 1;
       update.beach_switch_message = '';
       update.period_count = 3;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
     } else {
       update.beach_switch_message = '';
       update.home_sets = 0;
@@ -399,7 +380,6 @@ class ScoreboardService {
       update.period_count = 5;
       update.home_score = 0;
       update.away_score = 0;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
     }
 
     return this.updateScoreboard(gameId, update);
@@ -418,7 +398,6 @@ class ScoreboardService {
 
     const data = snapshot.data();
     const beachEnabled = !!data.beach_mode;
-    const twoWinsMode = !!data.two_wins_mode;
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
@@ -440,13 +419,12 @@ class ScoreboardService {
       beach_current_set: 1,
       beach_switch_message: '',
       beach_match_finished: false,
-      period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
+      period_count: beachEnabled ? 3 : 5,
       set_history: [],
       classic_match_finished: false,
       home_side: 'left',
       away_side: 'right',
       classic_tiebreak_switch_done: true,
-      two_wins_mode: twoWinsMode,
       invert_tablo: invertTablo,
       lastEdited: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -491,7 +469,6 @@ class ScoreboardService {
       overall_score: `${overallHome}:${overallAway}`,
       sets_score: overrideData?.setHistory || data.set_history || [],
       game_type: isBeach ? 'beach' : 'classic',
-      two_wins_mode: !!data.two_wins_mode,
       game_id: gameId,
     };
 
@@ -532,24 +509,13 @@ class ScoreboardService {
     return awayScore >= target && diff >= 2;
   }
 
-  _shouldClassicMidSwitch(homeAfter, awayAfter, data) {
-    const twoWinsMode = !!data.two_wins_mode;
-    const period = this._ensureNumber(data.current_period);
-    const tiebreakSet = twoWinsMode ? 3 : 5;
-    
-    if (period !== tiebreakSet) return false;
+  _shouldClassicMidSwitch(homeAfter, awayAfter) {
     return Math.max(homeAfter, awayAfter) >= 8;
   }
 
   _classicSetWon(teamScore, opponentScore, data) {
     const period = this._ensureNumber(data.current_period);
-    const twoWinsMode = !!data.two_wins_mode;
-    
-    // В режиме до 2 побед 3-й сет (тай-брейк) играется до 15
-    const target = twoWinsMode && period === 3 
-      ? CLASSIC_TIEBREAK_POINTS_TO_WIN 
-      : (period === 5 ? 15 : CLASSIC_POINTS_TO_WIN);
-    
+    const target = period === 5 ? 15 : CLASSIC_POINTS_TO_WIN;
     if (teamScore < target) return false;
     return (teamScore - opponentScore) >= 2;
   }
@@ -611,7 +577,7 @@ class ScoreboardService {
   async _applyClassicSetWin(ref, data, team, teamScore, opponentScore, baseUpdate) {
     const homeFouls = this._ensureNumber(data.home_fouls);
     const awayFouls = this._ensureNumber(data.away_fouls);
-
+    
     if (team === 'home') {
       homeFouls++;
     } else {
@@ -620,15 +586,10 @@ class ScoreboardService {
 
     const currentPeriod = this._ensureNumber(data.current_period) || 1;
     const maxPeriod = this._ensureNumber(data.period_count) || 5;
-    const twoWinsMode = !!data.two_wins_mode;
-    
-    // Определяем условие завершения матча
-    const setsToWin = twoWinsMode ? CLASSIC_SETS_TO_WIN_TWO : CLASSIC_SETS_TO_WIN;
-    const matchFinished = homeFouls >= setsToWin || awayFouls >= setsToWin;
-    
     const nextPeriod = currentPeriod < maxPeriod ? currentPeriod + 1 : currentPeriod;
     const homeFinal = team === 'home' ? teamScore : opponentScore;
     const awayFinal = team === 'home' ? opponentScore : teamScore;
+    const matchFinished = homeFouls >= CLASSIC_SETS_TO_WIN || awayFouls >= CLASSIC_SETS_TO_WIN;
 
     const update = {
       ...baseUpdate,
@@ -645,12 +606,9 @@ class ScoreboardService {
       const currentHomeSide = data.home_side || 'left';
       const newHomeSide = currentHomeSide === 'left' ? 'right' : 'left';
       
-      // В режиме до 2 побед тай-брейк это 3-й сет
-      const tiebreakSet = twoWinsMode ? 3 : 5;
-
       update.pending_home_side = newHomeSide;
       update.pending_away_side = newHomeSide === 'left' ? 'right' : 'left';
-      update.pending_classic_tiebreak_switch_done = nextPeriod === tiebreakSet ? false : true;
+      update.pending_classic_tiebreak_switch_done = nextPeriod === 5 ? false : true;
       update.next_period = nextPeriod;
       update.pending_new_set = true;
     } else {

@@ -862,8 +862,7 @@
 
             // Game type
             var gameType = match.game_type || 'classic';
-            var twoWinsMode = !!match.two_wins_mode;
-            var gameTypeLabel = gameType === 'beach' ? 'Пляжный' : (twoWinsMode ? 'Классический (до 2 побед)' : 'Классический');
+            var gameTypeLabel = gameType === 'beach' ? 'Пляжный' : 'Классический';
             var gameTypeClass = gameType === 'beach' ? 'game-type-beach' : 'game-type-classic';
             html += '<td><span class="game-type-badge ' + gameTypeClass + '">' + gameTypeLabel + '</span></td>';
 

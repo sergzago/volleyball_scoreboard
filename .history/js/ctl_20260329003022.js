@@ -62,14 +62,6 @@ $(document).ready(function() {
     $('#unlimited_score_toggle').prop('checked', unlimitedScore);
     var twoWinsMode = !!scoreboard_data['two_wins_mode'];
     $('#two_wins_mode_toggle').prop('checked', twoWinsMode);
-    
-    // Блокировка чекбоксов: beach_mode и two_wins_mode не могут быть выбраны одновременно
-    $('#two_wins_mode_toggle').prop('disabled', beachMode);
-    $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    
-    // Добавляем класс для стилизации заблокированных label
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
 
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
@@ -160,7 +152,6 @@ function update_db(data){
 
 function saveMatchResult(setHistory, overallHome, overallAway){
   var isBeach = isBeachMode();
-  var twoWinsMode = !!scoreboard_data['two_wins_mode'];
   var userInfo = getCurrentUserInfo();
 
   if(typeof overallHome === 'undefined' || typeof overallAway === 'undefined'){
@@ -181,7 +172,6 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
-    two_wins_mode: twoWinsMode, // Режим до двух побед
     game_id: game_id,
     username: userInfo.username || '',
     displayname: userInfo.displayname || ''
@@ -904,11 +894,7 @@ $(document).ready(function(){
   });
 
   $("#beach_mode_toggle").change(function(){
-    var beachMode = $(this).is(':checked');
-    toggleBeachMode(beachMode);
-    // Блокируем/разблокируем чекбокс two_wins_mode
-    $('#two_wins_mode_toggle').prop('disabled', beachMode);
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
+    toggleBeachMode($(this).is(':checked'));
   });
 
   $("#invert_tablo_toggle").change(function(){
@@ -920,11 +906,7 @@ $(document).ready(function(){
   });
 
   $("#two_wins_mode_toggle").change(function(){
-    var twoWinsMode = $(this).is(':checked');
-    toggleTwoWinsMode(twoWinsMode);
-    // Блокируем/разблокируем чекбокс beach_mode
-    $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
+    toggleTwoWinsMode($(this).is(':checked'));
   });
 
   $(".side-switch-btn").click(function(){

@@ -697,24 +697,17 @@
                 html += '<th>Статус</th>';
                 html += '<th>Общий счёт</th>';
                 html += '<th>Текущий сет</th>';
-
-                // Add set columns (up to 5 sets for classic, 3 for beach, 3 for two wins mode)
-                var maxSets;
-                if (group.gameType === 'beach') {
-                    maxSets = 3;
-                } else if (group.twoWinsMode) {
-                    maxSets = 3; // Режим до 2 побед - максимум 3 сета
-                } else {
-                    maxSets = 5; // Стандартный классический - до 3 побед, максимум 5 сетов
-                }
+                
+                // Add set columns (up to 5 sets for classic, 3 for beach)
+                var maxSets = group.gameType === 'beach' ? 3 : 5;
                 for (var i = 1; i <= maxSets; i++) {
                     html += '<th>Сет ' + i + '</th>';
                 }
-
+                
                 html += '</tr>';
                 html += '</thead>';
                 html += '<tbody>';
-
+                
                 group.games.forEach(function(game) {
                     html += renderGameRow(game, group.gameType);
                 });
@@ -849,7 +842,6 @@
                                 away_team: data.away_team,
                                 tournament_name: data.tournament_name || 'НВЛ',
                                 game_type: gameType,
-                                two_wins_mode: !!data.two_wins_mode,
                                 set_history: setsScore, // Используем sets_score для истории сетов
                                 home_sets: homeSets,    // Используем распарсенные значения из overall_score
                                 away_sets: awaySets,
@@ -857,8 +849,7 @@
                                 overall_score: overallScore // Сохраняем original overall_score
                             },
                             isFinished: true,
-                            gameType: gameType,
-                            twoWinsMode: !!data.two_wins_mode
+                            gameType: gameType
                         });
                     });
                     
@@ -917,14 +908,12 @@
             Object.values(finishedGames).forEach(function(game) {
                 var gameType = game.gameType || 'classic';
                 var tournament = game.data.tournament_name || 'НВЛ';
-                var twoWinsMode = !!game.twoWinsMode;
-                var key = gameType + '|' + tournament + '|' + (twoWinsMode ? 'two' : 'three');
-
+                var key = gameType + '|' + tournament;
+                
                 if (!groupedGames[key]) {
                     groupedGames[key] = {
                         gameType: gameType,
                         tournament: tournament,
-                        twoWinsMode: twoWinsMode,
                         games: []
                     };
                 }
@@ -947,36 +936,29 @@
             sortedGroups.forEach(function(group) {
                 html += '<div class="game-section">';
                 html += '<div class="section-header">';
-                html += '<span class="game-type-badge ' +
+                html += '<span class="game-type-badge ' + 
                     (group.gameType === 'classic' ? 'game-type-classic' : 'game-type-beach') + '">' +
-                    (group.gameType === 'classic' ? (group.twoWinsMode ? 'Классический (до 2 побед)' : 'Классический') : 'Пляжный') + '</span>';
+                    (group.gameType === 'classic' ? 'Классический' : 'Пляжный') + '</span>';
                 html += escapeHtml(group.tournament);
                 html += '</div>';
-
+                
                 html += '<table class="game-table">';
                 html += '<thead>';
                 html += '<tr>';
                 html += '<th>Команды</th>';
                 html += '<th>Статус</th>';
                 html += '<th>Общий счёт</th>';
-
-                // Add set columns (up to 5 sets for classic, 3 for beach, 3 for two wins mode)
-                var maxSets;
-                if (group.gameType === 'beach') {
-                    maxSets = 3;
-                } else if (group.twoWinsMode) {
-                    maxSets = 3; // Режим до 2 побед - максимум 3 сета
-                } else {
-                    maxSets = 5; // Стандартный классический - до 3 побед, максимум 5 сетов
-                }
+                
+                // Add set columns (up to 5 sets for classic, 3 for beach)
+                var maxSets = group.gameType === 'beach' ? 3 : 5;
                 for (var i = 1; i <= maxSets; i++) {
                     html += '<th>Сет ' + i + '</th>';
                 }
-
+                
                 html += '</tr>';
                 html += '</thead>';
                 html += '<tbody>';
-
+                
                 group.games.forEach(function(game) {
                     html += renderFinishedGameRow(game, group.gameType);
                 });

@@ -66,10 +66,6 @@ $(document).ready(function() {
     // Блокировка чекбоксов: beach_mode и two_wins_mode не могут быть выбраны одновременно
     $('#two_wins_mode_toggle').prop('disabled', beachMode);
     $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    
-    // Добавляем класс для стилизации заблокированных label
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
 
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
@@ -908,7 +904,6 @@ $(document).ready(function(){
     toggleBeachMode(beachMode);
     // Блокируем/разблокируем чекбокс two_wins_mode
     $('#two_wins_mode_toggle').prop('disabled', beachMode);
-    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
   });
 
   $("#invert_tablo_toggle").change(function(){
@@ -924,7 +919,6 @@ $(document).ready(function(){
     toggleTwoWinsMode(twoWinsMode);
     // Блокируем/разблокируем чекбокс beach_mode
     $('#beach_mode_toggle').prop('disabled', twoWinsMode);
-    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
   });
 
   $(".side-switch-btn").click(function(){

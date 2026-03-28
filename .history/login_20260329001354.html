@@ -222,16 +222,8 @@
         const redirectParam = urlParams.get('redirect');
         const isAdminPage = redirectParam && redirectParam.includes('admin.html');
 
-        console.log('Login page:', {
-            ENABLE_AUTH: ENABLE_AUTH,
-            isAuthEnabled: isAuthEnabled,
-            redirectParam: redirectParam,
-            isAdminPage: isAdminPage
-        });
-
         // Если авторизация отключена и это не admin.html, перенаправляем на главную
         if (!isAuthEnabled && !isAdminPage) {
-            console.log('Auth disabled, redirecting to index.html');
             window.location.href = 'index.html';
         }
 
@@ -273,25 +265,17 @@
                     console.log('User authenticated:', user.email);
                     showLoading();
                     try {
-                        // Для admin.html всегда проверяем роль через Firestore
-                        if (isAdminPage) {
-                            const db = firebase.firestore();
-                            const username = user.email.split('@')[0];
-                            const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
+                        // Проверяем роль из Firestore
+                        const db = firebase.firestore();
+                        const username = user.email.split('@')[0];
+                        const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
 
-                            let role = 'user';
-                            if (userDoc.exists) {
-                                const userData = userDoc.data();
-                                role = userData.role === 'admin' ? 'admin' : 'user';
-                            }
-                            console.log('User role:', role);
-
-                            if (role !== 'admin') {
-                                hideLoading();
-                                showError('Доступ запрещен. Требуются права администратора.');
-                                return;
-                            }
+                        let role = 'user';
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            role = userData.role === 'admin' ? 'admin' : 'user';
                         }
+                        console.log('User role:', role);
 
                         // Возвращаемся на страницу, с которой пришли
                         if (redirectUrl) {
@@ -350,14 +334,6 @@
                         role = userData.role === 'admin' ? 'admin' : 'user';
                     }
                     console.log('User role:', role);
-
-                    // Для admin.html проверяем права администратора
-                    if (isAdminPage && role !== 'admin') {
-                        hideLoading();
-                        showError('Доступ запрещен. Требуются права администратора.');
-                        await auth.signOut();
-                        return;
-                    }
 
                     showSuccess('Успешный вход! Перенаправление...');
 

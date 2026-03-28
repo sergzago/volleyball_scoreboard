@@ -48,11 +48,7 @@ var GAME_CONSTANTS = {
   BEACH_MAX_SETS: 3,
   CLASSIC_POINTS_TO_WIN: 25,
   CLASSIC_SETS_TO_WIN: 3,
-  CLASSIC_MAX_SETS: 5,
-  // Классический волейбол до 2 побед (3 сета максимум, 3-й сет тай-брейк до 15)
-  CLASSIC_SETS_TO_WIN_TWO: 2,
-  CLASSIC_MAX_SETS_TWO: 3,
-  CLASSIC_TIEBREAK_POINTS_TO_WIN: 15
+  CLASSIC_MAX_SETS: 5
 };
 
 // ============================================================================
