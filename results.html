@@ -466,16 +466,43 @@
           flex: 1;
         }
       }
+
+      /* Логотип в блоке Результаты */
+      .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        position: relative;
+      }
+
+      .results-header h2 {
+        margin: 0;
+        color: #225378;
+      }
+
+      .results-count {
+        color: #777;
+        font-size: 14px;
+      }
+
+      .logo-img {
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+        margin-left: auto;
+      }
+
+      @media (max-width: 768px) {
+        .logo-img {
+          width: 36px;
+          height: 36px;
+        }
+      }
     </style>
 </head>
 <body>
     <div class="container">
-      <div class="row">
-        <div class="col-xs-12">
-          <h1 class="text-center">Результаты матчей</h1>
-        </div>
-      </div>
-      
       <div class="results-container">
         <!-- Calendar Panel -->
         <div class="calendar-panel">
@@ -513,8 +540,9 @@
           <div class="results-header">
             <h2>Результаты</h2>
             <span class="results-count" id="resultsCount"></span>
+            <img class="logo-img" src="" alt="Logo">
           </div>
-          
+
           <div id="resultsContainer">
             <div class="loading">Выберите период для просмотра результатов</div>
           </div>
@@ -921,8 +949,28 @@
         renderCalendar();
       }
 
+      // Загрузка логотипа
+      function loadLogoImage() {
+        $.ajax({
+          url: 'logo_base64.txt',
+          dataType: 'text',
+          success: function(data) {
+            var logoData = data.trim();
+            if (logoData) {
+              $('.logo-img').attr('src', logoData);
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('Ошибка загрузки логотипа:', error);
+          }
+        });
+      }
+
       // Initialize
-      initCalendar();
+      $(document).ready(function() {
+        initCalendar();
+        loadLogoImage();
+      });
     </script>
 </body>
 </html>
