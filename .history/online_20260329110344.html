@@ -638,19 +638,25 @@
                         }
                     }
 
+                    // Update venue column (5th column, index 4)
+                    var venueCell = row.querySelectorAll('td')[4];
+                    if (venueCell) {
+                        venueCell.textContent = updatedData.venue || '';
+                    }
+
                     // Update sets history
-                    // Находим ячейки для истории сетов (начиная с 5-й ячейки таблицы: Команды, Статус, Общий счёт, Текущий сет, затем Сет 1, Сет 2...)
+                    // Находим ячейки для истории сетов (начиная с 6-й ячейки таблицы: Команды, Статус, Общий счёт, Текущий сет, Зал, затем Сет 1, Сет 2...)
                     var tableCells = row.querySelectorAll('td');
                     var maxSets = gameType === 'beach' ? 3 : 5;
                     var setHistory = updatedData.set_history || [];
 
-                    // Обновляем ячейки истории сетов (индексы 4, 5, 6, 7, 8 для сетов 1-5)
-                    for (var i = 0; i < maxSets && i + 4 < tableCells.length; i++) {
+                    // Обновляем ячейки истории сетов (индексы 5, 6, 7, 8, 9 для сетов 1-5)
+                    for (var i = 0; i < maxSets && i + 5 < tableCells.length; i++) {
                         if (i < setHistory.length) {
                             var set = setHistory[i];
-                            tableCells[i + 4].textContent = (set.home !== undefined ? set.home : '-') + ':' + (set.away !== undefined ? set.away : '-');
+                            tableCells[i + 5].textContent = (set.home !== undefined ? set.home : '-') + ':' + (set.away !== undefined ? set.away : '-');
                         } else {
-                            tableCells[i + 4].textContent = '-';
+                            tableCells[i + 5].textContent = '-';
                         }
                     }
                     
@@ -733,6 +739,7 @@
                 html += '<th>Статус</th>';
                 html += '<th>Общий счёт</th>';
                 html += '<th>Текущий сет</th>';
+                html += '<th>Зал</th>';
 
                 // Add set columns (up to 5 sets for classic, 3 for beach, 3 for two wins mode)
                 var maxSets;
@@ -771,6 +778,7 @@
             var awayScore = data.away_score || 0;
             var currentPeriod = data.current_period || 1;
             var setHistory = data.set_history || [];
+            var venue = data.venue || '';
             // Определяем статус матча динамически на основе данных, а не только game.isFinished
             var isFinished = game.isFinished || isGameFinished(data, gameType);
 
@@ -800,6 +808,9 @@
             } else {
                 html += '<td class="score-set">' + homeScore + ':' + awayScore + '</td>';
             }
+
+            // Venue column
+            html += '<td>' + escapeHtml(venue) + '</td>';
 
             // Sets history
             var maxSets = gameType === 'beach' ? 3 : 5;
@@ -890,6 +901,7 @@
                                 home_team: data.home_team,
                                 away_team: data.away_team,
                                 tournament_name: data.tournament_name || 'НВЛ',
+                                venue: data.venue || '', // Добавляем поле "Зал"
                                 game_type: gameType,
                                 two_wins_mode: !!data.two_wins_mode,
                                 set_history: setsScore, // Используем sets_score для истории сетов
@@ -1001,6 +1013,7 @@
                 html += '<th>Команды</th>';
                 html += '<th>Статус</th>';
                 html += '<th>Общий счёт</th>';
+                html += '<th>Зал</th>';
 
                 // Add set columns (up to 5 sets for classic, 3 for beach, 3 for two wins mode)
                 var maxSets;
@@ -1038,6 +1051,7 @@
             var setHistory = data.set_history || [];
             var homeSets = data.home_sets || 0;
             var awaySets = data.away_sets || 0;
+            var venue = data.venue || '';
 
             var html = '<tr data-game-id="' + game.id + '">';
 
@@ -1050,6 +1064,9 @@
             // Overall score (sets won)
             var overallScore = homeSets + ':' + awaySets;
             html += '<td class="score-current">' + overallScore + '</td>';
+
+            // Venue column
+            html += '<td>' + escapeHtml(venue) + '</td>';
 
             // Sets history
             var maxSets = gameType === 'beach' ? 3 : 5;

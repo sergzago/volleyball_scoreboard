@@ -134,7 +134,6 @@ $(document).ready(function() {
     if(typeof scoreboard_data['tournament_name'] === 'undefined'){
       update_db({tournament_name: 'НВЛ'});
     }
-    $('#in_venue').val(scoreboard_data['venue'] || '');
     $('#col_home_team').val(scoreboard_data['home_color'])
     $('#col_away_team').val(scoreboard_data['away_color'])
     $('#home_score').html(scoreboard_data['home_score'])
@@ -179,7 +178,6 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     home_team: scoreboard_data['home_team'],
     away_team: scoreboard_data['away_team'],
     tournament_name: scoreboard_data['tournament_name'] || 'НВЛ',
-    venue: scoreboard_data['venue'] || '', // Сохраняем значение поля "Зал"
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
@@ -796,7 +794,6 @@ $(document).ready(function(){
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
       tournament_name: $("#in_tournament").val() || "НВЛ",
-      venue: $("#in_venue").val() || "",
     };
     console.log(update);
     update_db(update);
@@ -805,12 +802,10 @@ $(document).ready(function(){
     var beachEnabled=isBeachMode();
     var invertTablo = !!scoreboard_data['invert_tablo'];
     var userInfo = getCurrentUserInfo();
-
+    
     // Получаем последнюю запись о матче для этой игры
     var lastMatchId = scoreboard_data['last_match_id'];
-    // Сохраняем значение поля "Зал" - оно не должно сбрасываться
-    var venue = scoreboard_data['venue'] || '';
-
+    
     // Формируем данные для сброса
     var resetData = {
       show:0,
@@ -825,7 +820,6 @@ $(document).ready(function(){
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
       tournament_name: $("#in_tournament").val(),
-      venue: venue, // Сохраняем значение поля "Зал"
       home_sets:0,
       away_sets:0,
       beach_mode:beachEnabled,
@@ -843,7 +837,7 @@ $(document).ready(function(){
       username: userInfo.username || '',
       displayname: userInfo.displayname || ''
     };
-
+    
     // Если есть last_match_id, помечаем матч как удаленный
     if (lastMatchId) {
       matches_collection.doc(lastMatchId).update({
@@ -853,7 +847,7 @@ $(document).ready(function(){
         console.error('Error marking match as deleted: ', error);
       });
     }
-
+    
     scoreboard_collection.doc(game_id).set(resetData);
   });
   $(".period-btn").click(function(){

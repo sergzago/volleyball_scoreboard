@@ -890,6 +890,7 @@
                                 home_team: data.home_team,
                                 away_team: data.away_team,
                                 tournament_name: data.tournament_name || 'НВЛ',
+                                venue: data.venue || '', // Добавляем поле "Зал"
                                 game_type: gameType,
                                 two_wins_mode: !!data.two_wins_mode,
                                 set_history: setsScore, // Используем sets_score для истории сетов
@@ -1001,6 +1002,7 @@
                 html += '<th>Команды</th>';
                 html += '<th>Статус</th>';
                 html += '<th>Общий счёт</th>';
+                html += '<th>Зал</th>';
 
                 // Add set columns (up to 5 sets for classic, 3 for beach, 3 for two wins mode)
                 var maxSets;
@@ -1038,6 +1040,7 @@
             var setHistory = data.set_history || [];
             var homeSets = data.home_sets || 0;
             var awaySets = data.away_sets || 0;
+            var venue = data.venue || '';
 
             var html = '<tr data-game-id="' + game.id + '">';
 
@@ -1050,6 +1053,9 @@
             // Overall score (sets won)
             var overallScore = homeSets + ':' + awaySets;
             html += '<td class="score-current">' + overallScore + '</td>';
+
+            // Venue column
+            html += '<td>' + escapeHtml(venue) + '</td>';
 
             // Sets history
             var maxSets = gameType === 'beach' ? 3 : 5;

@@ -890,6 +890,7 @@
                                 home_team: data.home_team,
                                 away_team: data.away_team,
                                 tournament_name: data.tournament_name || 'НВЛ',
+                                venue: data.venue || '', // Добавляем поле "Зал"
                                 game_type: gameType,
                                 two_wins_mode: !!data.two_wins_mode,
                                 set_history: setsScore, // Используем sets_score для истории сетов

@@ -134,7 +134,6 @@ $(document).ready(function() {
     if(typeof scoreboard_data['tournament_name'] === 'undefined'){
       update_db({tournament_name: 'НВЛ'});
     }
-    $('#in_venue').val(scoreboard_data['venue'] || '');
     $('#col_home_team').val(scoreboard_data['home_color'])
     $('#col_away_team').val(scoreboard_data['away_color'])
     $('#home_score').html(scoreboard_data['home_score'])
@@ -179,7 +178,6 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     home_team: scoreboard_data['home_team'],
     away_team: scoreboard_data['away_team'],
     tournament_name: scoreboard_data['tournament_name'] || 'НВЛ',
-    venue: scoreboard_data['venue'] || '', // Сохраняем значение поля "Зал"
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',

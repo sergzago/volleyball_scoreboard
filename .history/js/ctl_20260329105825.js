@@ -179,7 +179,6 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     home_team: scoreboard_data['home_team'],
     away_team: scoreboard_data['away_team'],
     tournament_name: scoreboard_data['tournament_name'] || 'НВЛ',
-    venue: scoreboard_data['venue'] || '', // Сохраняем значение поля "Зал"
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',

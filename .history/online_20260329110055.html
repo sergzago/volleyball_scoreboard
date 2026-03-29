@@ -628,7 +628,7 @@
                             statusBadge.textContent = 'Закончен';
                             statusBadge.className = 'status-badge status-finished';
                             game.isFinished = true;
-
+                            
                             // Update current set score to "-" for finished games
                             currentScoreCell.textContent = '-';
                         } else {
@@ -637,7 +637,7 @@
                             game.isFinished = false;
                         }
                     }
-
+                    
                     // Update sets history
                     // Находим ячейки для истории сетов (начиная с 5-й ячейки таблицы: Команды, Статус, Общий счёт, Текущий сет, затем Сет 1, Сет 2...)
                     var tableCells = row.querySelectorAll('td');
@@ -733,6 +733,7 @@
                 html += '<th>Статус</th>';
                 html += '<th>Общий счёт</th>';
                 html += '<th>Текущий сет</th>';
+                html += '<th>Зал</th>';
 
                 // Add set columns (up to 5 sets for classic, 3 for beach, 3 for two wins mode)
                 var maxSets;
@@ -771,6 +772,7 @@
             var awayScore = data.away_score || 0;
             var currentPeriod = data.current_period || 1;
             var setHistory = data.set_history || [];
+            var venue = data.venue || '';
             // Определяем статус матча динамически на основе данных, а не только game.isFinished
             var isFinished = game.isFinished || isGameFinished(data, gameType);
 
@@ -800,7 +802,7 @@
             } else {
                 html += '<td class="score-set">' + homeScore + ':' + awayScore + '</td>';
             }
-
+            
             // Sets history
             var maxSets = gameType === 'beach' ? 3 : 5;
             for (var i = 0; i < maxSets; i++) {
@@ -1022,15 +1024,15 @@
                 group.games.forEach(function(game) {
                     html += renderFinishedGameRow(game, group.gameType);
                 });
-
+                
                 html += '</tbody>';
                 html += '</table>';
                 html += '</div>';
             });
-
+            
             container.innerHTML = html;
         }
-
+        
         function renderFinishedGameRow(game, gameType) {
             var data = game.data;
             var homeTeam = data.home_team || 'Команда 1';
@@ -1038,26 +1040,26 @@
             var setHistory = data.set_history || [];
             var homeSets = data.home_sets || 0;
             var awaySets = data.away_sets || 0;
-
+            
             var html = '<tr data-game-id="' + game.id + '">';
-
+            
             // Teams column
             html += '<td class="team-name">' + escapeHtml(homeTeam) + ' — ' + escapeHtml(awayTeam) + '</td>';
-
+            
             // Status column
             html += '<td><span class="status-badge status-finished">Закончен</span></td>';
-
+            
             // Overall score (sets won)
             var overallScore = homeSets + ':' + awaySets;
             html += '<td class="score-current">' + overallScore + '</td>';
-
+            
             // Sets history
             var maxSets = gameType === 'beach' ? 3 : 5;
             for (var i = 0; i < maxSets; i++) {
                 if (i < setHistory.length) {
                     var set = setHistory[i];
-                    html += '<td class="score-set">' +
-                        (set.home !== undefined ? set.home : '-') + ':' +
+                    html += '<td class="score-set">' + 
+                        (set.home !== undefined ? set.home : '-') + ':' + 
                         (set.away !== undefined ? set.away : '-') + '</td>';
                 } else {
                     html += '<td>-</td>';
