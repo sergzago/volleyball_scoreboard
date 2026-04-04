@@ -376,31 +376,26 @@
             // Get today's date range
             var today = new Date();
             today.setHours(0, 0, 0, 0);
-            var tomorrow = new Date(today);
+            var tomorrow = new Date(today.getTime());
             tomorrow.setDate(tomorrow.getDate() + 1);
-            
-            console.log('Loading games for date range:', today.toISOString(), 'to', tomorrow.toISOString());
-            
+
             // Query scoreboard games that had changes today (active games)
             scoreboard_collection
                 .where('lastEdited', '>=', today)
                 .get()
                 .then(function(scoreboardSnapshot) {
-                    console.log('Found', scoreboardSnapshot.size, 'scoreboard games with changes today');
-                    
                     var allGames = [];
-                    
+
                     // Add active games
                     scoreboardSnapshot.forEach(function(doc) {
                         var data = doc.data();
                         var gameId = doc.id;
-                        
-                        
-                        console.log('Processing active game:', gameId, data.home_team, 'vs', data.away_team);
 
                         // Convert Firestore timestamp to Date
                         if (data.lastEdited && data.lastEdited.toDate) {
                             data.lastEdited = data.lastEdited.toDate();
+                        } else if (!data.lastEdited) {
+                            return;
                         }
 
                         // Определяем, завершен ли матч, по флагам или по количеству выигранных сетов
@@ -414,25 +409,29 @@
                             gameType: gameType,
                             twoWinsMode: !!data.two_wins_mode
                         });
-                        
-                        // Set up real-time listener for active games
+
+                        // Если игра уже завершена, не ставим listener — она просто отобразится
+                        if (isFinished) {
+                            return;
+                        }
+
+                        // Set up real-time listener for active games only
                         var unsub = scoreboard_collection.doc(gameId).onSnapshot(function(doc) {
                             if (doc.exists) {
                                 var updatedData = doc.data();
                                 if (updatedData.lastEdited && updatedData.lastEdited.toDate) {
                                     updatedData.lastEdited = updatedData.lastEdited.toDate();
                                 }
-                                
+
                                 // Check if game should be moved to finished
-                                var gameType = data.beach_mode ? 'beach' : 'classic';
+                                var gameType = updatedData.beach_mode ? 'beach' : 'classic';
                                 var setsWon = calculateSetsWon(updatedData, gameType);
                                 var isFinished = isGameFinished(updatedData, gameType);
-                                
+
                                 if (isFinished) {
-                                    console.log('Game', gameId, 'finished, moving to finished matches');
                                     // Remove from active games
                                     removeGame(gameId);
-                                    
+
                                     // Add to finished matches (simulate match document)
                                     var finishedGameData = {
                                         home_team: updatedData.home_team,
@@ -467,10 +466,11 @@
                     });
                     
                     if (allGames.length === 0) {
-                        document.getElementById('gamesContainer').innerHTML = 
+                        document.getElementById('gamesContainer').innerHTML =
                             '<div class="no-games">Нет матчей на сегодня</div>';
                     } else {
-                        console.log('Successfully loaded', allGames.length, 'games (active + finished)');
+                        var activeCount = allGames.filter(function(g) { return !g.isFinished; }).length;
+                        var finishedCount = allGames.filter(function(g) { return g.isFinished; }).length;
                         games = {};
                         allGames.forEach(function(game) {
                             games[game.id] = game;
@@ -630,7 +630,6 @@
                 if (game) {
                     // Проверяем, не началась ли новая игра с тем же ID
                     if (hasGameStateChanged(gameId, updatedData)) {
-                        console.log('Game state changed for', gameId, '- reloading games');
                         loadGames(); // Перезагружаем все игры
                         return;
                     }
@@ -711,11 +710,6 @@
             
             // Filter games - show all games without filters
             var filteredGames = Object.values(games);
-            
-            console.log('Rendering', filteredGames.length, 'games');
-            filteredGames.forEach(function(game) {
-                console.log('Game:', game.id, game.data.home_team, 'vs', game.data.away_team, 'Type:', game.gameType, 'Finished:', game.isFinished);
-            });
             
             // Group by game type and tournament
             var groupedGames = {};
@@ -880,28 +874,27 @@
         }
         
         function loadFinishedGames(today, tomorrow) {
-            // Query finished games from matches collection for today
+            // Создаём конец дня (как в results.html)
+            var endOfDay = new Date(today);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            // Используем тот же подход что и в results.html
             matches_collection
                 .where('date_time', '>=', today)
-                .where('date_time', '<', tomorrow)
+                .where('date_time', '<=', endOfDay)
                 .get()
                 .then(function(snapshot) {
-                    console.log('Found', snapshot.size, 'finished games in matches collection for today');
-                    
                     var finishedGamesList = [];
-                    
+
                     snapshot.forEach(function(doc) {
                         var data = doc.data();
                         var gameId = doc.id;
 
-                        // Пропускаем удаленные матчи
-                        if (data.is_deleted === true) {
-                            return;
-                        }
-
                         // Convert Firestore timestamp to Date
                         if (data.date_time && data.date_time.toDate) {
                             data.date_time = data.date_time.toDate();
+                        } else if (!data.date_time) {
+                            return;
                         }
 
                         var gameType = data.game_type || 'classic';
@@ -927,25 +920,25 @@
                                 tournament_name: data.tournament_name || 'НВЛ',
                                 game_type: gameType,
                                 two_wins_mode: !!data.two_wins_mode,
-                                set_history: setsScore, // Используем sets_score для истории сетов
-                                home_sets: homeSets,    // Используем распарсенные значения из overall_score
+                                set_history: setsScore,
+                                home_sets: homeSets,
                                 away_sets: awaySets,
                                 lastEdited: data.date_time,
-                                overall_score: overallScore // Сохраняем original overall_score
+                                overall_score: overallScore
                             },
                             isFinished: true,
                             gameType: gameType,
                             twoWinsMode: !!data.two_wins_mode
                         });
                     });
-                    
+
                     // Sort finished games by game type, tournament, and lastEdited time
                     finishedGamesList.sort(function(a, b) {
                         // First by game type (classic before beach)
                         if (a.gameType !== b.gameType) {
                             return a.gameType === 'classic' ? -1 : 1;
                         }
-                        
+
                         // Then by tournament name
                         var tournamentA = a.data.tournament_name || 'НВЛ';
                         var tournamentB = b.data.tournament_name || 'НВЛ';
@@ -953,37 +946,37 @@
                         if (tournamentCompare !== 0) {
                             return tournamentCompare;
                         }
-                        
+
                         // Finally by lastEdited time (newest first)
                         var timeA = a.data.lastEdited || new Date(0);
                         var timeB = b.data.lastEdited || new Date(0);
                         return timeB - timeA;
                     });
-                    
+
                     // Store in state
                     finishedGames = {};
                     finishedGamesList.forEach(function(game) {
                         finishedGames[game.id] = game;
                     });
-                    
+
                     renderFinishedGames();
-                    
+
                     // Hide loading message if no finished games
                     if (finishedGamesList.length === 0) {
-                        document.getElementById('finishedGamesContainer').innerHTML = 
+                        document.getElementById('finishedGamesContainer').innerHTML =
                             '<div class="no-games">Нет завершенных матчей на сегодня</div>';
                     }
                 })
                 .catch(function(error) {
                     console.error('Error loading finished games:', error);
-                    document.getElementById('finishedGamesContainer').innerHTML = 
+                    document.getElementById('finishedGamesContainer').innerHTML =
                         '<div class="no-games">Ошибка загрузки завершенных матчей</div>';
                 });
         }
-        
+
         function renderFinishedGames() {
             var container = document.getElementById('finishedGamesContainer');
-            
+
             if (Object.keys(finishedGames).length === 0) {
                 container.innerHTML = '<div class="no-games">Нет завершенных матчей на сегодня</div>';
                 return;
@@ -1007,7 +1000,7 @@
                 }
                 groupedGames[key].games.push(game);
             });
-            
+
             // Sort groups: classic first, then beach; within each, sort by tournament name
             var sortedGroups = Object.values(groupedGames).sort(function(a, b) {
                 // First by game type (classic before beach)
