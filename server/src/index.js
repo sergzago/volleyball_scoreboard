@@ -2,21 +2,22 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { initializeFirebase } = require('./config/firebase');
+const { initializeDb, provider } = require('./config/db');
 const { errorHandler } = require('./middleware/validators');
 const scoreboardRouter = require('./routes/scoreboard');
 const matchesRouter = require('./routes/matches');
 const authRouter = require('./routes/auth');
 
-// Инициализация Firebase
-const { admin, db } = initializeFirebase();
+// Инициализация БД (Firebase или PocketBase)
+const dbConfig = await initializeDb();
 
 // Создание Express приложения
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Сохраняем Firebase инстансы в app.locals для доступа в маршрутах
-app.locals.firebase = { admin, db };
+// Сохраняем инстансы в app.locals для доступа в маршрутах
+app.locals.db = dbConfig;
+app.locals.dbProvider = dbConfig.provider;
 
 // Middleware
 app.use(helmet()); // Безопасность HTTP заголовков
@@ -28,7 +29,7 @@ app.use(express.json());
 // Логгирование запросов (dev mode)
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path} [${dbConfig.provider}]`);
     next();
   });
 }
@@ -40,7 +41,11 @@ app.use('/api/matches', matchesRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    provider: dbConfig.provider,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 404 handler

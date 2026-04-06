@@ -1,9 +1,12 @@
 const express = require('express');
 const { ScoreboardService } = require('../services/scoreboardService');
-const { COLLECTIONS } = require('../../../js/firebase-config');
+const { createDbAdapter, MATCHES_COLLECTION } = require('../services/dbAdapter');
 
 const router = express.Router();
-const scoreboardService = new ScoreboardService();
+
+function getService(req) {
+  return new ScoreboardService(req.app.locals.db);
+}
 
 /**
  * @route   POST /api/matches
@@ -20,7 +23,7 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    const result = await scoreboardService.saveMatchResult(game_id, {
+    const result = await getService(req).saveMatchResult(game_id, {
       setHistory,
       overallHome,
       overallAway,
@@ -39,26 +42,19 @@ router.post('/', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const { tournament, game_type, limit = 50 } = req.query;
+    const dbAdapter = createDbAdapter(req.app.locals.db);
 
-    let query = require('../config/firebase').db.collection(COLLECTIONS.MATCHES);
-    
-    if (tournament) {
-      query = query.where('tournament_name', '==', tournament);
-    }
-    
-    if (game_type) {
-      query = query.where('game_type', '==', game_type);
-    }
-    
-    query = query.orderBy('date_time', 'desc').limit(parseInt(limit));
-    
-    const snapshot = await query.get();
-    const matches = [];
-    
-    snapshot.forEach(doc => {
-      matches.push({ id: doc.id, ...doc.data() });
-    });
-    
+    const filters = {
+      orderBy: { field: 'date_time', direction: 'desc' },
+      limit: parseInt(limit),
+    };
+
+    const where = [];
+    if (tournament) where.push(['tournament_name', '==', tournament]);
+    if (game_type) where.push(['game_type', '==', game_type]);
+    if (where.length > 0) filters.where = where;
+
+    const matches = await dbAdapter.queryDocs(MATCHES_COLLECTION, filters);
     res.json(matches);
   } catch (err) {
     next(err);
@@ -67,22 +63,22 @@ router.get('/', async (req, res, next) => {
 
 /**
  * @route   GET /api/matches/:id
- * @desc    Получить详细信息 матча по ID
+ * @desc    Получить details матча по ID
  */
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
+    const dbAdapter = createDbAdapter(req.app.locals.db);
+    const match = await dbAdapter.getDoc(MATCHES_COLLECTION, id);
 
-    const doc = await require('../config/firebase').db.collection(COLLECTIONS.MATCHES).doc(id).get();
-    
-    if (!doc.exists) {
+    if (!match) {
       return res.status(404).json({
         error: 'Not Found',
         message: 'Match not found',
       });
     }
-    
-    res.json({ id: doc.id, ...doc.data() });
+
+    res.json(match);
   } catch (err) {
     next(err);
   }

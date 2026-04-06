@@ -12,26 +12,44 @@ var CLASSIC_TIEBREAK_POINTS_TO_WIN = 15;
 
 // Получение информации о текущем пользователе
 function getCurrentUserInfo() {
-  const user = firebase.auth().currentUser;
-  if (!user) return {};
-  
-  const username = user.email.split('@')[0];
-  return {
-    username: username,
-    displayname: user.displayName || username
-  };
+  // Через DB интерфейс (работает для обоих провайдеров)
+  if (DB.getProvider() === 'firebase') {
+    const user = firebase.auth().currentUser;
+    if (!user) return {};
+    return {
+      username: user.email.split('@')[0],
+      displayname: user.displayName || user.email.split('@')[0]
+    };
+  }
+
+  // PocketBase
+  if (DB.auth.getAuthInstance && DB.auth.getAuthInstance()) {
+    const pb = typeof PocketBase !== 'undefined' ? new PocketBase(DB_CONFIG.pocketbase.url) : null;
+    if (pb && pb.authStore.isValid && pb.authStore.model) {
+      const record = pb.authStore.model;
+      return {
+        username: record.username || record.email.split('@')[0],
+        displayname: record.displayName || record.username || record.email.split('@')[0]
+      };
+    }
+  }
+  return {};
 }
 
-// Подписка на изменения в Firestore после загрузки DOM
+// Подписка на изменения после загрузки DOM
 $(document).ready(function() {
-  scoreboard_query.onSnapshot(
-    function(documentSnapshot){
-      if(!documentSnapshot.exists) {
-        console.warn('Document does not exist:', scoreboard_query.id);
-        return;
-      }
-      $(".hidden").removeClass("hidden");
-      scoreboard_data=documentSnapshot.data();
+  // Инициализируем DB
+  DB.init().then(function() {
+    // Подписка на изменения через DB интерфейс
+    DB.scoreboard.subscribe(
+      game_id,
+      function(data) {
+        if (!data) {
+          console.warn('Document does not exist:', game_id);
+          return;
+        }
+        $(".hidden").removeClass("hidden");
+        scoreboard_data = data;
       $('.away_team').html(scoreboard_data['away_team'])
       $('.home_team').html(scoreboard_data['home_team'])
       var disp=scoreboard_data['show'];
@@ -48,8 +66,6 @@ $(document).ready(function() {
       $(".show-select[data-val='4']").addClass("btn-info");
     }else if(disp == 6){
       $(".show-select[data-val='6']").addClass("btn-info");
-    }else if(disp == 14){
-      $(".show-select[data-val='14']").addClass("btn-info");
     }
 
     var beachMode=isBeachMode();
@@ -143,8 +159,13 @@ $(document).ready(function() {
     $('#custom_label').val(scoreboard_data['custom_label'])
     updateSideLayout();
     renderSetHistoryCtl(scoreboard_data['set_history']);
-  }, function(error) {
-    console.error('Error listening to scoreboard:', error);
+      },
+      function(error) {
+        console.error('Error listening to scoreboard:', error);
+      }
+    );
+  }).catch(function(err) {
+    console.error('DB initialization failed:', err);
   });
 });
 
@@ -155,7 +176,7 @@ function update_db(data){
     data.username = userInfo.username;
     data.displayname = userInfo.displayname;
   }
-  data.lastEdited = firebase.firestore.FieldValue.serverTimestamp();
+  data.lastEdited = DB.serverTimestamp();
   scoreboard_query.update(data);
 }
 
@@ -175,7 +196,7 @@ function saveMatchResult(setHistory, overallHome, overallAway){
   }
 
   var matchData = {
-    date_time: firebase.firestore.FieldValue.serverTimestamp(),
+    date_time: DB.serverTimestamp(),
     home_team: scoreboard_data['home_team'],
     away_team: scoreboard_data['away_team'],
     tournament_name: scoreboard_data['tournament_name'] || 'НВЛ',
@@ -216,8 +237,8 @@ function performNewSetUpdate(){
     }
     update['beach_current_set'] = nextSet;
     update['current_period'] = nextSet;
-    update['next_beach_set'] = firebase.firestore.FieldValue.delete();
-    update['pending_new_set'] = firebase.firestore.FieldValue.delete();
+    update['next_beach_set'] = DB.deleteField();
+    update['pending_new_set'] = DB.deleteField();
     update_db(update);
     return;
   }
@@ -236,11 +257,11 @@ function performNewSetUpdate(){
     update['classic_tiebreak_switch_done'] = scoreboard_data['pending_classic_tiebreak_switch_done'];
   }
   // clear pending fields
-  update['next_period'] = firebase.firestore.FieldValue.delete();
-  update['pending_home_side'] = firebase.firestore.FieldValue.delete();
-  update['pending_away_side'] = firebase.firestore.FieldValue.delete();
-  update['pending_classic_tiebreak_switch_done'] = firebase.firestore.FieldValue.delete();
-  update['pending_new_set'] = firebase.firestore.FieldValue.delete();
+  update['next_period'] = DB.deleteField();
+  update['pending_home_side'] = DB.deleteField();
+  update['pending_away_side'] = DB.deleteField();
+  update['pending_classic_tiebreak_switch_done'] = DB.deleteField();
+  update['pending_new_set'] = DB.deleteField();
   update_db(update);
 }
 
@@ -647,7 +668,7 @@ function handleClassicScore(team, delta){
   } else {
     // If condition is no longer met, remove only the 'needed' visual flag/message
     if(scoreboard_data['classic_switch_needed']){
-      var DEL = firebase.firestore.FieldValue.delete();
+      var DEL = DB.deleteField();
       update['classic_switch_needed'] = DEL;
       update['classic_switch_message'] = DEL;
       // keep 'classic_switch_shown' to avoid re-triggering highlight again
@@ -839,22 +860,43 @@ $(document).ready(function(){
       away_side:'right',
       classic_tiebreak_switch_done:true,
       invert_tablo:invertTablo,
-      lastEdited: firebase.firestore.FieldValue.serverTimestamp(),
+      lastEdited: DB.serverTimestamp(),
       username: userInfo.username || '',
       displayname: userInfo.displayname || ''
     };
 
     // Если есть last_match_id, помечаем матч как удаленный
     if (lastMatchId) {
-      matches_collection.doc(lastMatchId).update({
-        is_deleted: true,
-        deleted_at: firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(function(error) {
+      DB.matches.softDelete(lastMatchId).catch(function(error) {
         console.error('Error marking match as deleted: ', error);
       });
     }
 
-    scoreboard_collection.doc(game_id).set(resetData);
+    scoreboard_collection.doc(game_id).set(resetData)
+      .then(function(result) {
+        console.log('Scoreboard reset complete:', result);
+        // Принудительно обновляем UI из результата
+        if (result) {
+          scoreboard_data = result;
+          $(".hidden").removeClass("hidden");
+          $('.away_team').html(scoreboard_data['away_team'] || '');
+          $('.home_team').html(scoreboard_data['home_team'] || '');
+          $('#in_home_team').val(scoreboard_data['home_team'] || '');
+          $('#in_away_team').val(scoreboard_data['away_team'] || '');
+          $('#in_tournament').val(scoreboard_data['tournament_name'] || 'НВЛ');
+          $('#col_home_team').val(scoreboard_data['home_color'] || '');
+          $('#col_away_team').val(scoreboard_data['away_color'] || '');
+          $('#home_score').html('0');
+          $('#away_score').html('0');
+          $('#home_fouls').html('0');
+          $('#away_fouls').html('0');
+          $('#period').html('1');
+        }
+      })
+      .catch(function(err) {
+        console.error('Scoreboard reset failed:', err);
+        alert('Ошибка при сбросе: ' + err.message);
+      });
   });
   $(".period-btn").click(function(){
     var button=$(this);
@@ -961,11 +1003,11 @@ $(document).ready(function(){
     var update = {};
     Object.assign(update, flipSidesPayload());
     // Clear classic switch flags and beach switch message by deleting fields
-    var DEL = firebase.firestore.FieldValue.delete();
+    var DEL = DB.deleteField();
     update['classic_switch_needed'] = DEL;
     update['classic_switch_message'] = DEL;
     update['beach_switch_message'] = DEL;
-    update['lastEdited'] = firebase.firestore.FieldValue.serverTimestamp();
+    update['lastEdited'] = DB.serverTimestamp();
     scoreboard_query.update(update).then(function(){
       // Немедленно возвращаем белый фон кнопки после успешной записи
       $(".side-switch-btn").css('background-color', '').css('color', '');

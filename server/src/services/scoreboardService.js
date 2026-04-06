@@ -1,6 +1,4 @@
-const { db } = require('../config/firebase');
-const admin = require('firebase-admin');
-const { VOLLEYBALL_COLLECTION, MATCHES_COLLECTION, GAME_CONSTANTS } = require('../../../js/firebase-config');
+const { createDbAdapter, VOLLEYBALL_COLLECTION, MATCHES_COLLECTION, GAME_CONSTANTS } = require('./dbAdapter');
 
 // Константы из ctl.js
 const BEACH_SETS_TO_WIN = GAME_CONSTANTS.BEACH_SETS_TO_WIN;
@@ -13,12 +11,12 @@ const CLASSIC_TIEBREAK_POINTS_TO_WIN = GAME_CONSTANTS.CLASSIC_TIEBREAK_POINTS_TO
 const MAX_CLASSIC_SETS = GAME_CONSTANTS.CLASSIC_MAX_SETS;
 
 /**
- * Проверка доступности Firestore
+ * Проверка доступности БД
  */
-function checkDb() {
-  if (!db) {
-    const error = new Error('Firestore not initialized. Configure Firebase credentials in .env');
-    error.code = 'FIREBASE_NOT_CONFIGURED';
+function checkDb(dbAdapter) {
+  if (!dbAdapter) {
+    const error = new Error('Database not initialized. Configure DB_PROVIDER in .env');
+    error.code = 'DB_NOT_CONFIGURED';
     throw error;
   }
 }
@@ -27,55 +25,46 @@ function checkDb() {
  * Сервис для работы с табло
  */
 class ScoreboardService {
+  constructor(dbConfig) {
+    this.db = createDbAdapter(dbConfig);
+  }
+
   /**
    * Получить состояние табло
    */
   async getScoreboard(gameId) {
-    checkDb();
-    const doc = await db.collection(VOLLEYBALL_COLLECTION).doc(gameId).get();
-    if (!doc.exists) {
-      return null;
-    }
-    return { id: doc.id, ...doc.data() };
+    checkDb(this.db);
+    return this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
   }
 
   /**
    * Обновить произвольные поля табло
    */
   async updateScoreboard(gameId, data) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    await ref.update({
-      ...data,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return this.getScoreboard(gameId);
+    const { lastEdited, ...updateData } = data;
+    updateData.lastEdited = this.db.serverTimestamp();
+    return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, updateData);
   }
 
   /**
    * Изменить счёт (основная логика из ctl.js)
    */
   async updateScore(gameId, team, delta) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    const snapshot = await ref.get();
-    
-    if (!snapshot.exists) {
-      throw new Error('Scoreboard not found');
-    }
+    const data = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!data) throw new Error('Scoreboard not found');
 
-    const data = snapshot.data();
     const beachMode = !!data.beach_mode;
-    
     if (beachMode) {
-      return this._handleBeachScore(ref, data, team, delta);
+      return this._handleBeachScore(gameId, data, team, delta);
     } else {
-      return this._handleClassicScore(ref, data, team, delta);
+      return this._handleClassicScore(gameId, data, team, delta);
     }
   }
 
   /**
    * Обработка изменения счёта в пляжном волейболе
    */
-  async _handleBeachScore(ref, data, team, delta) {
+  async _handleBeachScore(gameId, data, team, delta) {
     if (data.beach_match_finished) {
       return { message: 'Match finished', data: data };
     }
@@ -113,21 +102,17 @@ class ScoreboardService {
 
     // Победа в сете
     if (delta > 0 && this._hasTeamWonSet(team, homeAfterScore, awayAfterScore, target)) {
-      return this._applyBeachSetWin(ref, data, team, homeAfterScore, awayAfterScore, update);
+      return this._applyBeachSetWin(gameId, data, team, homeAfterScore, awayAfterScore, update);
     }
 
-    await ref.update({
-      ...update,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return this.getScoreboard(data.id || ref.id);
+    update.lastEdited = this.db.serverTimestamp();
+    return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
   }
 
   /**
    * Обработка изменения счёта в классическом волейболе
    */
-  async _handleClassicScore(ref, data, team, delta) {
+  async _handleClassicScore(gameId, data, team, delta) {
     if (data.classic_match_finished) {
       return { message: 'Match finished', data: data };
     }
@@ -157,37 +142,28 @@ class ScoreboardService {
       }
     } else {
       if (data.classic_switch_needed) {
-        update.classic_switch_needed = admin.firestore.FieldValue.delete();
-        update.classic_switch_message = admin.firestore.FieldValue.delete();
+        update.classic_switch_needed = this.db.deleteField();
+        update.classic_switch_message = this.db.deleteField();
       }
     }
 
     // Проверка победы в сете (если не безлимитный счёт)
     const unlimitedScore = !!data.unlimited_score;
     if (delta > 0 && !unlimitedScore && this._classicSetWon(newScore, otherScore, data)) {
-      return this._applyClassicSetWin(ref, data, team, newScore, otherScore, update);
+      return this._applyClassicSetWin(gameId, data, team, newScore, otherScore, update);
     }
 
-    await ref.update({
-      ...update,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return this.getScoreboard(data.id || ref.id);
+    update.lastEdited = this.db.serverTimestamp();
+    return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
   }
 
   /**
    * Новый сет
    */
   async newSet(gameId) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    const snapshot = await ref.get();
+    const data = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!data) throw new Error('Scoreboard not found');
 
-    if (!snapshot.exists) {
-      throw new Error('Scoreboard not found');
-    }
-
-    const data = snapshot.data();
     const update = {
       home_score: 0,
       away_score: 0,
@@ -198,8 +174,8 @@ class ScoreboardService {
       let nextSet = data.next_beach_set || this._ensureNumber(data.beach_current_set) + 1;
       update.beach_current_set = nextSet;
       update.current_period = nextSet;
-      update.next_beach_set = admin.firestore.FieldValue.delete();
-      update.pending_new_set = admin.firestore.FieldValue.delete();
+      update.next_beach_set = this.db.deleteField();
+      update.pending_new_set = this.db.deleteField();
     } else {
       let nextPeriod = data.next_period || this._ensureNumber(data.current_period) + 1;
       update.current_period = nextPeriod;
@@ -214,69 +190,50 @@ class ScoreboardService {
         update.classic_tiebreak_switch_done = data.pending_classic_tiebreak_switch_done;
       }
 
-      update.next_period = admin.firestore.FieldValue.delete();
-      update.pending_home_side = admin.firestore.FieldValue.delete();
-      update.pending_away_side = admin.firestore.FieldValue.delete();
-      update.pending_classic_tiebreak_switch_done = admin.firestore.FieldValue.delete();
-      update.pending_new_set = admin.firestore.FieldValue.delete();
+      update.next_period = this.db.deleteField();
+      update.pending_home_side = this.db.deleteField();
+      update.pending_away_side = this.db.deleteField();
+      update.pending_classic_tiebreak_switch_done = this.db.deleteField();
+      update.pending_new_set = this.db.deleteField();
     }
 
-    await ref.update({
-      ...update,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return this.getScoreboard(gameId);
+    update.lastEdited = this.db.serverTimestamp();
+    return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
   }
 
   /**
    * Смена сторон
    */
   async swapSides(gameId) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    const snapshot = await ref.get();
+    const data = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!data) throw new Error('Scoreboard not found');
 
-    if (!snapshot.exists) {
-      throw new Error('Scoreboard not found');
-    }
-
-    const data = snapshot.data();
     const currentHomeSide = data.home_side || 'left';
     const newHomeSide = currentHomeSide === 'left' ? 'right' : 'left';
 
     const update = {
       home_side: newHomeSide,
       away_side: newHomeSide === 'left' ? 'right' : 'left',
-      classic_switch_needed: admin.firestore.FieldValue.delete(),
-      classic_switch_message: admin.firestore.FieldValue.delete(),
-      beach_switch_message: admin.firestore.FieldValue.delete(),
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
+      classic_switch_needed: this.db.deleteField(),
+      classic_switch_message: this.db.deleteField(),
+      beach_switch_message: this.db.deleteField(),
+      lastEdited: this.db.serverTimestamp(),
     };
 
-    await ref.update(update);
-    return this.getScoreboard(gameId);
+    return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
   }
 
   /**
    * Изменить период
    */
   async updatePeriod(gameId, delta) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    const snapshot = await ref.get();
+    const data = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!data) throw new Error('Scoreboard not found');
 
-    if (!snapshot.exists) {
-      throw new Error('Scoreboard not found');
-    }
-
-    const data = snapshot.data();
-    
     if (data.beach_mode) {
       return { message: 'Period control disabled in beach mode', data: data };
     }
 
-    const startOfSet = this._ensureNumber(data.home_score) === 0 && 
-                       this._ensureNumber(data.away_score) === 0;
-    
     const currentPeriod = this._ensureNumber(data.current_period);
     const maxPeriod = this._ensureNumber(data.period_count) || 5;
     const newPeriod = currentPeriod + delta;
@@ -300,11 +257,10 @@ class ScoreboardService {
       away_fouls: awayFouls,
       home_score: 0,
       away_score: 0,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
+      lastEdited: this.db.serverTimestamp(),
     };
 
-    await ref.update(update);
-    return this.getScoreboard(gameId);
+    return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
   }
 
   /**
@@ -315,7 +271,6 @@ class ScoreboardService {
     if (!validValues.includes(showValue)) {
       throw new Error(`Invalid show value. Must be one of: ${validValues.join(', ')}`);
     }
-
     return this.updateScoreboard(gameId, { show: showValue });
   }
 
@@ -353,14 +308,11 @@ class ScoreboardService {
       }
     }
 
-    // Если включаем two_wins_mode, отключаем beach_mode
     if (settings.two_wins_mode === true) {
       update.beach_mode = false;
       update.two_wins_mode = true;
-      update.period_count = 3; // Максимум 3 сета
+      update.period_count = 3;
     }
-    
-    // Если выключаем two_wins_mode, включаем стандартный режим (5 сетов)
     if (settings.two_wins_mode === false) {
       update.two_wins_mode = false;
       update.period_count = 5;
@@ -382,24 +334,17 @@ class ScoreboardService {
     };
 
     if (beachMode) {
-      update.home_sets = 0;
-      update.away_sets = 0;
-      update.home_score = 0;
-      update.away_score = 0;
-      update.beach_current_set = 1;
-      update.current_period = 1;
-      update.beach_switch_message = '';
-      update.period_count = 3;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
+      Object.assign(update, {
+        home_sets: 0, away_sets: 0, home_score: 0, away_score: 0,
+        beach_current_set: 1, current_period: 1, beach_switch_message: '',
+        period_count: 3, two_wins_mode: false,
+      });
     } else {
-      update.beach_switch_message = '';
-      update.home_sets = 0;
-      update.away_sets = 0;
-      update.beach_current_set = 1;
-      update.period_count = 5;
-      update.home_score = 0;
-      update.away_score = 0;
-      update.two_wins_mode = false; // Отключаем режим до 2 побед
+      Object.assign(update, {
+        beach_switch_message: '', home_sets: 0, away_sets: 0,
+        beach_current_set: 1, period_count: 5, home_score: 0, away_score: 0,
+        two_wins_mode: false,
+      });
     }
 
     return this.updateScoreboard(gameId, update);
@@ -409,82 +354,59 @@ class ScoreboardService {
    * Сбросить табло
    */
   async reset(gameId, keepSettings = true) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    const snapshot = await ref.get();
+    const data = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!data) throw new Error('Scoreboard not found');
 
-    if (!snapshot.exists) {
-      throw new Error('Scoreboard not found');
-    }
-
-    const data = snapshot.data();
     const beachEnabled = !!data.beach_mode;
     const twoWinsMode = !!data.two_wins_mode;
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
-      show: 0,
-      home_score: 0,
-      home_fouls: 0,
-      away_score: 0,
-      away_fouls: 0,
-      current_period: 1,
-      custom_label: 'Табло',
+      show: 0, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0,
+      current_period: 1, custom_label: 'Табло',
       away_team: keepSettings ? data.away_team : 'Team2',
       away_color: keepSettings ? data.away_color : '#00ff00',
       home_team: keepSettings ? data.home_team : 'Team1',
       home_color: keepSettings ? data.home_color : '#ff0000',
       tournament_name: keepSettings ? data.tournament_name : 'НВЛ',
-      home_sets: 0,
-      away_sets: 0,
-      beach_mode: beachEnabled,
-      beach_current_set: 1,
-      beach_switch_message: '',
+      home_sets: 0, away_sets: 0,
+      beach_mode: beachEnabled, beach_current_set: 1, beach_switch_message: '',
       beach_match_finished: false,
       period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
-      set_history: [],
-      classic_match_finished: false,
-      home_side: 'left',
-      away_side: 'right',
+      set_history: [], classic_match_finished: false,
+      home_side: 'left', away_side: 'right',
       classic_tiebreak_switch_done: true,
-      two_wins_mode: twoWinsMode,
-      invert_tablo: invertTablo,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
+      two_wins_mode: twoWinsMode, invert_tablo: invertTablo,
+      lastEdited: this.db.serverTimestamp(),
     };
 
-    await ref.set(resetData, { merge: true });
-    return this.getScoreboard(gameId);
+    return this.db.setDoc(VOLLEYBALL_COLLECTION, gameId, resetData, { merge: true });
   }
 
   /**
    * Сохранить результат матча
    */
   async saveMatchResult(gameId, overrideData) {
-    const ref = db.collection(VOLLEYBALL_COLLECTION).doc(gameId);
-    const snapshot = await ref.get();
+    const data = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!data) throw new Error('Scoreboard not found');
 
-    if (!snapshot.exists) {
-      throw new Error('Scoreboard not found');
-    }
-
-    const data = snapshot.data();
     const isBeach = !!data.beach_mode;
-
     let overallHome, overallAway;
+
     if (overrideData?.overallHome !== undefined && overrideData?.overallAway !== undefined) {
       overallHome = overrideData.overallHome;
       overallAway = overrideData.overallAway;
     } else {
-      if (isBeach) {
-        overallHome = this._ensureNumber(data.home_sets);
-        overallAway = this._ensureNumber(data.away_sets);
-      } else {
-        overallHome = this._ensureNumber(data.home_fouls);
-        overallAway = this._ensureNumber(data.away_fouls);
-      }
+      overallHome = isBeach
+        ? this._ensureNumber(data.home_sets)
+        : this._ensureNumber(data.home_fouls);
+      overallAway = isBeach
+        ? this._ensureNumber(data.away_sets)
+        : this._ensureNumber(data.away_fouls);
     }
 
     const matchData = {
-      date_time: admin.firestore.FieldValue.serverTimestamp(),
+      date_time: this.db.serverTimestamp(),
       home_team: data.home_team,
       away_team: data.away_team,
       tournament_name: data.tournament_name || 'НВЛ',
@@ -495,8 +417,7 @@ class ScoreboardService {
       game_id: gameId,
     };
 
-    const docRef = await db.collection(MATCHES_COLLECTION).add(matchData);
-    return { id: docRef.id, ...matchData };
+    return this.db.addDoc(MATCHES_COLLECTION, matchData);
   }
 
   // === Вспомогательные методы ===
@@ -508,9 +429,7 @@ class ScoreboardService {
 
   _getBeachSetNumber(data) {
     let setNumber = this._ensureNumber(data.beach_current_set);
-    if (!setNumber) {
-      setNumber = this._ensureNumber(data.current_period);
-    }
+    if (!setNumber) setNumber = this._ensureNumber(data.current_period);
     if (setNumber <= 0) setNumber = 1;
     if (setNumber > BEACH_MAX_SETS) setNumber = BEACH_MAX_SETS;
     return setNumber;
@@ -526,9 +445,7 @@ class ScoreboardService {
 
   _hasTeamWonSet(team, homeScore, awayScore, target) {
     const diff = Math.abs(homeScore - awayScore);
-    if (team === 'home') {
-      return homeScore >= target && diff >= 2;
-    }
+    if (team === 'home') return homeScore >= target && diff >= 2;
     return awayScore >= target && diff >= 2;
   }
 
@@ -536,7 +453,6 @@ class ScoreboardService {
     const twoWinsMode = !!data.two_wins_mode;
     const period = this._ensureNumber(data.current_period);
     const tiebreakSet = twoWinsMode ? 3 : 5;
-    
     if (period !== tiebreakSet) return false;
     return Math.max(homeAfter, awayAfter) >= 8;
   }
@@ -544,108 +460,81 @@ class ScoreboardService {
   _classicSetWon(teamScore, opponentScore, data) {
     const period = this._ensureNumber(data.current_period);
     const twoWinsMode = !!data.two_wins_mode;
-    
-    // В режиме до 2 побед 3-й сет (тай-брейк) играется до 15
-    const target = twoWinsMode && period === 3 
-      ? CLASSIC_TIEBREAK_POINTS_TO_WIN 
+    const target = twoWinsMode && period === 3
+      ? CLASSIC_TIEBREAK_POINTS_TO_WIN
       : (period === 5 ? 15 : CLASSIC_POINTS_TO_WIN);
-    
     if (teamScore < target) return false;
     return (teamScore - opponentScore) >= 2;
   }
 
-  async _applyBeachSetWin(ref, data, team, homeScore, awayScore, baseUpdate) {
-    const homeSets = this._ensureNumber(data.home_sets);
-    const awaySets = this._ensureNumber(data.away_sets);
-    
-    if (team === 'home') {
-      homeSets++;
-    } else {
-      awaySets++;
-    }
+  async _applyBeachSetWin(gameId, data, team, homeScore, awayScore, baseUpdate) {
+    let homeSets = this._ensureNumber(data.home_sets);
+    let awaySets = this._ensureNumber(data.away_sets);
+
+    if (team === 'home') homeSets++;
+    else awaySets++;
 
     const matchFinished = homeSets >= BEACH_SETS_TO_WIN || awaySets >= BEACH_SETS_TO_WIN;
     const currentSet = this._getBeachSetNumber(data);
 
     const update = {
       ...baseUpdate,
-      home_sets: homeSets,
-      away_sets: awaySets,
+      home_sets: homeSets, away_sets: awaySets,
       beach_switch_message: baseUpdate.beach_switch_message || '',
     };
 
     if (matchFinished || currentSet >= BEACH_MAX_SETS) {
       update.beach_match_finished = true;
-      update.home_score = homeScore;
-      update.away_score = awayScore;
-      update.current_period = currentSet;
-      update.beach_current_set = currentSet;
+      update.home_score = homeScore; update.away_score = awayScore;
+      update.current_period = currentSet; update.beach_current_set = currentSet;
     } else {
-      const nextSet = currentSet + 1;
-      update.home_score = homeScore;
-      update.away_score = awayScore;
-      update.next_beach_set = nextSet;
+      update.home_score = homeScore; update.away_score = awayScore;
+      update.next_beach_set = currentSet + 1;
       update.pending_new_set = true;
     }
 
     // История сетов
     const history = Array.isArray(data.set_history) ? data.set_history.slice(0, MAX_CLASSIC_SETS) : [];
     history.push({ home: homeScore, away: awayScore });
-    if (history.length > MAX_CLASSIC_SETS) {
-      history.shift();
-    }
+    if (history.length > MAX_CLASSIC_SETS) history.shift();
     update.set_history = history;
+    update.lastEdited = this.db.serverTimestamp();
 
-    await ref.update({
-      ...update,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    await this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
 
     if (matchFinished) {
-      await this.saveMatchResult(data.id || ref.id, { setHistory: history, overallHome: homeSets, overallAway: awaySets });
+      await this.saveMatchResult(gameId, { setHistory: history, overallHome: homeSets, overallAway: awaySets });
     }
 
-    return this.getScoreboard(data.id || ref.id);
+    return this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
   }
 
-  async _applyClassicSetWin(ref, data, team, teamScore, opponentScore, baseUpdate) {
-    const homeFouls = this._ensureNumber(data.home_fouls);
-    const awayFouls = this._ensureNumber(data.away_fouls);
+  async _applyClassicSetWin(gameId, data, team, teamScore, opponentScore, baseUpdate) {
+    let homeFouls = this._ensureNumber(data.home_fouls);
+    let awayFouls = this._ensureNumber(data.away_fouls);
 
-    if (team === 'home') {
-      homeFouls++;
-    } else {
-      awayFouls++;
-    }
+    if (team === 'home') homeFouls++;
+    else awayFouls++;
 
     const currentPeriod = this._ensureNumber(data.current_period) || 1;
     const maxPeriod = this._ensureNumber(data.period_count) || 5;
     const twoWinsMode = !!data.two_wins_mode;
-    
-    // Определяем условие завершения матча
     const setsToWin = twoWinsMode ? CLASSIC_SETS_TO_WIN_TWO : CLASSIC_SETS_TO_WIN;
     const matchFinished = homeFouls >= setsToWin || awayFouls >= setsToWin;
-    
     const nextPeriod = currentPeriod < maxPeriod ? currentPeriod + 1 : currentPeriod;
     const homeFinal = team === 'home' ? teamScore : opponentScore;
     const awayFinal = team === 'home' ? opponentScore : teamScore;
 
     const update = {
       ...baseUpdate,
-      home_fouls: homeFouls,
-      away_fouls: awayFouls,
-      current_period: currentPeriod,
-      classic_match_finished: matchFinished,
-      home_score: homeFinal,
-      away_score: awayFinal,
+      home_fouls: homeFouls, away_fouls: awayFouls,
+      current_period: currentPeriod, classic_match_finished: matchFinished,
+      home_score: homeFinal, away_score: awayFinal,
     };
 
     if (!matchFinished) {
-      // Смена сторон
       const currentHomeSide = data.home_side || 'left';
       const newHomeSide = currentHomeSide === 'left' ? 'right' : 'left';
-      
-      // В режиме до 2 побед тай-брейк это 3-й сет
       const tiebreakSet = twoWinsMode ? 3 : 5;
 
       update.pending_home_side = newHomeSide;
@@ -660,30 +549,17 @@ class ScoreboardService {
     // История сетов
     const history = Array.isArray(data.set_history) ? data.set_history.slice(0, MAX_CLASSIC_SETS) : [];
     history.push({ home: homeFinal, away: awayFinal });
-    if (history.length > MAX_CLASSIC_SETS) {
-      history.shift();
-    }
+    if (history.length > MAX_CLASSIC_SETS) history.shift();
     update.set_history = history;
+    update.lastEdited = this.db.serverTimestamp();
 
-    await ref.update({
-      ...update,
-      lastEdited: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    await this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, update);
 
     if (matchFinished) {
-      await this.saveMatchResult(data.id || ref.id, { setHistory: history, overallHome: homeFouls, overallAway: awayFouls });
+      await this.saveMatchResult(gameId, { setHistory: history, overallHome: homeFouls, overallAway: awayFouls });
     }
 
-    return this.getScoreboard(data.id || ref.id);
-  }
-
-  async getScoreboard(gameId) {
-    checkDb();
-    const doc = await db.collection(VOLLEYBALL_COLLECTION).doc(gameId).get();
-    if (!doc.exists) {
-      return null;
-    }
-    return { id: doc.id, ...doc.data() };
+    return this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
   }
 }
 

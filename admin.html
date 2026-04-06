@@ -8,11 +8,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Админ-панель - Управление пользователями</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <link href="css/css.css" rel="stylesheet">
-    <script src="js/firebase-config.js"></script>
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
+    <script src="js/auth.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         body {
@@ -419,46 +418,180 @@
     </div>
 
     <script>
-        // Инициализация Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
         // Глобальные переменные
         let currentUser = null;
         let usersList = [];
+        let db; // Firestore wrapper
+        let auth; // Auth instance
 
-        // Проверка авторизации при загрузке - ВСЕГДА обязательна для админ-панели
-        auth.onAuthStateChanged(async (user) => {
-            if (!user) {
-                const currentPath = window.location.pathname + window.location.search;
-                window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
-                return;
-            }
+        // Инициализация DB + обёртки
+        DB.init().then(function() {
+            auth = DB.auth.getAuthInstance();
+            db = createFirestoreWrapper();
+            initAdminApp();
+        }).catch(function(err) {
+            console.error('DB init failed:', err);
+        });
 
-            currentUser = user;
+        // PocketBase client для админских операций
+        var _adminPbClient = null;
+        function getPocketBaseClientForAdmin() {
+            if (_adminPbClient) return Promise.resolve(_adminPbClient);
+            if (typeof PocketBase === 'undefined') return Promise.resolve(null);
+            _adminPbClient = new PocketBase(DB_CONFIG.pocketbase.url);
+            // Авторизуемся как админ
+            return _adminPbClient.admins.authWithPassword(
+                DB_CONFIG.pocketbase.adminEmail,
+                DB_CONFIG.pocketbase.adminPassword
+            ).then(function() {
+                return _adminPbClient;
+            }).catch(function() {
+                // Если не удалось авторизоваться, пробуем без админа
+                return _adminPbClient;
+            });
+        }
 
-            try {
-                // Получаем токен
-                const idToken = await user.getIdToken();
+        // Firestore wrapper для обратной совместимости
+        function createFirestoreWrapper() {
+            return {
+                collection: function(name) {
+                    return {
+                        doc: function(id) {
+                            return {
+                                get: async function() {
+                                    if (name === COLLECTIONS.USERS || name === 'users') {
+                                        const data = await DB.users.get(id);
+                                        return {
+                                            exists: !!data,
+                                            data: function() { return data; },
+                                            id: id
+                                        };
+                                    }
+                                    return { exists: false, data: function() { return null; } };
+                                },
+                                set: async function(data) {
+                                    if (name === COLLECTIONS.USERS || name === 'users') {
+                                        return DB.auth.createUser(
+                                            id,
+                                            data._password || 'temp',
+                                            data.displayName || id,
+                                            data.role || 'user'
+                                        );
+                                    }
+                                    return Promise.resolve();
+                                },
+                                update: async function(data) {
+                                    if (name === COLLECTIONS.USERS || name === 'users') {
+                                        return DB.users.update(id, data);
+                                    }
+                                    return Promise.resolve();
+                                },
+                                delete: async function() {
+                                    if (name === COLLECTIONS.USERS || name === 'users') {
+                                        return DB.auth.deleteUser(id);
+                                    }
+                                    return Promise.resolve();
+                                }
+                            };
+                        },
+                        where: function(field, op, value) {
+                            return {
+                                orderBy: function(orderField, direction) {
+                                    return {
+                                        limit: function(n) {
+                                            return {
+                                                get: async function() {
+                                                    // Simplified: return empty for auth_log queries
+                                                    return { forEach: function() {} };
+                                                }
+                                            };
+                                        },
+                                        get: async function() {
+                                            if (name === COLLECTIONS.USERS || name === 'users') {
+                                                // Return all users (client-side filtering for simplicity)
+                                                const allUsers = [];
+                                                return {
+                                                    forEach: function(cb) {
+                                                        allUsers.forEach(function(u) {
+                                                            if (op === '==' && u[field] === value) {
+                                                                cb({ id: u.username || u.id, exists: true, data: function() { return u; } });
+                                                            }
+                                                        });
+                                                    }
+                                                };
+                                            }
+                                            return { forEach: function() {} };
+                                        }
+                                    };
+                                },
+                                get: async function() {
+                                    if (name === COLLECTIONS.USERS || name === 'users') {
+                                        // Get all users через PocketBase API
+                                        try {
+                                            const pb = await getPocketBaseClientForAdmin();
+                                            if (pb) {
+                                                const records = await pb.collection('users').getFullList({
+                                                    sort: '+created'
+                                                });
+                                                return {
+                                                    empty: records.length === 0,
+                                                    docs: records.map(function(r) {
+                                                        return {
+                                                            id: r.id,
+                                                            exists: true,
+                                                            data: function() {
+                                                                return {
+                                                                    uid: r.id,
+                                                                    email: r.email,
+                                                                    displayName: r.name,
+                                                                    name: r.name,
+                                                                    role: r.role || 'user',
+                                                                    username: r.username || r.email.split('@')[0],
+                                                                    createdAt: r.created,
+                                                                    lastLoginAt: null
+                                                                };
+                                                            }
+                                                        };
+                                                    })
+                                                };
+                                            }
+                                        } catch(e) {
+                                            console.error('Failed to list users:', e);
+                                        }
+                                        return { empty: true, docs: [] };
+                                    }
+                                    // auth_log — возвращаем пустой
+                                    return { empty: true, docs: [] };
+                                }
+                            };
+                        },
+                        get: async function() {
+                            return { forEach: function() {} };
+                        }
+                    };
+                }
+            };
+        }
 
-                // Проверяем роль из Firestore
-                const db = firebase.firestore();
-                const userDoc = await db.collection(COLLECTIONS.USERS).doc(user.email.split('@')[0]).get();
+        function initAdminApp() {
+            // Проверка авторизации при загрузке - ВСЕГДА обязательна для админ-панели
+            DB.auth.onAuthStateChanged(async (user) => {
+                if (!user) {
+                    const currentPath = window.location.pathname + window.location.search;
+                    window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
+                    return;
+                }
+
+                currentUser = user;
+
+                try {
+                    // Проверяем роль через DB
+                    const username = user.email.split('@')[0];
+                    const userData = await DB.users.get(username);
 
                 let role = 'user';
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
+                if (userData && userData.role) {
                     role = userData.role === 'admin' ? 'admin' : 'user';
-                } else {
-                    // Если документа нет, пробуем найти по uid
-                    const usersByUid = await db.collection(COLLECTIONS.USERS).where('uid', '==', user.uid).get();
-                    if (!usersByUid.empty) {
-                        const userData = usersByUid.docs[0].data();
-                        role = userData.role === 'admin' ? 'admin' : 'user';
-                    }
                 }
 
                 if (role !== 'admin') {
@@ -476,47 +609,55 @@
                 showAlert('Ошибка проверки авторизации: ' + error.message, 'error');
             }
         });
+        } // close initAdminApp
 
         // Загрузка пользователей и их последних входов
         async function loadUsers() {
             try {
-                // Загружаем пользователей
-                const usersSnapshot = await db.collection(COLLECTIONS.USERS).get();
-                
-                if (usersSnapshot.empty) {
-                    usersList = [];
-                } else {
-                    // Для каждого пользователя получаем последний вход из auth_log
-                    usersList = await Promise.all(usersSnapshot.docs.map(async (doc) => {
-                        const data = doc.data();
-                        
-                        // Получаем последний вход пользователя
-                        let lastLogin = null;
-                        try {
-                            const authLogSnapshot = await db.collection('auth_log')
-                                .where('username', '==', doc.id)
-                                .orderBy('loginAt', 'desc')
-                                .limit(1)
-                                .get();
-                            
-                            if (!authLogSnapshot.empty) {
-                                lastLogin = authLogSnapshot.docs[0].data();
-                            }
-                        } catch (err) {
-                            if (err.code === 'failed-precondition') {
-                                console.error(`Index required for user ${doc.id}. Create index: https://console.firebase.google.com/project/myvolleyscore/firestore/indexes`);
-                            } else {
-                                console.error(`Failed to load auth_log for ${doc.id}:`, err);
-                            }
-                        }
-                        
+                // Для PocketBase загружаем напрямую через getFullList
+                var provider = DB.getProvider();
+                if (provider === 'pocketbase') {
+                    var pb = await getPocketBaseClientForAdmin();
+                    var records = await pb.collection('users').getFullList({ sort: '+created' });
+                    usersList = records.map(function(r) {
                         return {
-                            docId: doc.id,
-                            uid: data.uid || doc.id,
-                            lastLogin: lastLogin,
-                            ...data
+                            docId: r.id,
+                            uid: r.id,
+                            email: r.email,
+                            username: r.username || r.email.split('@')[0],
+                            displayName: r.name || r.username || '',
+                            role: r.role || 'user',
+                            lastLogin: null,
+                            createdAt: r.created
                         };
-                    }));
+                    });
+                } else {
+                    // Firebase
+                    const usersSnapshot = await db.collection(COLLECTIONS.USERS).get();
+                    if (usersSnapshot.empty) {
+                        usersList = [];
+                    } else {
+                        usersList = await Promise.all(usersSnapshot.docs.map(async (doc) => {
+                            const data = doc.data();
+                            let lastLogin = null;
+                            try {
+                                const authLogSnapshot = await db.collection('auth_log')
+                                    .where('username', '==', doc.id)
+                                    .orderBy('loginAt', 'desc')
+                                    .limit(1)
+                                    .get();
+                                if (!authLogSnapshot.empty) {
+                                    lastLogin = authLogSnapshot.docs[0].data();
+                                }
+                            } catch (err) { /* ignore */ }
+                            return {
+                                docId: doc.id,
+                                uid: data.uid || doc.id,
+                                lastLogin: lastLogin,
+                                ...data
+                            };
+                        }));
+                    }
                 }
 
                 renderUsersTable();
@@ -657,30 +798,16 @@
             const role = document.getElementById('newRole').value;
 
             try {
-                // Генерируем email из username
-                const email = username.toLowerCase() + '@volleyball.local';
+                // Создаём пользователя через DB
+                await DB.auth.createUser(
+                    username.toLowerCase(),
+                    password,
+                    displayName || username,
+                    role
+                );
 
-                // Создаем пользователя через Firebase Auth
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const newUser = userCredential.user;
-
-                // Обновляем displayName
-                await newUser.updateProfile({ displayName: displayName || username });
-
-                // Сохраняем информацию о пользователе в Firestore
-                const db = firebase.firestore();
-                await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).set({
-                    uid: newUser.uid,
-                    email: email,
-                    username: username.toLowerCase(),
-                    displayName: displayName || username,
-                    role: role,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastLoginAt: null
-                });
-
-                // Выходим из-под созданного пользователя
-                await auth.signOut();
+                // Выходим из-под созданного пользователя (если текущая сессия была сброшена)
+                try { await DB.auth.logout(); } catch(e) {}
 
                 showAlert(
                     `Пользователь ${username} успешно создан!\n\n` +
@@ -750,23 +877,17 @@
             const role = document.getElementById('editRole').value;
 
             try {
-                // Находим пользователя в Firebase Auth
-                // Примечание: Прямое редактирование пользователей возможно только через Admin SDK
-                // Поэтому обновляем только Firestore и показываем инструкцию
-                
-                const db = firebase.firestore();
-                const userRef = db.collection(COLLECTIONS.USERS).doc(uid);
-                const userDoc = await userRef.get();
-                
-                if (!userDoc.exists) {
+                // Обновляем данные пользователя через DB
+                const userData = await DB.users.get(uid);
+
+                if (!userData) {
                     throw new Error('Пользователь не найден');
                 }
-                
-                const userData = userDoc.data();
-                const username = userData.username;
 
-                // Обновляем Firestore
-                await userRef.update({
+                const username = userData.username || uid;
+
+                // Обновляем через DB
+                await DB.users.update(uid, {
                     displayName: displayName || userData.displayName,
                     role: role
                 });
@@ -799,17 +920,11 @@
             }
 
             try {
-                const db = firebase.firestore();
+                // Удаляем пользователя через DB
+                await DB.auth.deleteUser(docId);
 
-                // Удаляем документ по docId (который является username)
-                await db.collection(COLLECTIONS.USERS).doc(docId).delete();
-
-                // Примечание: Удаление из Firebase Auth возможно только через Admin SDK
-                // Показываем инструкцию
                 showAlert(
-                    `Пользователь удален из Firestore.\n\n` +
-                    `⚠️ Для полного удаления используйте Firebase Console:\n` +
-                    `Authentication → Users → Найдите пользователя → Delete`,
+                    `Пользователь "${username}" удалён.`,
                     'success'
                 );
 
@@ -824,7 +939,10 @@
         // Выход
         async function logout() {
             try {
-                await auth.signOut();
+                if (auth && auth.signOut) {
+                    await auth.signOut();
+                }
+                await DB.auth.logout();
                 window.location.href = 'login.html';
             } catch (error) {
                 console.error('Logout error:', error);

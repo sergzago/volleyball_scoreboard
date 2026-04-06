@@ -4,15 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control scoreboard</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
-    <script src="js/firebase-config.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
     <script src="js/common.js"></script>
     <script src="js/ctl.js"></script>
     <script src="js/auth.js"></script>
+    <link href="css/css.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         .auth-header {
@@ -116,12 +114,10 @@
               <button data-val="0" class="btn show-select" type="button">none</button>
               <button data-val="1" class="btn show-select" type="button">top</button>
               <button data-val="2" class="btn show-select" type="button">bottom</button>
-            </div>
-                <button data-val="4" class="btn show-select" type="button">top label</button>
-                <button data-val="6" class="btn show-select" type="button">top label+bottom</button>
-                <button data-val="14" class="btn show-select" type="button">top label+bottom names</button>
-                <input id="custom_label" value="Разминка">
-                <button class="label-btn btn btn-info" type="button">save</button>
+              <button data-val="4" class="btn show-select" type="button">top label</button>
+              <button data-val="6" class="btn show-select" type="button">top label+bottom</button>
+              <input id="custom_label" value="Разминка">
+              <button class="label-btn btn btn-info" type="button">save</button>
             </div>
 
           </div>
@@ -275,32 +271,37 @@
                 return;
             }
 
-            const auth = AuthModule.auth;
+            try {
+                // Сначала инициализируем DB
+                await DB.init();
+            } catch (e) {
+                console.error('DB init failed:', e);
+                document.getElementById('userInfo').textContent = 'Ошибка подключения к БД';
+                return;
+            }
 
             // Сохраняем текущий URL с параметрами для возврата после авторизации
             const currentPath = window.location.pathname + window.location.search;
 
-            auth.onAuthStateChanged(async (user) => {
+            DB.auth.onAuthStateChanged(async (user) => {
                 if (!user) {
                     // Перенаправляем на login с параметром redirect
-                    window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
+                    window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
                     return;
                 }
 
-                // Получаем токен и проверяем роль через Firestore
+                // Получаем роль через DB
                 try {
-                    const db = firebase.firestore();
                     const username = user.email.split('@')[0];
-                    const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
-                    
+                    const userData = await DB.users.get(username);
+
                     let role = 'user';
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
+                    if (userData && userData.role) {
                         role = userData.role === 'admin' ? 'admin' : 'user';
                     }
 
                     // Отображение информации о пользователе
-                    document.getElementById('userInfo').textContent = `${user.email} (${role === 'admin' ? 'Админ' : 'Пользователь'})`;
+                    document.getElementById('userInfo').textContent = user.email + ' (' + (role === 'admin' ? 'Админ' : 'Пользователь') + ')';
 
                     // Показываем ссылку на админку если администратор
                     if (role === 'admin') {
@@ -308,7 +309,7 @@
                     }
                 } catch (error) {
                     console.error('Auth error:', error);
-                    window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
+                    window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
                 }
             });
         });

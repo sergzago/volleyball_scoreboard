@@ -9,7 +9,11 @@ const {
 } = require('../middleware/validators');
 
 const router = express.Router();
-const scoreboardService = new ScoreboardService();
+
+// Factory для создания сервиса с текущим dbConfig
+function getService(req) {
+  return new ScoreboardService(req.app.locals.db);
+}
 
 /**
  * @route   GET /api/scoreboard/:game_id
@@ -18,7 +22,7 @@ const scoreboardService = new ScoreboardService();
 router.get('/:game_id', validateGameId, async (req, res, next) => {
   try {
     const { game_id } = req.params;
-    const data = await scoreboardService.getScoreboard(game_id);
+    const data = await getService(req).getScoreboard(game_id);
     
     if (!data) {
       return res.status(404).json({
@@ -45,7 +49,7 @@ router.patch('/:game_id', validateGameId, async (req, res, next) => {
     // Удаляем служебные поля из запроса
     const { lastEdited, ...updateData } = data;
     
-    const result = await scoreboardService.updateScoreboard(game_id, updateData);
+    const result = await getService(req).updateScoreboard(game_id, updateData);
     res.json(result);
   } catch (err) {
     next(err);
@@ -61,7 +65,7 @@ router.post('/:game_id/score', validateGameId, validateTeam, validateDelta, asyn
     const { game_id } = req.params;
     const { team, delta } = req.body;
     
-    const result = await scoreboardService.updateScore(game_id, team, delta);
+    const result = await getService(req).updateScore(game_id, team, delta);
     res.json(result);
   } catch (err) {
     next(err);
@@ -76,7 +80,7 @@ router.post('/:game_id/new-set', validateGameId, async (req, res, next) => {
   try {
     const { game_id } = req.params;
     
-    const result = await scoreboardService.newSet(game_id);
+    const result = await getService(req).newSet(game_id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -91,7 +95,7 @@ router.post('/:game_id/swap-sides', validateGameId, async (req, res, next) => {
   try {
     const { game_id } = req.params;
     
-    const result = await scoreboardService.swapSides(game_id);
+    const result = await getService(req).swapSides(game_id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -107,7 +111,7 @@ router.post('/:game_id/period', validateGameId, validatePeriodDelta, async (req,
     const { game_id } = req.params;
     const { delta } = req.body;
     
-    const result = await scoreboardService.updatePeriod(game_id, delta);
+    const result = await getService(req).updatePeriod(game_id, delta);
     res.json(result);
   } catch (err) {
     next(err);
@@ -123,7 +127,7 @@ router.post('/:game_id/display', validateGameId, async (req, res, next) => {
     const { game_id } = req.params;
     const { show } = req.body;
     
-    const result = await scoreboardService.updateDisplay(game_id, show);
+    const result = await getService(req).updateDisplay(game_id, show);
     res.json(result);
   } catch (err) {
     next(err);
@@ -139,7 +143,7 @@ router.post('/:game_id/label', validateGameId, async (req, res, next) => {
     const { game_id } = req.params;
     const { custom_label } = req.body;
     
-    const result = await scoreboardService.updateLabel(game_id, custom_label);
+    const result = await getService(req).updateLabel(game_id, custom_label);
     res.json(result);
   } catch (err) {
     next(err);
@@ -155,7 +159,7 @@ router.put('/:game_id/teams', validateGameId, async (req, res, next) => {
     const { game_id } = req.params;
     const teamsData = req.body;
     
-    const result = await scoreboardService.updateTeams(game_id, teamsData);
+    const result = await getService(req).updateTeams(game_id, teamsData);
     res.json(result);
   } catch (err) {
     next(err);
@@ -171,7 +175,7 @@ router.patch('/:game_id/settings', validateGameId, async (req, res, next) => {
     const { game_id } = req.params;
     const settings = req.body;
 
-    const result = await scoreboardService.updateSettings(game_id, settings);
+    const result = await getService(req).updateSettings(game_id, settings);
     res.json(result);
   } catch (err) {
     next(err);
@@ -187,7 +191,7 @@ router.post('/:game_id/mode', validateGameId, validateMode, async (req, res, nex
     const { game_id } = req.params;
     const { beach_mode } = req.body;
     
-    const result = await scoreboardService.toggleMode(game_id, beach_mode);
+    const result = await getService(req).toggleMode(game_id, beach_mode);
     res.json(result);
   } catch (err) {
     next(err);
@@ -203,7 +207,7 @@ router.post('/:game_id/reset', validateGameId, async (req, res, next) => {
     const { game_id } = req.params;
     const { keep_settings = true } = req.body;
     
-    const result = await scoreboardService.reset(game_id, keep_settings);
+    const result = await getService(req).reset(game_id, keep_settings);
     res.json(result);
   } catch (err) {
     next(err);

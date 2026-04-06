@@ -1,35 +1,41 @@
 var scoreboard_data={};
-scoreboard_query.onSnapshot(
-  function(documentSnapshot){
-    var pdata=scoreboard_data;
-    if(!documentSnapshot.exists){
-      pdata={show:0};
-      scoreboard_data={
-        "show": 1,
-        "away_color": "#000000",
-        "away_fouls": '-',
-        "away_score": '-',
-        "away_team": "--------",
-        "current_period": '0',
-        "home_color": "#000000",
-        "home_fouls": '-',
-        "home_score": '-',
-        "home_team": "--------",
-        "home_sets": 0,
-        "away_sets": 0,
-        "beach_mode": false,
-        "beach_switch_message": "",
-        "beach_current_set": 1,
-        "set_history": [],
-        "classic_match_finished": false,
-        "home_side": "left",
-        "away_side": "right",
-        "classic_tiebreak_switch_done": true,
-        "invert_tablo": false
-      };
-    }else{
-      scoreboard_data=documentSnapshot.data();
-    }
+var _unsubscribe = null;
+
+// Дефолтные данные (если документ ещё не создан)
+var DEFAULT_SCOREBOARD_DATA = {
+  "show": 1,
+  "away_color": "#000000",
+  "away_fouls": '-',
+  "away_score": '-',
+  "away_team": "--------",
+  "current_period": '0',
+  "home_color": "#000000",
+  "home_fouls": '-',
+  "home_score": '-',
+  "home_team": "--------",
+  "home_sets": 0,
+  "away_sets": 0,
+  "beach_mode": false,
+  "beach_switch_message": "",
+  "beach_current_set": 1,
+  "set_history": [],
+  "classic_match_finished": false,
+  "home_side": "left",
+  "away_side": "right",
+  "classic_tiebreak_switch_done": true,
+  "invert_tablo": false
+};
+
+// Подписка на изменения через DB интерфейс (вызывается после DB.init)
+function startScoreboardSubscription() {
+console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
+DB.scoreboard.subscribe(
+  game_id,
+  function(data){
+    console.log('sb/ctl: scoreboard data received, show:', data ? data.show : 'null');
+    var pdata = scoreboard_data;
+    // Если данные не пришли — используем дефолтные
+    scoreboard_data = data || DEFAULT_SCOREBOARD_DATA;
     if(pdata['show'] != scoreboard_data['show']){
       if(scoreboard_data.show & 2){
         $(".big-table").animate({"left":80},1000)
@@ -101,6 +107,7 @@ scoreboard_query.onSnapshot(
     // Обновляем порядок на табло (функция сама проверит наличие элементов)
     updateTabloSides();
   });
+}
 
 function renderSetHistory(history, showTop, showBottom){
   var items=Array.isArray(history)?history:[];
@@ -294,10 +301,19 @@ function updateTabloSides(){
   
   // Обновляем отображение общего счета и истории сетов в соответствии с текущим расположением
   updateGeneralScoreFromHistory(scoreboard_data['set_history']);
-  
+
   // При смене сторон обновляем историю сетов, чтобы она соответствовала текущему расположению команд
   var showTop = !!(scoreboard_data.show & 1);
   var showBottom = !!(scoreboard_data.show & 2);
   renderSetHistory(scoreboard_data['set_history'], showTop, showBottom);
 }
+
+// Инициализация DB при загрузке
+$(document).ready(function() {
+  DB.init().then(function() {
+    startScoreboardSubscription();
+  }).catch(function(err) {
+    console.error('DB initialization failed:', err);
+  });
+});
 

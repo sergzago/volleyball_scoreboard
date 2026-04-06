@@ -5,11 +5,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Результаты матчей</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
-    <script src="js/firebase-config.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
       .results-container {
@@ -551,9 +550,39 @@
     </div>
 
     <script>
-      firebase.initializeApp(firebaseConfig);
-      var db = firebase.firestore();
-      var matches_collection = db.collection(COLLECTIONS.MATCHES);
+      // Глобальные переменные
+      var matches_collection = {
+        where: function(field, op, value) {
+          return {
+            where: function(field2, op2, value2) {
+              return {
+                get: function() {
+                  return DB.matches.query({
+                    dateFrom: value,
+                    dateTo: value2
+                  }).then(function(results) {
+                    return {
+                      forEach: function(cb) {
+                        results.forEach(function(item) {
+                          cb({
+                            id: item.id,
+                            data: function() { return item; }
+                          });
+                        });
+                      }
+                    };
+                  });
+                }
+              };
+            }
+          };
+        }
+      };
+
+      // Инициализация DB
+      DB.init().catch(function(err) {
+        console.error('DB init failed:', err);
+      });
       
       // Calendar state
       var currentDate = new Date();

@@ -1,10 +1,11 @@
 /**
  * Маршруты для аутентификации и управления пользователями
+ * Поддерживает Firebase и PocketBase
  */
 const express = require('express');
 const router = express.Router();
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { COLLECTIONS } = require('../../../js/firebase-config');
+const { createDbAdapter } = require('../services/dbAdapter');
 
 /**
  * POST /api/auth/me
@@ -16,7 +17,7 @@ router.get('/me', requireAuth, async (req, res) => {
       user: {
         uid: req.user.uid,
         email: req.user.email,
-        role: req.user.claims?.admin ? 'admin' : 'user',
+        role: req.user.role,
         claims: req.user.claims
       }
     });
@@ -50,13 +51,17 @@ router.post('/set-role', requireAdmin, async (req, res) => {
       });
     }
 
-    const { admin } = req.app.locals.firebase || require('../config/firebase').initializeFirebase();
+    const dbConfig = req.app.locals.db;
 
-    // Устанавливаем custom claims
-    await admin.auth().setCustomUserClaims(uid, { 
-      role: role,
-      admin: role === 'admin'
-    });
+    if (dbConfig.provider === 'firebase') {
+      await dbConfig.admin.auth().setCustomUserClaims(uid, {
+        role,
+        admin: role === 'admin'
+      });
+    } else if (dbConfig.provider === 'pocketbase') {
+      const dbAdapter = createDbAdapter(dbConfig);
+      await dbAdapter.client.collection('_users').update(uid, { role });
+    }
 
     res.json({
       success: true,
@@ -77,19 +82,32 @@ router.post('/set-role', requireAdmin, async (req, res) => {
  */
 router.get('/users', requireAdmin, async (req, res) => {
   try {
-    const { admin } = req.app.locals.firebase || require('../config/firebase').initializeFirebase();
-    
-    // Получаем список пользователей из Firebase Auth
-    const listUsersResult = await admin.auth().listUsers();
-    
-    const users = listUsersResult.users.map(userRecord => ({
-      uid: userRecord.uid,
-      email: userRecord.email,
-      displayName: userRecord.displayName,
-      role: userRecord.customClaims?.admin ? 'admin' : 'user',
-      createdAt: userRecord.metadata.creationTime,
-      lastLoginAt: userRecord.metadata.lastSignInTime
-    }));
+    const dbConfig = req.app.locals.db;
+    let users = [];
+
+    if (dbConfig.provider === 'firebase') {
+      const listUsersResult = await dbConfig.admin.auth().listUsers();
+      users = listUsersResult.users.map(userRecord => ({
+        uid: userRecord.uid,
+        email: userRecord.email,
+        displayName: userRecord.displayName,
+        role: userRecord.customClaims?.admin ? 'admin' : 'user',
+        createdAt: userRecord.metadata.creationTime,
+        lastLoginAt: userRecord.metadata.lastSignInTime
+      }));
+    } else if (dbConfig.provider === 'pocketbase') {
+      const dbAdapter = createDbAdapter(dbConfig);
+      const records = await dbAdapter.client.collection('_users').getFullList();
+      users = records.map(r => ({
+        uid: r.id,
+        email: r.email,
+        displayName: r.displayName,
+        username: r.username,
+        role: r.role || 'user',
+        createdAt: r.created,
+        lastLoginAt: r.lastLoginAt
+      }));
+    }
 
     res.json({ users });
   } catch (error) {
@@ -109,7 +127,6 @@ router.post('/users', requireAdmin, async (req, res) => {
   try {
     const { username, email, password, displayName, role = 'user' } = req.body;
 
-    // Проверяем, что предоставлен username или email
     if (!username && !email) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -124,48 +141,56 @@ router.post('/users', requireAdmin, async (req, res) => {
       });
     }
 
-    const { admin } = req.app.locals.firebase || require('../config/firebase').initializeFirebase();
-    const db = admin.firestore();
-
-    // Если предоставлен только username, генерируем email
+    const dbConfig = req.app.locals.db;
     const finalEmail = email || `${username.toLowerCase()}@volleyball.local`;
     const finalUsername = username || email.split('@')[0];
     const finalDisplayName = displayName || finalUsername;
 
-    // Создаем пользователя в Firebase Auth
-    const userRecord = await admin.auth().createUser({
-      email: finalEmail,
-      password,
-      displayName: finalDisplayName
-    });
-
-    // Устанавливаем роль через custom claims
-    await admin.auth().setCustomUserClaims(userRecord.uid, {
-      role,
-      admin: role === 'admin'
-    });
-
-    // Сохраняем пользователя в Firestore
-    await db.collection(COLLECTIONS.USERS).doc(finalUsername.toLowerCase()).set({
-      uid: userRecord.uid,
-      email: finalEmail,
-      username: finalUsername.toLowerCase(),
-      displayName: finalDisplayName,
-      role,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastLoginAt: null
-    });
-
-    res.status(201).json({
-      success: true,
-      user: {
-        uid: userRecord.uid,
+    if (dbConfig.provider === 'firebase') {
+      const userRecord = await dbConfig.admin.auth().createUser({
         email: finalEmail,
-        username: finalUsername,
+        password,
+        displayName: finalDisplayName
+      });
+
+      await dbConfig.admin.auth().setCustomUserClaims(userRecord.uid, {
+        role,
+        admin: role === 'admin'
+      });
+
+      res.status(201).json({
+        success: true,
+        user: {
+          uid: userRecord.uid,
+          email: finalEmail,
+          username: finalUsername,
+          displayName: finalDisplayName,
+          role
+        }
+      });
+    } else if (dbConfig.provider === 'pocketbase') {
+      const dbAdapter = createDbAdapter(dbConfig);
+      const record = await dbAdapter.client.collection('_users').create({
+        username: finalUsername.toLowerCase(),
+        email: finalEmail,
+        password,
+        passwordConfirm: password,
         displayName: finalDisplayName,
-        role
-      }
-    });
+        role,
+        emailVisibility: true
+      });
+
+      res.status(201).json({
+        success: true,
+        user: {
+          uid: record.id,
+          email: record.email,
+          username: record.username,
+          displayName: record.displayName,
+          role
+        }
+      });
+    }
   } catch (error) {
     console.error('Create user error:', error);
     res.status(500).json({
@@ -184,37 +209,56 @@ router.put('/users/:uid', requireAdmin, async (req, res) => {
     const { uid } = req.params;
     const { email, password, displayName, role } = req.body;
 
-    const { admin } = req.app.locals.firebase || require('../config/firebase').initializeFirebase();
+    const dbConfig = req.app.locals.db;
 
-    const updateData = {};
-    if (email) updateData.email = email;
-    if (password) updateData.password = password;
-    if (displayName !== undefined) updateData.displayName = displayName;
+    if (dbConfig.provider === 'firebase') {
+      const updateData = {};
+      if (email) updateData.email = email;
+      if (password) updateData.password = password;
+      if (displayName !== undefined) updateData.displayName = displayName;
 
-    // Обновляем данные пользователя
-    if (Object.keys(updateData).length > 0) {
-      await admin.auth().updateUser(uid, updateData);
-    }
+      if (Object.keys(updateData).length > 0) {
+        await dbConfig.admin.auth().updateUser(uid, updateData);
+      }
+      if (role) {
+        await dbConfig.admin.auth().setCustomUserClaims(uid, {
+          role,
+          admin: role === 'admin'
+        });
+      }
 
-    // Обновляем роль если указано
-    if (role) {
-      await admin.auth().setCustomUserClaims(uid, {
-        role,
-        admin: role === 'admin'
+      const updatedUser = await dbConfig.admin.auth().getUser(uid);
+      res.json({
+        success: true,
+        user: {
+          uid: updatedUser.uid,
+          email: updatedUser.email,
+          displayName: updatedUser.displayName,
+          role: updatedUser.customClaims?.admin ? 'admin' : 'user'
+        }
+      });
+    } else if (dbConfig.provider === 'pocketbase') {
+      const dbAdapter = createDbAdapter(dbConfig);
+      const updateData = {};
+      if (email) updateData.email = email;
+      if (password) {
+        updateData.password = password;
+        updateData.passwordConfirm = password;
+      }
+      if (displayName !== undefined) updateData.displayName = displayName;
+      if (role) updateData.role = role;
+
+      const record = await dbAdapter.client.collection('_users').update(uid, updateData);
+      res.json({
+        success: true,
+        user: {
+          uid: record.id,
+          email: record.email,
+          displayName: record.displayName,
+          role: record.role || 'user'
+        }
       });
     }
-
-    const updatedUser = await admin.auth().getUser(uid);
-    
-    res.json({
-      success: true,
-      user: {
-        uid: updatedUser.uid,
-        email: updatedUser.email,
-        displayName: updatedUser.displayName,
-        role: updatedUser.customClaims?.admin ? 'admin' : 'user'
-      }
-    });
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({
@@ -232,7 +276,6 @@ router.delete('/users/:uid', requireAdmin, async (req, res) => {
   try {
     const { uid } = req.params;
 
-    // Проверка: нельзя удалить самого себя
     if (uid === req.user.uid) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -240,9 +283,14 @@ router.delete('/users/:uid', requireAdmin, async (req, res) => {
       });
     }
 
-    const { admin } = req.app.locals.firebase || require('../config/firebase').initializeFirebase();
+    const dbConfig = req.app.locals.db;
 
-    await admin.auth().deleteUser(uid);
+    if (dbConfig.provider === 'firebase') {
+      await dbConfig.admin.auth().deleteUser(uid);
+    } else if (dbConfig.provider === 'pocketbase') {
+      const dbAdapter = createDbAdapter(dbConfig);
+      await dbAdapter.client.collection('_users').delete(uid);
+    }
 
     res.json({
       success: true,
@@ -259,18 +307,16 @@ router.delete('/users/:uid', requireAdmin, async (req, res) => {
 
 /**
  * POST /api/auth/token
- * Получить новый токен (для обновления)
+ * Получить информацию о текущем токене
  */
 router.post('/token', requireAuth, async (req, res) => {
   try {
-    // Возвращаем текущую информацию о пользователе
-    // Клиент должен запросить новый токен через Firebase SDK
     res.json({
-      message: 'Получите новый токен через Firebase SDK на клиенте',
+      message: 'Используйте токен из заголовка Authorization',
       user: {
         uid: req.user.uid,
         email: req.user.email,
-        role: req.user.claims?.admin ? 'admin' : 'user'
+        role: req.user.role
       }
     });
   } catch (error) {

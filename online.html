@@ -5,12 +5,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Онлайн результаты</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <link href="css/css.css" rel="stylesheet">
     <script src="js/jquery-3.4.1.min.js"></script>
-    <script src="js/firebase-config.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         body {
@@ -337,26 +334,114 @@
     </div>
 
     <script>
-        // Инициализация Firebase (если ещё не инициализирован)
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        var db = firebase.firestore();
-        var scoreboard_collection = db.collection(COLLECTIONS.VOLLEYBALL);
-        var matches_collection = db.collection(COLLECTIONS.MATCHES);
-        
+        // DB wrappers для обратной совместимости с inline Firebase кодом
+        var scoreboard_collection;
+        var matches_collection;
+
         // State
         var games = {};
         var finishedGames = {};
         var unsubscribeFunctions = [];
         var lastGameStates = {}; // Для отслеживания предыдущих состояний игр
-        
+
         // Initialize
         function init() {
-            setupEventListeners();
-            loadGames();
+            DB.init().then(function() {
+                // Создаём обёртку scoreboard_collection
+                scoreboard_collection = createVolleyballCollection();
+                matches_collection = createMatchesCollection();
+                setupEventListeners();
+                loadGames();
+            }).catch(function(err) {
+                console.error('DB init failed:', err);
+            });
         }
-        
+
+        function createVolleyballCollection() {
+            return {
+                where: function() { return this; },
+                orderBy: function() { return this; },
+                limit: function() { return this; },
+                doc: function(id) {
+                    return {
+                        onSnapshot: function(successCb, errorCb) {
+                            return DB.scoreboard.subscribe(id, function(data) {
+                                if (data) successCb({ id: id, exists: true, data: function() { return data; } });
+                            }, function(err) { if (errorCb) errorCb(err); });
+                        }
+                    };
+                },
+                get: function() {
+                    return DB.scoreboard.queryActive().then(function(results) {
+                        return {
+                            forEach: function(cb) {
+                                results.forEach(function(item) {
+                                    cb({ id: item.id, exists: true, data: function() { return item; } });
+                                });
+                            }
+                        };
+                    });
+                }
+            };
+        }
+
+        function createMatchesCollection() {
+            return {
+                where: function(field, op, value) {
+                    var dateFrom = null, dateTo = null;
+                    if (field === 'date_time' && op === '>=') dateFrom = value;
+                    if (field === 'date_time' && op === '<=') dateTo = value;
+                    return {
+                        where: function(field2, op2, value2) {
+                            if (field2 === 'date_time' && op2 === '>=') dateFrom = value2;
+                            if (field2 === 'date_time' && op2 === '<=') dateTo = value2;
+                            return {
+                                orderBy: function() { return this; },
+                                get: function() {
+                                    var filters = {};
+                                    if (dateFrom) filters.dateFrom = dateFrom;
+                                    if (dateTo) filters.dateTo = dateTo;
+                                    return DB.matches.query(filters).then(function(results) {
+                                        return {
+                                            forEach: function(cb) {
+                                                results.forEach(function(item) {
+                                                    cb({ id: item.id, exists: true, data: function() { return item; } });
+                                                });
+                                            }
+                                        };
+                                    });
+                                }
+                            };
+                        },
+                        orderBy: function() { return this; },
+                        get: function() {
+                            return DB.matches.query({}).then(function(results) {
+                                return {
+                                    forEach: function(cb) {
+                                        results.forEach(function(item) {
+                                            cb({ id: item.id, exists: true, data: function() { return item; } });
+                                        });
+                                    }
+                                };
+                            });
+                        }
+                    };
+                },
+                orderBy: function() { return this; },
+                get: function() {
+                    return DB.matches.query({}).then(function(results) {
+                        return {
+                            forEach: function(cb) {
+                                results.forEach(function(item) {
+                                    cb({ id: item.id, exists: true, data: function() { return item; } });
+                                });
+                            }
+                        };
+                    });
+                }
+            };
+        }
+
         function setupEventListeners() {
             document.getElementById('refreshBtn').addEventListener('click', loadGames);
         }

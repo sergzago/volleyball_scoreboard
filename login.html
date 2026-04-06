@@ -8,11 +8,9 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Вход в систему - Volleyball Scoreboard</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <link href="css/css.css" rel="stylesheet">
-    <script src="js/firebase-config.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css">
     <style>
         body {
@@ -230,11 +228,22 @@
             window.location.href = 'index.html';
         }
 
-        // Инициализация Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const auth = firebase.auth();
+        // Инициализация DB
+        const auth = {
+            onAuthStateChanged: function(cb) {
+                DB.init().then(function() {
+                    DB.auth.onAuthStateChanged(cb);
+                });
+            },
+            signInWithEmailAndPassword: async function(email, password) {
+                const username = email.split('@')[0];
+                const userInfo = await DB.auth.login(username, password);
+                return { user: { uid: userInfo.uid, email: userInfo.email, displayName: userInfo.displayName } };
+            },
+            signOut: function() {
+                return DB.auth.logout();
+            }
+        };
 
         // Элементы DOM
         let loginFormElement, loginBtn, usernameInput, passwordInput, errorMessage, successMessage, loadingDiv;
@@ -242,7 +251,9 @@
         let isLoggingIn = false; // Флаг для предотвращения редиректа во время входа
 
         // Ждем загрузки DOM
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await DB.init();
+
             loginFormElement = document.getElementById('loginFormElement');
             loginBtn = document.getElementById('loginBtn');
             usernameInput = document.getElementById('username');
@@ -256,25 +267,23 @@
             redirectUrl = urlParams.get('redirect');
 
             // Проверка: если уже авторизован, перенаправляем
-            auth.onAuthStateChanged(async (user) => {
+            DB.auth.onAuthStateChanged(async (user) => {
                 // Если正在进行 вход, не делаем редирект
                 if (isLoggingIn) {
                     console.log('Login in progress, skipping redirect');
                     return;
                 }
-                
+
                 if (user) {
                     showLoading();
                     try {
-                        // Для admin.html всегда проверяем роль через Firestore
+                        // Для admin.html всегда проверяем роль через DB
                         if (isAdminPage) {
-                            const db = firebase.firestore();
                             const username = user.email.split('@')[0];
-                            const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
+                            const userData = await DB.users.get(username);
 
                             let role = 'user';
-                            if (userDoc.exists) {
-                                const userData = userDoc.data();
+                            if (userData && userData.role) {
                                 role = userData.role === 'admin' ? 'admin' : 'user';
                             }
 
@@ -328,7 +337,6 @@
 
                     // Записываем вход в auth_log
                     try {
-                        const db = firebase.firestore();
                         const usernameLower = username.toLowerCase();
                         const loginTime = new Date();
 
@@ -342,8 +350,8 @@
                             // Не критично, продолжаем без IP
                         }
 
-                        // Записываем в auth_log
-                        await db.collection('auth_log').add({
+                        // Записываем в auth_log через DB
+                        await DB.auth.logAuthEvent({
                             username: usernameLower,
                             uid: user.uid,
                             email: user.email,
@@ -356,13 +364,11 @@
                         console.error('Failed to write auth_log:', err);
                     }
 
-                    // Проверяем роль из Firestore
-                    const db = firebase.firestore();
-                    const userDoc = await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).get();
+                    // Проверяем роль через DB
+                    const userData = await DB.users.get(username.toLowerCase());
 
                     let role = 'user';
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
+                    if (userData && userData.role) {
                         role = userData.role === 'admin' ? 'admin' : 'user';
                     }
 
@@ -393,9 +399,9 @@
                     // Сбрасываем флаг при ошибке
                     isLoggingIn = false;
                     hideLoading();
+                    console.error('Login error:', error);
 
-                    let errorMsg = 'Ошибка входа. Проверьте логин и пароль.';
-
+                    let errorMsg = error.message || 'Ошибка входа. Проверьте логин и пароль.';
                     // Проверяем код ошибки
                     if (error.code === 'auth/user-not-found') {
                         errorMsg = 'Пользователь не найден';

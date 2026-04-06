@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Volleyball scoreboard</title>
     <link href="css/css.css" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="js/jquery-3.4.1.min.js"></script>
-    <script src="js/firebase-config.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
     <script src="js/common.js"></script>
     <script src="js/scoreboard.js"></script>
     <style>
@@ -549,11 +548,15 @@
     // Обновляем scoreboard1 при загрузке данных из Firebase
     // Функция вызывается из scoreboard.js через updateScoreboard1History
     function updateScoreboard1Display() {
-        // Обновляем видимость табло на основе show битов
-        // Используем show & 1 (top) для отображения табло
+        // Если данные ещё не загружены — ничего не делаем (дождёмся данных)
+        if (!scoreboard_data || scoreboard_data.show === undefined || scoreboard_data.show === null) {
+            console.log('sb.html: scoreboard_data.show not available yet');
+            return;
+        }
         var showTop = !!(scoreboard_data.show & 1);
         var showBottom = !!(scoreboard_data.show & 2);
         var showLabel = !!(scoreboard_data.show & 4);
+        console.log('sb.html: updateScoreboard1Display, show=', scoreboard_data.show, 'showTop=', showTop, 'showBottom=', showBottom, 'showLabel=', showLabel);
 
         // Показываем/скрываем верхний лейбл (анимация как в scoreboard.html)
         var $label = $('.top_label');
@@ -634,9 +637,14 @@
                 }
             });
         }
-        
-        if (typeof updateScoreboard1Display === 'function') {
-            updateScoreboard1Display();
+
+        // Не вызываем updateScoreboard1Display здесь — данные ещё не загружены.
+        // Функция будет вызвана автоматически из scoreboard.js когда придут данные
+        // через updateScoreboard1History().
+
+        // Обновляем блоки сетов если данные уже есть
+        if (typeof scoreboard_data !== 'undefined' && scoreboard_data.set_history) {
+            updateBottomSetsDisplay(scoreboard_data.set_history);
         }
     });
 

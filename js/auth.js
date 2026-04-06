@@ -1,6 +1,7 @@
 /**
  * Общий модуль авторизации для клиентских страниц
- * Подключается после firebase-app.js и firebase-auth.js
+ * Работает через единый DB интерфейс (Firebase / PocketBase)
+ * Подключается после db-config.js и db-interface.js
  */
 
 // Глобальные переменные
@@ -8,12 +9,6 @@ window.AuthModule = (function() {
     // Проверка включена ли авторизация
     const isAuthEnabled = (typeof ENABLE_AUTH !== 'undefined') ? ENABLE_AUTH === 1 : true;
 
-    // Инициализация Firebase
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
-
-    const auth = firebase.auth();
     let currentUser = null;
     let currentRole = null;
     let idToken = null;
@@ -31,8 +26,11 @@ window.AuthModule = (function() {
             return true;
         }
 
+        // Инициализируем DB
+        await DB.init();
+
         return new Promise((resolve, reject) => {
-            auth.onAuthStateChanged(async (user) => {
+            DB.auth.onAuthStateChanged(async (user) => {
                 if (!user) {
                     if (redirectUrl) {
                         window.location.href = redirectUrl;
@@ -42,39 +40,19 @@ window.AuthModule = (function() {
                 }
 
                 currentUser = user;
+                currentRole = user.role || 'user';
 
-                try {
-                    idToken = await user.getIdToken();
-
-                    // Получаем роль из Firestore
-                    const db = firebase.firestore();
-                    const username = user.email.split('@')[0];
-                    const userDoc = await db.collection(COLLECTIONS.USERS).doc(username).get();
-                    
-                    currentRole = 'user';
-                    if (userDoc.exists) {
-                        const userData = userDoc.data();
-                        currentRole = userData.role === 'admin' ? 'admin' : 'user';
-                    }
-
-                    // Проверяем роль
-                    if (requiredRole === 'admin' && currentRole !== 'admin') {
-                        // Если требуется админ, а у пользователя роль user
-                        if (redirectUrl) {
-                            window.location.href = 'ctl.html';
-                        }
-                        resolve(false);
-                        return;
-                    }
-
-                    resolve(true);
-                } catch (error) {
-                    console.error('Auth check error:', error);
+                // Проверяем роль
+                if (requiredRole === 'admin' && currentRole !== 'admin') {
+                    // Если требуется админ, а у пользователя роль user
                     if (redirectUrl) {
-                        window.location.href = redirectUrl;
+                        window.location.href = 'ctl.html';
                     }
                     resolve(false);
+                    return;
                 }
+
+                resolve(true);
             });
         });
     }
@@ -115,14 +93,17 @@ window.AuthModule = (function() {
         }
 
         try {
-            await auth.signOut();
+            // Убедимся что DB инициализирован
+            await DB.init();
+            await DB.auth.logout();
             currentUser = null;
             currentRole = null;
             idToken = null;
             window.location.href = 'login.html';
         } catch (error) {
             console.error('Logout error:', error);
-            throw error;
+            // Даже при ошибке перенаправляем
+            window.location.href = 'login.html';
         }
     }
 
@@ -139,8 +120,8 @@ window.AuthModule = (function() {
 
     /**
      * Авторизованный fetch запрос
-     * @param {string} url 
-     * @param {Object} options 
+     * @param {string} url
+     * @param {Object} options
      * @returns {Promise<Response>}
      */
     async function fetch(url, options = {}) {
@@ -149,6 +130,18 @@ window.AuthModule = (function() {
             ...getAuthHeaders()
         };
         return window.fetch(url, options);
+    }
+
+    /**
+     * Firebase auth object (для обратной совместимости)
+     * Lazy getter — возвращает null если DB ещё не инициализирован
+     */
+    function getAuth() {
+        try {
+            return DB.auth.getAuthInstance();
+        } catch (e) {
+            return null;
+        }
     }
 
     // Публичный API модуля
@@ -160,6 +153,8 @@ window.AuthModule = (function() {
         logout,
         getAuthHeaders,
         fetch,
-        auth
+        get auth() {
+            return getAuth();
+        }
     };
 })();
