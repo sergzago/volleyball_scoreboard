@@ -4,6 +4,9 @@
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Админ-панель - Управление пользователями</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -397,20 +400,31 @@
         </div>
     </div>
 
-    <script>
-        // Логирование для отладки
-        console.log('Admin page loading...', {
-            ENABLE_AUTH: typeof ENABLE_AUTH !== 'undefined' ? ENABLE_AUTH : 'undefined'
-        });
+    <!-- Модальное окно истории входов -->
+    <div id="loginHistoryModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>📋 История входов: <span id="loginHistoryUsername"></span></h3>
+            </div>
+            <div id="loginHistoryContent">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Загрузка истории...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeLoginHistoryModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
 
+    <script>
         // Инициализация Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
-            console.log('✅ Firebase initialized');
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
-        console.log('✅ Firestore initialized, projectId:', firebaseConfig.projectId);
 
         // Глобальные переменные
         let currentUser = null;
@@ -418,9 +432,7 @@
 
         // Проверка авторизации при загрузке - ВСЕГДА обязательна для админ-панели
         auth.onAuthStateChanged(async (user) => {
-            console.log('Auth state changed:', user ? user.email : 'no user');
             if (!user) {
-                console.log('No user, redirecting to login.html');
                 const currentPath = window.location.pathname + window.location.search;
                 window.location.href = `login.html?redirect=${encodeURIComponent(currentPath)}`;
                 return;
@@ -430,7 +442,6 @@
 
             try {
                 // Получаем токен
-                console.log('Getting ID token...');
                 const idToken = await user.getIdToken();
 
                 // Проверяем роль из Firestore
@@ -441,30 +452,23 @@
                 if (userDoc.exists) {
                     const userData = userDoc.data();
                     role = userData.role === 'admin' ? 'admin' : 'user';
-                    console.log('User role from Firestore:', role, userData);
                 } else {
                     // Если документа нет, пробуем найти по uid
                     const usersByUid = await db.collection(COLLECTIONS.USERS).where('uid', '==', user.uid).get();
                     if (!usersByUid.empty) {
                         const userData = usersByUid.docs[0].data();
                         role = userData.role === 'admin' ? 'admin' : 'user';
-                        console.log('User role from Firestore (by uid):', role, userData);
                     }
                 }
 
-                console.log('User role:', role);
-
                 if (role !== 'admin') {
-                    console.log('User is not admin');
                     showAlert('Доступ запрещен. Требуются права администратора.', 'error');
                     document.getElementById('userInfo').textContent = `${user.email} (Пользователь)`;
-                    // Не перенаправляем, остаемся на странице
                     return;
                 }
 
                 // Загружаем список пользователей
                 document.getElementById('userInfo').textContent = `${user.email} (Администратор)`;
-                console.log('Loading users from Firestore...');
                 loadUsers();
 
             } catch (error) {
@@ -473,49 +477,53 @@
             }
         });
 
-        // Загрузка пользователей
+        // Загрузка пользователей и их последних входов
         async function loadUsers() {
-            console.log('=== loadUsers() started ===');
             try {
-                console.log('Fetching users from Firestore...');
-                const startTime = Date.now();
+                // Загружаем пользователей
+                const usersSnapshot = await db.collection(COLLECTIONS.USERS).get();
                 
-                const snapshot = await db.collection(COLLECTIONS.USERS).get();
-                
-                const duration = Date.now() - startTime;
-                console.log(`✅ Users fetched in ${duration}ms:`, snapshot.size);
-
-                if (snapshot.empty) {
-                    console.log('No users found in Firestore');
+                if (usersSnapshot.empty) {
                     usersList = [];
                 } else {
-                    usersList = snapshot.docs.map(doc => {
+                    // Для каждого пользователя получаем последний вход из auth_log
+                    usersList = await Promise.all(usersSnapshot.docs.map(async (doc) => {
                         const data = doc.data();
-                        console.log('User doc:', doc.id, data);
+                        
+                        // Получаем последний вход пользователя
+                        let lastLogin = null;
+                        try {
+                            const authLogSnapshot = await db.collection('auth_log')
+                                .where('username', '==', doc.id)
+                                .orderBy('loginAt', 'desc')
+                                .limit(1)
+                                .get();
+                            
+                            if (!authLogSnapshot.empty) {
+                                lastLogin = authLogSnapshot.docs[0].data();
+                            }
+                        } catch (err) {
+                            if (err.code === 'failed-precondition') {
+                                console.error(`Index required for user ${doc.id}. Create index: https://console.firebase.google.com/project/myvolleyscore/firestore/indexes`);
+                            } else {
+                                console.error(`Failed to load auth_log for ${doc.id}:`, err);
+                            }
+                        }
+                        
                         return {
-                            docId: doc.id,  // ID документа Firestore (username)
-                            uid: data.uid || doc.id,  // Настоящий UID из Firebase Auth или fallback на doc.id
+                            docId: doc.id,
+                            uid: data.uid || doc.id,
+                            lastLogin: lastLogin,
                             ...data
                         };
-                    });
+                    }));
                 }
 
-                console.log('usersList:', usersList);
                 renderUsersTable();
 
             } catch (error) {
-                console.error('❌ Load users error:', error);
-                console.error('Error code:', error.code);
-                console.error('Error message:', error.message);
-
-                let detailedError = error.message;
-                if (error.code === 'permission-denied') {
-                    detailedError = 'Нет доступа к Firestore. Проверьте правила безопасности в Firebase Console.';
-                }
-
-                showAlert('Ошибка загрузки: ' + detailedError, 'error');
+                showAlert('Ошибка загрузки: ' + error.message, 'error');
             }
-            console.log('=== loadUsers() finished ===');
         }
 
         // Рендеринг таблицы пользователей
@@ -550,35 +558,66 @@
             usersList.forEach(user => {
                 // Конвертация Firestore Timestamp в Date
                 let createdAt = 'N/A';
-                let lastLogin = 'N/A';
-                
+                let lastLogin = 'Никогда не входил';
+                let lastLoginIP = '';
+
                 if (user.createdAt) {
-                    if (user.createdAt.toDate) {
-                        // Firestore Timestamp
-                        createdAt = user.createdAt.toDate().toLocaleDateString('ru-RU');
-                    } else if (user.createdAt.seconds) {
-                        // Unix timestamp
-                        createdAt = new Date(user.createdAt.seconds * 1000).toLocaleDateString('ru-RU');
-                    } else {
-                        // String or other format
-                        createdAt = new Date(user.createdAt).toLocaleDateString('ru-RU');
+                    try {
+                        let createdDate;
+                        if (user.createdAt.toDate) {
+                            // Firestore Timestamp
+                            createdDate = user.createdAt.toDate();
+                        } else if (user.createdAt.seconds) {
+                            // Unix timestamp object
+                            createdDate = new Date(user.createdAt.seconds * 1000);
+                        } else {
+                            // String or other format
+                            createdDate = new Date(user.createdAt);
+                        }
+
+                        // Проверяем, что дата валидна
+                        if (createdDate instanceof Date && !isNaN(createdDate.getTime())) {
+                            createdAt = createdDate.toLocaleString('ru-RU');
+                        } else {
+                            createdAt = 'Некорректная дата';
+                        }
+                    } catch (e) {
+                        createdAt = 'Ошибка чтения';
                     }
                 }
-                
-                if (user.lastLoginAt) {
-                    if (user.lastLoginAt.toDate) {
-                        lastLogin = user.lastLoginAt.toDate().toLocaleDateString('ru-RU');
-                    } else if (user.lastLoginAt.seconds) {
-                        lastLogin = new Date(user.lastLoginAt.seconds * 1000).toLocaleDateString('ru-RU');
-                    } else {
-                        lastLogin = new Date(user.lastLoginAt).toLocaleDateString('ru-RU');
+
+                // Отображаем последний вход из auth_log
+                if (user.lastLogin) {
+                    try {
+                        let loginDate;
+                        const loginData = user.lastLogin;
+                        
+                        if (loginData.loginAt) {
+                            if (loginData.loginAt.toDate) {
+                                loginDate = loginData.loginAt.toDate();
+                            } else if (loginData.loginAt.seconds) {
+                                loginDate = new Date(loginData.loginAt.seconds * 1000);
+                            } else {
+                                loginDate = new Date(loginData.loginAt);
+                            }
+                            
+                            if (loginDate instanceof Date && !isNaN(loginDate.getTime())) {
+                                lastLogin = loginDate.toLocaleString('ru-RU');
+                                lastLoginIP = loginData.ipAddress || 'N/A';
+                            } else {
+                                lastLogin = 'Некорректная дата';
+                            }
+                        }
+                    } catch (e) {
+                        lastLogin = 'Ошибка чтения';
                     }
                 }
-                
+
                 const roleClass = user.role === 'admin' ? 'role-admin' : 'role-user';
                 const roleText = user.role === 'admin' ? 'Администратор' : 'Пользователь';
                 const isCurrentUser = user.email === currentUser.email;
                 const username = user.username || user.email.split('@')[0];
+                const hasLoginHistory = user.lastLogin !== null;
 
                 html += `
                     <tr>
@@ -586,7 +625,14 @@
                         <td>${escapeHtml(user.displayName || '-')}</td>
                         <td><span class="role-badge ${roleClass}">${roleText}</span></td>
                         <td>${createdAt}</td>
-                        <td>${lastLogin}</td>
+                        <td>
+                            ${hasLoginHistory ? `
+                                <a href="#" onclick="showLoginHistory('${username}'); return false;" style="color: #225378; text-decoration: none; cursor: pointer;">
+                                    <div style="border-bottom: 1px dashed #225378; display: inline-block;">${lastLogin}</div>
+                                </a>
+                                ${lastLoginIP ? `<div style="font-size: 11px; color: #666; margin-top: 4px;">IP: ${escapeHtml(lastLoginIP)}</div>` : ''}
+                            ` : lastLogin}
+                        </td>
                         <td class="actions">
                             <button class="btn btn-primary btn-sm" onclick="openEditModal('${user.docId}')" ${isCurrentUser ? 'disabled' : ''}>
                                 ${isCurrentUser ? 'Текущий' : '✏️'}
@@ -786,6 +832,102 @@
             }
         }
 
+        // Показать историю входов
+        async function showLoginHistory(username) {
+            document.getElementById('loginHistoryUsername').textContent = `@${username}`;
+            document.getElementById('loginHistoryModal').classList.add('active');
+            
+            const contentDiv = document.getElementById('loginHistoryContent');
+            contentDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Загрузка истории...</p>
+                </div>
+            `;
+
+            try {
+                const snapshot = await db.collection('auth_log')
+                    .where('username', '==', username)
+                    .orderBy('loginAt', 'desc')
+                    .limit(50)
+                    .get();
+
+                if (snapshot.empty) {
+                    contentDiv.innerHTML = `
+                        <div class="empty-state">
+                            <p>История входов отсутствует</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Дата и время</th>
+                                <th>IP-адрес</th>
+                                <th>Браузер</th>
+                                <th>Страница</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    let loginTime = 'N/A';
+                    
+                    if (data.loginAt) {
+                        try {
+                            let loginDate;
+                            if (data.loginAt.toDate) {
+                                loginDate = data.loginAt.toDate();
+                            } else if (data.loginAt.seconds) {
+                                loginDate = new Date(data.loginAt.seconds * 1000);
+                            } else {
+                                loginDate = new Date(data.loginAt);
+                            }
+                            
+                            if (loginDate instanceof Date && !isNaN(loginDate.getTime())) {
+                                loginTime = loginDate.toLocaleString('ru-RU');
+                            }
+                        } catch (e) {
+                            loginTime = 'Ошибка';
+                        }
+                    }
+
+                    const browser = data.userAgent ? data.userAgent.split(' ').slice(-2).join(' ') : 'N/A';
+                    const page = data.isAdminPage ? 'Админ-панель' : 'Обычная страница';
+
+                    html += `
+                        <tr>
+                            <td>${loginTime}</td>
+                            <td>${escapeHtml(data.ipAddress || 'N/A')}</td>
+                            <td style="font-size: 11px;">${escapeHtml(browser)}</td>
+                            <td>${page}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table>`;
+                contentDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('Load login history error:', error);
+                contentDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        Ошибка загрузки истории: ${escapeHtml(error.message)}
+                    </div>
+                `;
+            }
+        }
+
+        // Закрыть историю входов
+        function closeLoginHistoryModal() {
+            document.getElementById('loginHistoryModal').classList.remove('active');
+        }
+
         // Утилиты
         function showAlert(message, type) {
             const container = document.getElementById('alertContainer');
@@ -809,10 +951,16 @@
             return div.innerHTML;
         }
 
-        // Закрытие модального окна по клику вне его
+        // Закрытие модальных окон по клику вне их
         document.getElementById('editModal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('editModal')) {
                 closeEditModal();
+            }
+        });
+
+        document.getElementById('loginHistoryModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('loginHistoryModal')) {
+                closeLoginHistoryModal();
             }
         });
     </script>

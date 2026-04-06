@@ -4,6 +4,9 @@
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Вход в систему - Volleyball Scoreboard</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -222,16 +225,8 @@
         const redirectParam = urlParams.get('redirect');
         const isAdminPage = redirectParam && redirectParam.includes('admin.html');
 
-        console.log('Login page:', {
-            ENABLE_AUTH: ENABLE_AUTH,
-            isAuthEnabled: isAuthEnabled,
-            redirectParam: redirectParam,
-            isAdminPage: isAdminPage
-        });
-
         // Если авторизация отключена и это не admin.html, перенаправляем на главную
         if (!isAuthEnabled && !isAdminPage) {
-            console.log('Auth disabled, redirecting to index.html');
             window.location.href = 'index.html';
         }
 
@@ -244,6 +239,7 @@
         // Элементы DOM
         let loginFormElement, loginBtn, usernameInput, passwordInput, errorMessage, successMessage, loadingDiv;
         let redirectUrl = null;
+        let isLoggingIn = false; // Флаг для предотвращения редиректа во время входа
 
         // Ждем загрузки DOM
         document.addEventListener('DOMContentLoaded', () => {
@@ -259,18 +255,15 @@
             const urlParams = new URLSearchParams(window.location.search);
             redirectUrl = urlParams.get('redirect');
 
-            console.log('DOM loaded, elements:', {
-                form: !!loginFormElement,
-                btn: !!loginBtn,
-                username: !!usernameInput,
-                password: !!passwordInput,
-                redirect: redirectUrl
-            });
-
             // Проверка: если уже авторизован, перенаправляем
             auth.onAuthStateChanged(async (user) => {
+                // Если正在进行 вход, не делаем редирект
+                if (isLoggingIn) {
+                    console.log('Login in progress, skipping redirect');
+                    return;
+                }
+                
                 if (user) {
-                    console.log('User authenticated:', user.email);
                     showLoading();
                     try {
                         // Для admin.html всегда проверяем роль через Firestore
@@ -284,7 +277,6 @@
                                 const userData = userDoc.data();
                                 role = userData.role === 'admin' ? 'admin' : 'user';
                             }
-                            console.log('User role:', role);
 
                             if (role !== 'admin') {
                                 hideLoading();
@@ -315,8 +307,6 @@
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
 
-                console.log('Login attempt:', { username, passwordLength: password.length });
-
                 if (!username || !password) {
                     showError('Введите имя пользователя и пароль');
                     return;
@@ -326,30 +316,55 @@
                 hideError();
 
                 try {
+                    // Устанавливаем флаг для предотвращения редиректа
+                    isLoggingIn = true;
+                    
                     // Генерируем email из username
                     const email = username.toLowerCase() + '@volleyball.local';
-                    console.log('Attempting login with email:', email);
 
                     // Вход через Firebase Auth с email
                     const userCredential = await auth.signInWithEmailAndPassword(email, password);
                     const user = userCredential.user;
-                    console.log('Login successful:', user.email);
 
-                    // Обновляем lastLoginAt в Firestore
-                    const db = firebase.firestore();
-                    await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).update({
-                        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }).catch(err => console.warn('Failed to update lastLoginAt:', err));
+                    // Записываем вход в auth_log
+                    try {
+                        const db = firebase.firestore();
+                        const usernameLower = username.toLowerCase();
+                        const loginTime = new Date();
+
+                        // Получаем IP-адрес
+                        let ipAddress = 'unknown';
+                        try {
+                            const ipResponse = await fetch('https://api.ipify.org?format=json');
+                            const ipData = await ipResponse.json();
+                            ipAddress = ipData.ip || 'unknown';
+                        } catch (ipErr) {
+                            // Не критично, продолжаем без IP
+                        }
+
+                        // Записываем в auth_log
+                        await db.collection('auth_log').add({
+                            username: usernameLower,
+                            uid: user.uid,
+                            email: user.email,
+                            loginAt: loginTime,
+                            ipAddress: ipAddress,
+                            userAgent: navigator.userAgent,
+                            isAdminPage: isAdminPage
+                        });
+                    } catch (err) {
+                        console.error('Failed to write auth_log:', err);
+                    }
 
                     // Проверяем роль из Firestore
+                    const db = firebase.firestore();
                     const userDoc = await db.collection(COLLECTIONS.USERS).doc(username.toLowerCase()).get();
-                    
+
                     let role = 'user';
                     if (userDoc.exists) {
                         const userData = userDoc.data();
                         role = userData.role === 'admin' ? 'admin' : 'user';
                     }
-                    console.log('User role:', role);
 
                     // Для admin.html проверяем права администратора
                     if (isAdminPage && role !== 'admin') {
@@ -360,6 +375,9 @@
                     }
 
                     showSuccess('Успешный вход! Перенаправление...');
+
+                    // Сбрасываем флаг
+                    isLoggingIn = false;
 
                     // Возвращаемся на страницу, с которой пришли
                     setTimeout(() => {
@@ -372,9 +390,8 @@
                     }, 1000);
 
                 } catch (error) {
-                    console.error('Login error:', error);
-                    console.error('Error code:', error.code);
-                    console.error('Error message:', error.message);
+                    // Сбрасываем флаг при ошибке
+                    isLoggingIn = false;
                     hideLoading();
 
                     let errorMsg = 'Ошибка входа. Проверьте логин и пароль.';
