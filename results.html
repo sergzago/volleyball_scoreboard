@@ -829,9 +829,13 @@
               if (data.date_time && data.date_time.toDate) {
                 data.date_time = data.date_time.toDate();
               }
+              // PocketBase возвращает дату как строку — конвертируем в Date
+              if (data.date_time && typeof data.date_time === 'string') {
+                data.date_time = new Date(data.date_time);
+              }
               matches.push(data);
             });
-            
+
             displayResults(matches);
           })
           .catch(function(error) {
