@@ -338,7 +338,7 @@
                     // Записываем вход в auth_log
                     try {
                         const usernameLower = username.toLowerCase();
-                        const loginTime = new Date();
+                        const loginTime = new Date().toISOString();
 
                         // Получаем IP-адрес
                         let ipAddress = 'unknown';
@@ -356,8 +356,11 @@
                             uid: user.uid,
                             email: user.email,
                             loginAt: loginTime,
+                            timestamp: loginTime,
                             ipAddress: ipAddress,
+                            ip_address: ipAddress,
                             userAgent: navigator.userAgent,
+                            user_agent: navigator.userAgent,
                             isAdminPage: isAdminPage
                         });
                     } catch (err) {

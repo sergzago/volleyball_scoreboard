@@ -501,12 +501,33 @@
                                         limit: function(n) {
                                             return {
                                                 get: async function() {
-                                                    // Simplified: return empty for auth_log queries
+                                                    if (name === 'auth_log') {
+                                                        // Firebase: загружаем из реального Firestore
+                                                        if (firebase.firestore) {
+                                                            const realCollection = firebase.firestore().collection('auth_log');
+                                                            return realCollection
+                                                                .where(field, op, value)
+                                                                .orderBy(orderField, direction)
+                                                                .limit(n)
+                                                                .get();
+                                                        }
+                                                        return { empty: true, docs: [] };
+                                                    }
                                                     return { forEach: function() {} };
                                                 }
                                             };
                                         },
                                         get: async function() {
+                                            if (name === 'auth_log') {
+                                                if (firebase.firestore) {
+                                                    const realCollection = firebase.firestore().collection('auth_log');
+                                                    return realCollection
+                                                        .where(field, op, value)
+                                                        .orderBy(orderField, direction)
+                                                        .get();
+                                                }
+                                                return { empty: true, docs: [] };
+                                            }
                                             if (name === COLLECTIONS.USERS || name === 'users') {
                                                 // Return all users (client-side filtering for simplicity)
                                                 const allUsers = [];
@@ -526,13 +547,24 @@
                                 },
                                 get: async function() {
                                     if (name === COLLECTIONS.USERS || name === 'users') {
-                                        // Get all users через PocketBase API
+                                        var provider = DB.getProvider();
+                                        if (provider === 'firebase') {
+                                            // Firebase: используем реальный Firestore
+                                            if (firebase && firebase.firestore) {
+                                                return firebase.firestore().collection(name).get();
+                                            }
+                                            return { empty: true, docs: [] };
+                                        }
+                                        // PocketBase: загружаем через API
                                         try {
                                             const pb = await getPocketBaseClientForAdmin();
                                             if (pb) {
-                                                const records = await pb.collection('users').getFullList({
+                                                const records = await pb.collection(DB_CONFIG.collections.USERS).getFullList({
                                                     sort: '+created'
                                                 });
+                                                if (!Array.isArray(records)) {
+                                                    return { empty: true, docs: [] };
+                                                }
                                                 return {
                                                     empty: records.length === 0,
                                                     docs: records.map(function(r) {
@@ -618,8 +650,33 @@
                 var provider = DB.getProvider();
                 if (provider === 'pocketbase') {
                     var pb = await getPocketBaseClientForAdmin();
-                    var records = await pb.collection('users').getFullList({ sort: '+created' });
+                    var records = await pb.collection(DB_CONFIG.collections.USERS).getFullList({ sort: '+created' });
+
+                    // Загружаем auth_log для последнего входа каждого пользователя
+                    var authLogs = [];
+                    try {
+                        authLogs = await pb.collection('auth_log').getFullList({ sort: '-loginAt', perPage: 20 });
+                    } catch(e) {
+                        console.log('auth_log не доступен:', e.message);
+                    }
+
+                    // Проверим, что records — массив
+                    if (!Array.isArray(records)) {
+                        console.warn('users records is not an array:', records);
+                        records = [];
+                    }
+
                     usersList = records.map(function(r) {
+                        // Находим последний вход для этого пользователя
+                        var userLastLogin = null;
+                        for (var i = 0; i < authLogs.length; i++) {
+                            var log = authLogs[i];
+                            if (log.username === r.username || log.username === (r.username || '')) {
+                                userLastLogin = log;
+                                break;
+                            }
+                        }
+
                         return {
                             docId: r.id,
                             uid: r.id,
@@ -627,29 +684,47 @@
                             username: r.username || r.email.split('@')[0],
                             displayName: r.name || r.username || '',
                             role: r.role || 'user',
-                            lastLogin: null,
+                            lastLogin: userLastLogin,
                             createdAt: r.created
                         };
                     });
                 } else {
                     // Firebase
-                    const usersSnapshot = await db.collection(COLLECTIONS.USERS).get();
-                    if (usersSnapshot.empty) {
+                    var usersSnapshot;
+                    try {
+                        // Убедимся, что Firestore доступен
+                        if (!firebase || !firebase.firestore) {
+                            throw new Error('Firebase Firestore not available');
+                        }
+                        var realSnapshot = await firebase.firestore().collection(COLLECTIONS.USERS).get();
+                        usersSnapshot = realSnapshot;
+                    } catch(err) {
+                        console.error('Firebase users query failed:', err.message);
+                        usersSnapshot = { empty: true, docs: [] };
+                    }
+
+                    if (!usersSnapshot || !usersSnapshot.docs || usersSnapshot.empty) {
                         usersList = [];
                     } else {
                         usersList = await Promise.all(usersSnapshot.docs.map(async (doc) => {
                             const data = doc.data();
                             let lastLogin = null;
                             try {
-                                const authLogSnapshot = await db.collection('auth_log')
-                                    .where('username', '==', doc.id)
-                                    .orderBy('loginAt', 'desc')
-                                    .limit(1)
-                                    .get();
-                                if (!authLogSnapshot.empty) {
-                                    lastLogin = authLogSnapshot.docs[0].data();
+                                // Для Firebase используем реальный Firestore для auth_log
+                                if (firebase.firestore) {
+                                    const authLogSnapshot = await firebase.firestore()
+                                        .collection('auth_log')
+                                        .where('username', '==', doc.id)
+                                        .orderBy('loginAt', 'desc')
+                                        .limit(20)
+                                        .get();
+                                    if (!authLogSnapshot.empty) {
+                                        lastLogin = authLogSnapshot.docs[0].data();
+                                    }
                                 }
-                            } catch (err) { /* ignore */ }
+                            } catch (err) {
+                                console.log('auth_log query failed:', err.message);
+                            }
                             return {
                                 docId: doc.id,
                                 uid: data.uid || doc.id,
@@ -732,16 +807,21 @@
                     try {
                         let loginDate;
                         const loginData = user.lastLogin;
-                        
-                        if (loginData.loginAt) {
-                            if (loginData.loginAt.toDate) {
-                                loginDate = loginData.loginAt.toDate();
-                            } else if (loginData.loginAt.seconds) {
-                                loginDate = new Date(loginData.loginAt.seconds * 1000);
+
+                        // PocketBase: loginAt — строка "2026-04-07 07:17:02.521Z"
+                        var dateValue = loginData.loginAt;
+
+                        if (dateValue) {
+                            if (dateValue.toDate) {
+                                loginDate = dateValue.toDate();
+                            } else if (dateValue.seconds) {
+                                loginDate = new Date(dateValue.seconds * 1000);
                             } else {
-                                loginDate = new Date(loginData.loginAt);
+                                // Строка "YYYY-MM-DD HH:mm:ss.SSSZ" — заменяем пробел на T
+                                var dateStr = dateValue.replace(' ', 'T');
+                                loginDate = new Date(dateStr);
                             }
-                            
+
                             if (loginDate instanceof Date && !isNaN(loginDate.getTime())) {
                                 lastLogin = loginDate.toLocaleString('ru-RU');
                                 lastLoginIP = loginData.ipAddress || 'N/A';
@@ -750,6 +830,7 @@
                             }
                         }
                     } catch (e) {
+                        console.log('Error parsing login date:', e);
                         lastLogin = 'Ошибка чтения';
                     }
                 }
@@ -806,20 +887,11 @@
                     role
                 );
 
-                // Выходим из-под созданного пользователя (если текущая сессия была сброшена)
-                try { await DB.auth.logout(); } catch(e) {}
-
                 showAlert(
                     `Пользователь ${username} успешно создан!\n\n` +
-                    `Роль: ${role === 'admin' ? 'Администратор' : 'Пользователь'}\n\n` +
-                    `⚠️ Для продолжения работы необходимо войти повторно под своей учетной записью.`,
+                    `Роль: ${role === 'admin' ? 'Администратор' : 'Пользователь'}`,
                     'success'
                 );
-
-                // Перенаправляем на страницу входа через 2 секунды
-                setTimeout(() => {
-                    window.location.href = 'login.html';
-                }, 2000);
 
                 // Очистка формы
                 document.getElementById('addUserForm').reset();
@@ -954,7 +1026,7 @@
         async function showLoginHistory(username) {
             document.getElementById('loginHistoryUsername').textContent = `@${username}`;
             document.getElementById('loginHistoryModal').classList.add('active');
-            
+
             const contentDiv = document.getElementById('loginHistoryContent');
             contentDiv.innerHTML = `
                 <div class="loading">
@@ -963,14 +1035,57 @@
                 </div>
             `;
 
-            try {
-                const snapshot = await db.collection('auth_log')
-                    .where('username', '==', username)
-                    .orderBy('loginAt', 'desc')
-                    .limit(50)
-                    .get();
+            let entries = [];
 
-                if (snapshot.empty) {
+            try {
+                var provider = DB.getProvider();
+                if (provider === 'pocketbase') {
+                    var pb = await getPocketBaseClientForAdmin();
+                    var authLogs = await pb.collection('auth_log').getFullList({
+                        filter: 'username = "' + username + '"',
+                        sort: '-loginAt',
+                        perPage: 20
+                    });
+                    entries = authLogs.map(function(log) {
+                        return {
+                            loginAt: log.loginAt,
+                            ipAddress: log.ipAddress || 'N/A',
+                            userAgent: log.userAgent || '',
+                            isAdminPage: log.isAdminPage
+                        };
+                    });
+                } else {
+                    // Firebase
+                    if (firebase.firestore) {
+                        const snapshot = await firebase.firestore()
+                            .collection('auth_log')
+                            .where('username', '==', username)
+                            .orderBy('loginAt', 'desc')
+                            .limit(20)
+                            .get();
+
+                        if (snapshot.empty) {
+                            contentDiv.innerHTML = `
+                                <div class="empty-state">
+                                    <p>История входов отсутствует</p>
+                                </div>
+                            `;
+                            return;
+                        }
+
+                        entries = snapshot.docs.map(function(doc) {
+                            const data = doc.data();
+                            return {
+                                loginAt: data.loginAt,
+                                ipAddress: data.ipAddress || 'N/A',
+                                userAgent: data.userAgent || '',
+                                isAdminPage: data.isAdminPage
+                            };
+                        });
+                    }
+                }
+
+                if (entries.length === 0) {
                     contentDiv.innerHTML = `
                         <div class="empty-state">
                             <p>История входов отсутствует</p>
@@ -992,21 +1107,23 @@
                         <tbody>
                 `;
 
-                snapshot.docs.forEach(doc => {
-                    const data = doc.data();
+                entries.forEach(function(entry) {
                     let loginTime = 'N/A';
-                    
-                    if (data.loginAt) {
+
+                    if (entry.loginAt) {
                         try {
                             let loginDate;
-                            if (data.loginAt.toDate) {
-                                loginDate = data.loginAt.toDate();
-                            } else if (data.loginAt.seconds) {
-                                loginDate = new Date(data.loginAt.seconds * 1000);
+                            if (entry.loginAt.toDate) {
+                                // Firestore Timestamp
+                                loginDate = entry.loginAt.toDate();
+                            } else if (entry.loginAt.seconds) {
+                                loginDate = new Date(entry.loginAt.seconds * 1000);
                             } else {
-                                loginDate = new Date(data.loginAt);
+                                // PocketBase строка или обычная дата
+                                var dateStr = entry.loginAt.replace(' ', 'T');
+                                loginDate = new Date(dateStr);
                             }
-                            
+
                             if (loginDate instanceof Date && !isNaN(loginDate.getTime())) {
                                 loginTime = loginDate.toLocaleString('ru-RU');
                             }
@@ -1015,13 +1132,13 @@
                         }
                     }
 
-                    const browser = data.userAgent ? data.userAgent.split(' ').slice(-2).join(' ') : 'N/A';
-                    const page = data.isAdminPage ? 'Админ-панель' : 'Обычная страница';
+                    const browser = entry.userAgent ? entry.userAgent.split(' ').slice(-2).join(' ') : 'N/A';
+                    const page = entry.isAdminPage ? 'Админ-панель' : 'Обычная страница';
 
                     html += `
                         <tr>
                             <td>${loginTime}</td>
-                            <td>${escapeHtml(data.ipAddress || 'N/A')}</td>
+                            <td>${escapeHtml(entry.ipAddress || 'N/A')}</td>
                             <td style="font-size: 11px;">${escapeHtml(browser)}</td>
                             <td>${page}</td>
                         </tr>

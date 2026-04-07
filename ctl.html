@@ -97,8 +97,8 @@
         <span>🏐 Volleyball Scoreboard - Управление табло</span>
         <div>
             <span id="userInfo">Загрузка...</span>
-            <a href="admin.html" id="adminLink" style="display:none;">Админ-панель</a>
-            <a href="online.html">Результаты</a>
+            <a href="admin.html" id="adminLink" style="display:none;" target="_blank">Админ-панель</a>
+            <a href="online.html" target="_blank">Результаты</a>
             <a href="#" onclick="AuthModule.logout(); return false;">Выйти</a>
         </div>
     </div>
@@ -111,13 +111,13 @@
             </div>
             <div class="panel-body">
               <!--input type="checkbox" class="checkbox" id="show"></input-->
-              <button data-val="0" class="btn show-select" type="button">none</button>
-              <button data-val="1" class="btn show-select" type="button">top</button>
-              <button data-val="2" class="btn show-select" type="button">bottom</button>
-              <button data-val="4" class="btn show-select" type="button">top label</button>
-              <button data-val="6" class="btn show-select" type="button">top label+bottom</button>
+              <button data-val="0" class="btn show-select" type="button">нет</button>
+              <button data-val="1" class="btn show-select" type="button">верх</button>
+              <button data-val="2" class="btn show-select" type="button">низ</button>
+              <button data-val="4" class="btn show-select" type="button">верх надпись</button>
+              <button data-val="6" class="btn show-select" type="button">верх надпись+низ</button>
               <input id="custom_label" value="Разминка">
-              <button class="label-btn btn btn-info" type="button">save</button>
+              <button class="label-btn btn btn-info" type="button">сохранить</button>
             </div>
 
           </div>
@@ -252,8 +252,8 @@
                 <input type="color" id="col_away_team" value="#00ff00" style="width:50%;">
               </div>
               <div class="panel-body">
-                <button class="names-btn btn btn-info hidden" type="button">save</button>
-                <button class="reset-btn btn btn-info" type="button">reset</button>
+                <button class="names-btn btn btn-info hidden" type="button">сохранить</button>
+                <button class="reset-btn btn btn-info" type="button">сброс</button>
               </div>
             </div>
           </div>

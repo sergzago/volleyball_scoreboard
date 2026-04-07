@@ -7,7 +7,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
-    "setup": "node scripts/setup-simple.js"
+    "setup": "node scripts/setup-simple.js",
+    "create-collections": "node scripts/create-collections.js"
   },
   "keywords": [
     "volleyball",
@@ -21,7 +22,8 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "firebase-admin": "^12.7.0",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "pocketbase": "^0.21.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",

@@ -111,6 +111,242 @@
   }
 
   // ============================================================================
+  // POCKETBASE COLLECTION SCHEMA DEFINITIONS
+  // ============================================================================
+
+  /**
+   * Определения схем коллекций PocketBase
+   * Каждая коллекция содержит поля, необходимые для работы приложения
+   */
+  var POCKETBASE_COLLECTION_SCHEMAS = {
+    // Коллекция пользователей для авторизации
+    // Это auth collection — PocketBase автоматически хеширует пароли
+    // (аналогично встроенной коллекции 'users')
+    scoreusers: {
+      name: 'scoreusers',
+      type: 'auth', // auth collection — пароли хешируются автоматически
+      fields: [
+        { name: 'username', type: 'text', required: true, unique: true },
+        { name: 'email', type: 'email', required: true, unique: true },
+        { name: 'name', type: 'text', required: false },
+        { name: 'role', type: 'select', required: false, values: ['admin', 'user', 'moderator'] },
+        { name: 'avatar', type: 'file', required: false }
+      ],
+      authOptions: {
+        allowEmailAuth: true,
+        allowOAuth2Auth: true,
+        allowUsernameAuth: true,
+        exceptEmailDomains: null,
+        manageRule: null,
+        minPasswordLength: 8,
+        onlyEmailDomains: null,
+        onlyVerified: false,
+        requireEmail: false
+      }
+    },
+    volleyball: {
+      name: 'volleyball',
+      type: 'base',
+      fields: [
+        { name: 'id', type: 'text', required: false, unique: true },
+        { name: 'home_team', type: 'text', required: false },
+        { name: 'away_team', type: 'text', required: false },
+        { name: 'home_score', type: 'number', required: false },
+        { name: 'away_score', type: 'number', required: false },
+        { name: 'home_sets', type: 'number', required: false },
+        { name: 'away_sets', type: 'number', required: false },
+        { name: 'current_set', type: 'number', required: false },
+        { name: 'home_sets_history', type: 'json', required: false },
+        { name: 'away_sets_history', type: 'json', required: false },
+        { name: 'serving_team', type: 'text', required: false },
+        { name: 'status', type: 'select', required: false, values: ['not_started', 'in_progress', 'finished', 'paused'] },
+        { name: 'match_type', type: 'select', required: false, values: ['classic', 'beach'] },
+        { name: 'lastEdited', type: 'date', required: false },
+        { name: 'created', type: 'date', required: false }
+      ]
+    },
+    matches: {
+      name: 'matches',
+      type: 'base',
+      fields: [
+        { name: 'game_id', type: 'text', required: false },
+        { name: 'date_time', type: 'date', required: false },
+        { name: 'home_team', type: 'text', required: false },
+        { name: 'away_team', type: 'text', required: false },
+        { name: 'home_score', type: 'number', required: false },
+        { name: 'away_score', type: 'number', required: false },
+        { name: 'home_sets', type: 'number', required: false },
+        { name: 'away_sets', type: 'number', required: false },
+        { name: 'match_type', type: 'select', required: false, values: ['classic', 'beach'] },
+        { name: 'is_deleted', type: 'bool', required: false },
+        { name: 'deleted_at', type: 'date', required: false },
+        { name: 'notes', type: 'text', required: false }
+      ]
+    },
+    auth_log: {
+      name: 'auth_log',
+      type: 'base',
+      fields: [
+        { name: 'username', type: 'text', required: false },
+        { name: 'event', type: 'text', required: false },
+        { name: 'timestamp', type: 'date', required: false },
+        { name: 'ip_address', type: 'text', required: false },
+        { name: 'user_agent', type: 'text', required: false },
+        { name: 'details', type: 'json', required: false }
+      ]
+    }
+  };
+
+  /**
+   * Проверить существование коллекции в PocketBase
+   * @param {PocketBase} pb — клиент PocketBase
+   * @param {string} collectionName — имя коллекции
+   * @returns {Promise<boolean>}
+   */
+  function pbCollectionExists(pb, collectionName) {
+    return pb.collections.getList().then(function(collections) {
+      return collections.some(function(c) { return c.name === collectionName; });
+    });
+  }
+
+  /**
+   * Создать коллекцию в PocketBase с заданной схемой
+   * @param {PocketBase} pb — клиент PocketBase (с авторизацией администратора)
+   * @param {Object} schema — определение схемы коллекции
+   * @returns {Promise<Object>}
+   */
+  function pbCreateCollection(pb, schema) {
+    var collectionPayload = {
+      name: schema.name,
+      type: schema.type || 'base',
+      listRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
+      viewRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
+      createRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
+      updateRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
+      deleteRule: schema.type === 'auth' ? null : 'role = "admin"',
+      schema: schema.fields.map(function(field) {
+        var baseField = {
+          name: field.name,
+          type: field.type,
+          required: field.required || false,
+          unique: field.unique || false
+        };
+
+        // Добавляем специфичные параметры для разных типов полей
+        if (field.type === 'select') {
+          baseField.maxSelect = 1;
+          baseField.values = field.values || [];
+        } else if (field.type === 'text' && field.max !== undefined) {
+          baseField.max = field.max;
+        } else if (field.type === 'file') {
+          baseField.maxSelect = field.maxSelect || 1;
+          baseField.mimeTypes = field.mimeTypes || ['image/*'];
+          baseField.thumbs = field.thumbs || [];
+        }
+
+        return baseField;
+      })
+    };
+
+    // Для auth коллекций добавляем дополнительные опции
+    if (schema.type === 'auth' && schema.authOptions) {
+      collectionPayload.options = schema.authOptions;
+    }
+
+    return pb.collections.create(collectionPayload);
+  }
+
+  /**
+   * Проверить существование всех необходимых коллекций и создать их при необходимости
+   * 
+   * ВАЖНО: Из-за CORS ограничений в браузере, создание коллекций может не работать.
+   * Коллекции следует создавать через админ-панель PocketBase (http://your-server:8090/_/)
+   * или через серверный скрипт.
+   * 
+   * Эта функция выполняет проверку и даёт рекомендации.
+   * @returns {Promise<void>}
+   */
+  function ensurePocketBaseCollections() {
+    if (provider !== 'pocketbase') {
+      return Promise.resolve();
+    }
+
+    return init().then(function() {
+      var pb = getPocketBaseClient();
+
+      // Пробуем получить список коллекций
+      return pb.collections.getList().then(function(existingCollections) {
+        var existingNames = existingCollections.map(function(c) { return c.name; });
+        var requiredCollections = [
+          'volleyball',
+          'matches',
+          'auth_log'
+        ];
+
+        var missingCollections = requiredCollections.filter(function(name) {
+          return !existingNames.includes(name);
+        });
+
+        if (missingCollections.length > 0) {
+          console.warn('[DB] Отсутствуют необходимые коллекции в PocketBase:');
+          console.warn('[DB]   - ' + missingCollections.join('\n[DB]   - '));
+          console.warn('[DB]');
+          console.warn('[DB] Для создания коллекций выполните одно из действий:');
+          console.warn('[DB] 1. Откройте админ-панель PocketBase: ' + DB_CONFIG.pocketbase.url + '/_/');
+          console.warn('[DB]    и создайте коллекции вручную');
+          console.warn('[DB] 2. Запустите серверный скрипт: node server/scripts/create-collections.js');
+          console.warn('[DB] 3. Импортируйте файл pocketbase_collections_export.json');
+          console.warn('[DB]');
+          console.warn('[DB] Операции с несуществующими коллекциями будут завершаться с ошибкой!');
+
+          // Выбрасываем ошибку, чтобы привлечь внимание
+          throw new Error(
+            'Отсутствуют коллекции в PocketBase: ' + missingCollections.join(', ') +
+            '. Создайте их через админ-панель: ' + DB_CONFIG.pocketbase.url + '/_/'
+          );
+        }
+
+        console.log('[DB] Все необходимые коллекции найдены в PocketBase');
+        return Promise.resolve();
+      }).catch(function(err) {
+        // Проверяем, является ли ошибка CORS
+        var isCorsError = err.message && (
+          err.message.includes('Failed to fetch') ||
+          err.message.includes('CORS') ||
+          err.message.includes('cors') ||
+          err.code === 0
+        );
+
+        if (isCorsError) {
+          console.error('[DB] ⚠️ ОШИБКА CORS: Браузер блокирует запросы к PocketBase');
+          console.error('[DB]');
+          console.error('[DB] Причина: PocketBase не настроен для обработки CORS запросов');
+          console.error('[DB]');
+          console.error('[DB] Решение (выберите один вариант):');
+          console.error('[DB]');
+          console.error('[DB] 1. Запустить PocketBase с флагом --origins (рекомендуется):');
+          console.error('[DB]    ./pocketbase serve --http="0.0.0.0:8090" --origins="*"');
+          console.error('[DB]');
+          console.error('[DB] 2. Настроить Nginx как reverse proxy с CORS заголовками');
+          console.error('[DB]    См. файл CORS_SETUP.md');
+          console.error('[DB]');
+          console.error('[DB] 3. Для разработки: запустить Chrome с флагом:');
+          console.error('[DB]    google-chrome --disable-web-security --user-data-dir="/tmp/chrome-dev"');
+          console.error('[DB]');
+          console.error('[DB] Подробности: файл CORS_SETUP.md в корне проекта');
+        } else {
+          // Не удалось получить список коллекций (другая ошибка)
+          console.error('[DB] Не удалось проверить существование коллекций PocketBase:', err.message);
+          console.warn('[DB] Убедитесь, что коллекции volleyball, matches, auth_log существуют');
+          console.warn('[DB] Проверьте через админ-панель: ' + DB_CONFIG.pocketbase.url + '/_/');
+        }
+        // Не блокируем работу — даём приложению попытаться работать
+        return Promise.resolve();
+      });
+    });
+  }
+
+  // ============================================================================
   // INIT
   // ============================================================================
 
@@ -183,10 +419,14 @@
             });
         }
 
-        // PocketBase — авторизуемся напрямую по username
+        // PocketBase — авторизуемся через настраиваемую коллекцию (scoreusers)
         var pb = getPocketBaseClient();
         var loginUsername = username.toLowerCase();
-        return pb.collection('users').authWithPassword(loginUsername, password)
+        var usersCollection = DB_CONFIG.collections.USERS;
+
+        // Для PocketBase: если коллекция — auth (scoreusers), используем authWithPassword
+        // Если коллекция не auth, используем поиск + проверку хеша
+        return pb.collection(usersCollection).authWithPassword(loginUsername, password)
           .then(function(authData) {
             return {
               username: authData.record.username || loginUsername,
@@ -198,7 +438,8 @@
           })
           .catch(function() {
             // Fallback: пробуем войти по email
-            return pb.collection('users').authWithPassword(loginUsername + '@volleyball.local', password)
+            var loginEmail = username.toLowerCase() + '@volleyball.local';
+            return pb.collection(usersCollection).authWithPassword(loginEmail, password)
               .then(function(authData) {
                 return {
                   username: loginUsername,
@@ -249,7 +490,7 @@
         return;
       }
 
-      // PocketBase — проверяем сессию во встроенной users
+      // PocketBase — проверяем сессию в настраиваемой коллекции пользователей
       var pb = getPocketBaseClient();
       if (pb.authStore.isValid && pb.authStore.model) {
         var record = pb.authStore.model;
@@ -295,11 +536,12 @@
           });
       }
 
-      // PocketBase — создаём пользователя во встроенной users
+      // PocketBase — создаём пользователя в настраиваемой коллекции
       var pb = getPocketBaseClient();
+      var usersCollection = DB_CONFIG.collections.USERS;
       return pb.admins.authWithPassword(DB_CONFIG.pocketbase.adminEmail, DB_CONFIG.pocketbase.adminPassword)
         .then(function() {
-          return pb.collection('users').create({
+          return pb.collection(usersCollection).create({
             username: username.toLowerCase(),
             email: email,
             password: password,
@@ -321,14 +563,15 @@
         return Promise.reject(new Error('Удаление пользователей доступно только через Admin SDK'));
       }
 
-      // PocketBase — удаляем пользователя из встроенной users
+      // PocketBase — удаляем пользователя из настраиваемой коллекции
       var pb = getPocketBaseClient();
+      var usersCollection = DB_CONFIG.collections.USERS;
       return pb.admins.authWithPassword(DB_CONFIG.pocketbase.adminEmail, DB_CONFIG.pocketbase.adminPassword)
         .then(function() {
-          return pb.collection('users').getFirstListItem('username="' + username.toLowerCase() + '"');
+          return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"');
         })
         .then(function(record) {
-          return pb.collection('users').delete(record.id);
+          return pb.collection(usersCollection).delete(record.id);
         });
     },
 
@@ -345,7 +588,8 @@
       }
 
       var pb = getPocketBaseClient();
-      return pb.collection('users').getFirstListItem('username="' + username.toLowerCase() + '"')
+      var usersCollection = DB_CONFIG.collections.USERS;
+      return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"')
         .then(function(record) {
           return record.role || 'user';
         })
@@ -725,7 +969,8 @@
       }
 
       var pb = getPocketBaseClient();
-      return pb.collection('users').getFirstListItem('username="' + username.toLowerCase() + '"')
+      var usersCollection = DB_CONFIG.collections.USERS;
+      return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"')
         .catch(function() { return null; });
     },
 
@@ -741,9 +986,10 @@
       }
 
       var pb = getPocketBaseClient();
-      return pb.collection('users').getFirstListItem('username="' + username.toLowerCase() + '"')
+      var usersCollection = DB_CONFIG.collections.USERS;
+      return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"')
         .then(function(record) {
-          return pb.collection('users').update(record.id, data);
+          return pb.collection(usersCollection).update(record.id, data);
         });
     },
 
@@ -759,9 +1005,10 @@
       }
 
       var pb = getPocketBaseClient();
-      return pb.collection('users').getFirstListItem('username="' + username.toLowerCase() + '"')
+      var usersCollection = DB_CONFIG.collections.USERS;
+      return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"')
         .then(function(record) {
-          return pb.collection('users').delete(record.id);
+          return pb.collection(usersCollection).delete(record.id);
         });
     }
   };
@@ -781,7 +1028,9 @@
     // Получение текущего провайдера
     getProvider: function() { return provider; },
     // Проверка инициализации
-    isInitialized: function() { return initialized; }
+    isInitialized: function() { return initialized; },
+    // Проверка и создание коллекций PocketBase (публичный API)
+    ensureCollections: ensurePocketBaseCollections
   };
 
 })(typeof window !== 'undefined' ? window : global);

@@ -150,6 +150,9 @@ $(document).ready(function() {
     if(typeof scoreboard_data['tournament_name'] === 'undefined'){
       update_db({tournament_name: 'НВЛ'});
     }
+    if(typeof scoreboard_data['venue'] === 'undefined'){
+      update_db({venue: ''});
+    }
     $('#in_venue').val(scoreboard_data['venue'] || '');
     $('#col_home_team').val(scoreboard_data['home_color'])
     $('#col_away_team').val(scoreboard_data['away_color'])
@@ -822,6 +825,7 @@ $(document).ready(function(){
     console.log(update);
     update_db(update);
   });
+
   $(".reset-btn").click(function(){
     var beachEnabled=isBeachMode();
     var invertTablo = !!scoreboard_data['invert_tablo'];
@@ -829,8 +833,6 @@ $(document).ready(function(){
 
     // Получаем последнюю запись о матче для этой игры
     var lastMatchId = scoreboard_data['last_match_id'];
-    // Сохраняем значение поля "Зал" - оно не должно сбрасываться
-    var venue = scoreboard_data['venue'] || '';
 
     // Формируем данные для сброса
     var resetData = {
@@ -846,7 +848,7 @@ $(document).ready(function(){
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
       tournament_name: $("#in_tournament").val(),
-      venue: venue, // Сохраняем значение поля "Зал"
+      venue: $("#in_venue").val() || "",
       home_sets:0,
       away_sets:0,
       beach_mode:beachEnabled,
@@ -884,6 +886,7 @@ $(document).ready(function(){
           $('#in_home_team').val(scoreboard_data['home_team'] || '');
           $('#in_away_team').val(scoreboard_data['away_team'] || '');
           $('#in_tournament').val(scoreboard_data['tournament_name'] || 'НВЛ');
+          $('#in_venue').val(scoreboard_data['venue'] || '');
           $('#col_home_team').val(scoreboard_data['home_color'] || '');
           $('#col_away_team').val(scoreboard_data['away_color'] || '');
           $('#home_score').html('0');
