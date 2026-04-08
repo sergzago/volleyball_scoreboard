@@ -4,7 +4,7 @@
  * ⚠️  Скопируйте этот файл в credentials.js и заполните реальными значениями:
  *     cp credentials.example.js credentials.js
  *
- * 🔒 Файл credentials.js добавлен в .gitignore и не синхронизируется через Git
+ * 🔒 Файл credentials.js добавлен в .gitignore и не синхронизируется через Git 
  */
 
 var CREDENTIALS = {
