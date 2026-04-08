@@ -33,7 +33,8 @@ async function requireAuth(req, res, next) {
     } else if (dbConfig.provider === 'pocketbase') {
       // PocketBase: проверяем токен через SDK
       const { client } = dbConfig;
-      const record = await client.collection('_users').getFirstListItem(`token = "${token}"`)
+      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
+      const record = await client.collection(usersCollection).getFirstListItem(`token = "${token}"`)
         .catch(() => null);
 
       if (!record) {

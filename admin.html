@@ -332,7 +332,7 @@
                     </div>
                     <div class="form-group">
                         <label for="newPassword">Пароль *</label>
-                        <input type="password" id="newPassword" required placeholder="Минимум 6 символов" minlength="6">
+                        <input type="password" id="newPassword" required placeholder="Минимум 8 символов" minlength="8">
                     </div>
                     <div class="form-group">
                         <label for="newDisplayName">Отображаемое имя</label>
@@ -378,7 +378,7 @@
                 </div>
                 <div class="form-group">
                     <label for="editPassword">Новый пароль</label>
-                    <input type="password" id="editPassword" placeholder="Оставьте пустым для сохранения текущего" minlength="6">
+                    <input type="password" id="editPassword" placeholder="Оставьте пустым для сохранения текущего" minlength="8">
                 </div>
                 <div class="form-group">
                     <label for="editDisplayName">Имя</label>
@@ -906,7 +906,7 @@
                 if (error.code === 'auth/email-already-in-use') {
                     errorMsg = 'Пользователь с таким именем уже существует';
                 } else if (error.code === 'auth/weak-password') {
-                    errorMsg = 'Слишком слабый пароль. Минимум 6 символов';
+                    errorMsg = 'Слишком слабый пароль. Минимум 8 символов';
                 } else if (error.code === 'auth/invalid-email') {
                     errorMsg = 'Неверное имя пользователя';
                 }
@@ -949,33 +949,54 @@
             const role = document.getElementById('editRole').value;
 
             try {
-                // Обновляем данные пользователя через DB
-                const userData = await DB.users.get(uid);
+                const provider = DB.getProvider();
 
-                if (!userData) {
-                    throw new Error('Пользователь не найден');
-                }
+                if (provider === 'pocketbase') {
+                    // PocketBase: обновляем напрямую через SDK
+                    const pb = await getPocketBaseClientForAdmin();
+                    if (!pb) {
+                        throw new Error('Не удалось подключиться к PocketBase');
+                    }
 
-                const username = userData.username || uid;
+                    const usersCollection = DB_CONFIG.collections.USERS;
+                    const updateData = {
+                        displayName: displayName,
+                        role: role
+                    };
+                    if (password && password.length >= 8) {
+                        updateData.password = password;
+                        updateData.passwordConfirm = password;
+                    } else if (password && password.length > 0 && password.length < 8) {
+                        showAlert('Пароль должен быть минимум 8 символов', 'error');
+                        return;
+                    }
 
-                // Обновляем через DB
-                await DB.users.update(uid, {
-                    displayName: displayName || userData.displayName,
-                    role: role
-                });
-
-                // Если указан пароль, показываем инструкцию
-                if (password) {
-                    showAlert(
-                        `Данные обновлены в Firestore.\n\n` +
-                        `⚠️ Для смены пароля используйте Firebase Console:\n` +
-                        `Authentication → Users → Найдите ${email} → Reset password`,
-                        'success'
-                    );
-                } else {
+                    await pb.collection(usersCollection).update(uid, updateData);
                     showAlert('Пользователь успешно обновлен', 'success');
+                } else {
+                    // Firebase: обновляем через DB
+                    const userData = await DB.users.get(uid);
+                    if (!userData) {
+                        throw new Error('Пользователь не найден');
+                    }
+
+                    await DB.users.update(uid, {
+                        displayName: displayName || userData.displayName,
+                        role: role
+                    });
+
+                    if (password) {
+                        showAlert(
+                            `Данные обновлены в Firestore.\n\n` +
+                            `⚠️ Для смены пароля используйте Firebase Console:\n` +
+                            `Authentication → Users → Найдите ${email} → Reset password`,
+                            'success'
+                        );
+                    } else {
+                        showAlert('Пользователь успешно обновлен', 'success');
+                    }
                 }
-                
+
                 closeEditModal();
                 loadUsers();
 

@@ -14,7 +14,7 @@
 
 var DB_CONFIG = {
   // Текущий провайдер: 'firebase' | 'pocketbase'
-  provider: 'firebase',
+  provider: 'pocketbase',
 
   // ============================================================================
   // FIREBASE КОНФИГУРАЦИЯ

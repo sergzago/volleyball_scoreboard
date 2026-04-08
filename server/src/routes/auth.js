@@ -60,7 +60,8 @@ router.post('/set-role', requireAdmin, async (req, res) => {
       });
     } else if (dbConfig.provider === 'pocketbase') {
       const dbAdapter = createDbAdapter(dbConfig);
-      await dbAdapter.client.collection('_users').update(uid, { role });
+      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
+      await dbAdapter.client.collection(usersCollection).update(uid, { role });
     }
 
     res.json({
@@ -97,7 +98,8 @@ router.get('/users', requireAdmin, async (req, res) => {
       }));
     } else if (dbConfig.provider === 'pocketbase') {
       const dbAdapter = createDbAdapter(dbConfig);
-      const records = await dbAdapter.client.collection('_users').getFullList();
+      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
+      const records = await dbAdapter.client.collection(usersCollection).getFullList();
       users = records.map(r => ({
         uid: r.id,
         email: r.email,
@@ -170,7 +172,8 @@ router.post('/users', requireAdmin, async (req, res) => {
       });
     } else if (dbConfig.provider === 'pocketbase') {
       const dbAdapter = createDbAdapter(dbConfig);
-      const record = await dbAdapter.client.collection('_users').create({
+      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
+      const record = await dbAdapter.client.collection(usersCollection).create({
         username: finalUsername.toLowerCase(),
         email: finalEmail,
         password,
@@ -239,6 +242,7 @@ router.put('/users/:uid', requireAdmin, async (req, res) => {
       });
     } else if (dbConfig.provider === 'pocketbase') {
       const dbAdapter = createDbAdapter(dbConfig);
+      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
       const updateData = {};
       if (email) updateData.email = email;
       if (password) {
@@ -248,7 +252,7 @@ router.put('/users/:uid', requireAdmin, async (req, res) => {
       if (displayName !== undefined) updateData.displayName = displayName;
       if (role) updateData.role = role;
 
-      const record = await dbAdapter.client.collection('_users').update(uid, updateData);
+      const record = await dbAdapter.client.collection(usersCollection).update(uid, updateData);
       res.json({
         success: true,
         user: {
@@ -289,7 +293,8 @@ router.delete('/users/:uid', requireAdmin, async (req, res) => {
       await dbConfig.admin.auth().deleteUser(uid);
     } else if (dbConfig.provider === 'pocketbase') {
       const dbAdapter = createDbAdapter(dbConfig);
-      await dbAdapter.client.collection('_users').delete(uid);
+      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
+      await dbAdapter.client.collection(usersCollection).delete(uid);
     }
 
     res.json({
