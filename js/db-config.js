@@ -33,7 +33,7 @@ var DB_CONFIG = {
   // POCKETBASE КОНФИГУРАЦИЯ
   // ============================================================================
   pocketbase: {
-    url: 'http://zago.my.to:8090',
+    url: 'https://zago.my.to/pb/',
     // Опции авторизации администратора (для серверных операций)
     adminEmail: 'supervisor@volleyball.local',
     adminPassword: 'Mer1in00'
