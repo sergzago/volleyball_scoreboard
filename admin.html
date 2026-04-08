@@ -9,6 +9,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Админ-панель - Управление пользователями</title>
     <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="credentials.js"></script>
     <script src="js/db-config.js"></script>
     <script src="js/db-interface.js"></script>
     <script src="js/auth.js"></script>
@@ -439,15 +440,15 @@
             if (_adminPbClient) return Promise.resolve(_adminPbClient);
             if (typeof PocketBase === 'undefined') return Promise.resolve(null);
             _adminPbClient = new PocketBase(DB_CONFIG.pocketbase.url);
-            // Авторизуемся как админ
-            return _adminPbClient.admins.authWithPassword(
-                DB_CONFIG.pocketbase.adminEmail,
-                DB_CONFIG.pocketbase.adminPassword
+            // Авторизуемся как технический пользователь приложения
+            return _adminPbClient.collection('app_users').authWithPassword(
+                DB_CONFIG.pocketbase.user_email,
+                DB_CONFIG.pocketbase.user_password
             ).then(function() {
                 return _adminPbClient;
-            }).catch(function() {
-                // Если не удалось авторизоваться, пробуем без админа
-                return _adminPbClient;
+            }).catch(function(err) {
+                console.error('Ошибка авторизации app_user:', err?.message || err);
+                return null;
             });
         }
 
@@ -960,7 +961,7 @@
 
                     const usersCollection = DB_CONFIG.collections.USERS;
                     const updateData = {
-                        displayName: displayName,
+                        name: displayName,
                         role: role
                     };
                     if (password && password.length >= 8) {
@@ -971,8 +972,15 @@
                         return;
                     }
 
-                    await pb.collection(usersCollection).update(uid, updateData);
-                    showAlert('Пользователь успешно обновлен', 'success');
+                    await pb.collection(usersCollection).update(uid, updateData)
+                        .then(function() {
+                            showAlert('Пользователь успешно обновлен', 'success');
+                        })
+                        .catch(function(err) {
+                            console.error('PB Update Error:', err);
+                            console.error('Update data:', JSON.stringify(updateData, null, 2));
+                            throw err;
+                        });
                 } else {
                     // Firebase: обновляем через DB
                     const userData = await DB.users.get(uid);

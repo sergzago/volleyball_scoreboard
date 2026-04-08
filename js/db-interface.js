@@ -539,8 +539,11 @@
       // PocketBase — создаём пользователя в настраиваемой коллекции
       var pb = getPocketBaseClient();
       var usersCollection = DB_CONFIG.collections.USERS;
-      return pb.admins.authWithPassword(DB_CONFIG.pocketbase.adminEmail, DB_CONFIG.pocketbase.adminPassword)
-        .then(function() {
+      // Авторизуемся как обычный пользователь приложения
+      return pb.collection('app_users').authWithPassword(
+        DB_CONFIG.pocketbase.user_email,
+        DB_CONFIG.pocketbase.user_password
+      ).then(function() {
           return pb.collection(usersCollection).create({
             username: username.toLowerCase(),
             email: email,
@@ -566,8 +569,11 @@
       // PocketBase — удаляем пользователя из настраиваемой коллекции
       var pb = getPocketBaseClient();
       var usersCollection = DB_CONFIG.collections.USERS;
-      return pb.admins.authWithPassword(DB_CONFIG.pocketbase.adminEmail, DB_CONFIG.pocketbase.adminPassword)
-        .then(function() {
+      // Авторизуемся как обычный пользователь приложения
+      return pb.collection('app_users').authWithPassword(
+        DB_CONFIG.pocketbase.user_email,
+        DB_CONFIG.pocketbase.user_password
+      ).then(function() {
           return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"');
         })
         .then(function(record) {

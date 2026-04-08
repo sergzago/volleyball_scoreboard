@@ -9,6 +9,14 @@
  */
 
 // ============================================================================
+// ИМПОРТ УЧЕТНЫХ ДАННЫХ
+// ============================================================================
+
+// Для браузера — загружаем credentials из отдельного файла (подключается в HTML)
+// Для Node.js — require('./credentials.js')
+var CREDENTIALS = (typeof CREDENTIALS !== 'undefined') ? CREDENTIALS : { firebase: {}, pocketbase: {} };
+
+// ============================================================================
 // ВЫБОР ПРОВАЙДЕРА БАЗЫ ДАННЫХ
 // ============================================================================
 
@@ -17,27 +25,14 @@ var DB_CONFIG = {
   provider: 'pocketbase',
 
   // ============================================================================
-  // FIREBASE КОНФИГУРАЦИЯ
+  // FIREBASE КОНФИГУРАЦИЯ (из credentials.js)
   // ============================================================================
-  firebase: {
-    apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
-    authDomain: "myvolleyscore.firebaseapp.com",
-    projectId: "myvolleyscore",
-    storageBucket: "myvolleyscore.firebasestorage.app",
-    messagingSenderId: "102858014506",
-    appId: "1:102858014506:web:aa67a16c0c281b06f3e853",
-    measurementId: "G-6MQ6ZLE52N"
-  },
+  firebase: CREDENTIALS.firebase || {},
 
   // ============================================================================
-  // POCKETBASE КОНФИГУРАЦИЯ
+  // POCKETBASE КОНФИГУРАЦИЯ (из credentials.js)
   // ============================================================================
-  pocketbase: {
-    url: 'https://zago.my.to/pb/',
-    // Опции авторизации администратора (для серверных операций)
-    adminEmail: 'supervisor@volleyball.local',
-    adminPassword: 'Mer1in00'
-  },
+  pocketbase: CREDENTIALS.pocketbase || {},
 
   // ============================================================================
   // НАЗВАНИЯ КОЛЛЕКЦИЙ (отдельно для каждого провайдера)
@@ -54,6 +49,9 @@ var DB_CONFIG = {
     USERS: 'scoreusers',
     AUTH_LOG: 'auth_log'
   },
+
+  // Техническая коллекция для обычных пользователей приложения (не для бизнес-логики)
+  pocketbaseAppUsersCollection: 'app_users',
 
   // ============================================================================
   // КОНСТАНТЫ МАТЧА
@@ -109,6 +107,19 @@ var firebaseConfig = DB_CONFIG.firebase;
 if (typeof module !== 'undefined' && module.exports) {
   var fs = require('fs');
   var path = require('path');
+  
+  // Загружаем учетные данные для Node.js
+  try {
+    CREDENTIALS = require('../credentials.js');
+  } catch (e) {
+    console.warn('credentials.js не найден, используем пустые значения');
+    CREDENTIALS = { firebase: {}, pocketbase: {} };
+  }
+  
+  // Обновляем DB_CONFIG после загрузки credentials
+  DB_CONFIG.firebase = CREDENTIALS.firebase || {};
+  DB_CONFIG.pocketbase = CREDENTIALS.pocketbase || {};
+  
   try {
     LOGO_BASE64 = fs.readFileSync(path.join(__dirname, '..', LOGO_FILE_NAME), 'utf8').trim();
   } catch (e) {
@@ -117,6 +128,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   module.exports = {
     DB_CONFIG: DB_CONFIG,
+    CREDENTIALS: CREDENTIALS,
     COLLECTIONS: COLLECTIONS,
     VOLLEYBALL_COLLECTION: VOLLEYBALL_COLLECTION,
     MATCHES_COLLECTION: MATCHES_COLLECTION,
@@ -124,7 +136,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ENABLE_AUTH: ENABLE_AUTH,
     LOGO_BASE64: LOGO_BASE64,
     LOGO_FILE_NAME: LOGO_FILE_NAME,
-    firebaseConfig: firebaseConfig // для обратной совместимости
+    firebaseConfig: firebaseConfig
   };
 }
 
