@@ -16,6 +16,34 @@ function getService(req) {
 }
 
 /**
+ * @route   POST /api/scoreboard
+ * @desc    Создать новую игру
+ */
+router.post('/', async (req, res, next) => {
+  try {
+    const { game_id, ...data } = req.body;
+
+    if (!game_id) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'game_id is required',
+      });
+    }
+
+    const result = await getService(req).createScoreboard(game_id, data);
+    res.status(201).json(result);
+  } catch (err) {
+    if (err.message && err.message.startsWith('Scoreboard with id')) {
+      return res.status(409).json({
+        error: 'Conflict',
+        message: err.message,
+      });
+    }
+    next(err);
+  }
+});
+
+/**
  * @route   GET /api/scoreboard/:game_id
  * @desc    Получить состояние табло
  */

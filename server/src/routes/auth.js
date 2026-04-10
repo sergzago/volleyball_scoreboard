@@ -1,14 +1,153 @@
 /**
- * Маршруты для аутентификации и управления пользователями
+ * Маршруты для аутентификации
  * Поддерживает Firebase и PocketBase
+ *
+ * Управление пользователями осуществляется через:
+ * - Firebase Console (Firebase Auth)
+ * - PocketBase Admin Dashboard (/_/)
  */
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { createDbAdapter } = require('../services/dbAdapter');
+const { requireAuth } = require('../middleware/auth');
+
+// Загружаем credentials для Firebase API key
+let firebaseApiKey = null;
+try {
+  const credentials = require('../../credentials.js');
+  firebaseApiKey = credentials?.firebase?.apiKey || process.env.FIREBASE_API_KEY;
+} catch {
+  firebaseApiKey = process.env.FIREBASE_API_KEY;
+}
+
+const USERS_COLLECTION = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
 
 /**
- * POST /api/auth/me
+ * POST /api/auth/login
+ * Войти по username/email и паролю, получить токен
+ */
+router.post('/login', async (req, res) => {
+  try {
+    const { identity, password } = req.body;
+
+    if (!identity || !password) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Требуется identity и password'
+      });
+    }
+
+    const dbConfig = req.app.locals.db;
+
+    if (dbConfig.provider === 'firebase') {
+      // Firebase: получаем ID token через Google Identity Toolkit API
+      const email = identity.includes('@') ? identity : `${identity.toLowerCase()}@volleyball.local`;
+
+      const response = await fetch(
+        'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            returnSecureToken: true
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        let message = 'Неверные учётные данные';
+        if (error.error?.message === 'INVALID_LOGIN_CREDENTIALS') {
+          message = 'Пользователь не найден или неверный пароль';
+        } else if (error.error?.message === 'USER_DISABLED') {
+          message = 'Учётная запись заблокирована';
+        } else if (error.error?.message === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
+          message = 'Слишком много попыток входа. Попробуйте позже';
+        }
+        return res.status(401).json({ error: 'Unauthorized', message });
+      }
+
+      const data = await response.json();
+
+      // Получаем роль пользователя из Firestore
+      let role = 'user';
+      const username = email.split('@')[0];
+      try {
+        const userDoc = await dbConfig.db
+          .collection(process.env.FIREBASE_USERS_COLLECTION || 'users')
+          .doc(username)
+          .get();
+        if (userDoc.exists && userDoc.data().role) {
+          role = userDoc.data().role;
+        }
+      } catch {
+        // Роль по умолчанию — 'user'
+      }
+
+      res.json({
+        token: data.idToken,
+        refreshToken: data.refreshToken,
+        expiresIn: parseInt(data.expiresIn, 10),
+        user: {
+          uid: data.localId,
+          email: data.email,
+          username,
+          role,
+          displayName: data.displayName || username
+        }
+      });
+
+    } else if (dbConfig.provider === 'pocketbase') {
+      // PocketBase: авторизуемся через коллекцию scoreusers
+      const pb = dbConfig.client;
+      let authData;
+
+      // Пробуем войти по username
+      try {
+        authData = await pb.collection(USERS_COLLECTION).authWithPassword(identity.toLowerCase(), password);
+      } catch {
+        // Fallback: пробуем по email
+        const email = identity.includes('@') ? identity : `${identity.toLowerCase()}@volleyball.local`;
+        authData = await pb.collection(USERS_COLLECTION).authWithPassword(email, password);
+      }
+
+      res.json({
+        token: authData.token,
+        refreshToken: authData.token, // PocketBase использует один токен
+        expiresIn: 604800, // 7 дней (стандарт PocketBase)
+        user: {
+          uid: authData.record.id,
+          email: authData.record.email,
+          username: authData.record.username || authData.record.email.split('@')[0],
+          role: authData.record.role || 'user',
+          displayName: authData.record.name || authData.record.username || identity
+        }
+      });
+
+    } else {
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Unknown database provider'
+      });
+    }
+  } catch (error) {
+    console.error('Login error:', error.message);
+
+    let message = 'Неверные учётные данные';
+    if (error.message?.includes('Failed to authenticate')) {
+      message = 'Пользователь не найден или неверный пароль';
+    }
+
+    res.status(401).json({
+      error: 'Unauthorized',
+      message
+    });
+  }
+});
+
+/**
+ * GET /api/auth/me
  * Получить информацию о текущем пользователе
  */
 router.get('/me', requireAuth, async (req, res) => {
@@ -22,287 +161,6 @@ router.get('/me', requireAuth, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message
-    });
-  }
-});
-
-/**
- * POST /api/auth/set-role
- * Установить роль пользователя (только админ)
- */
-router.post('/set-role', requireAdmin, async (req, res) => {
-  try {
-    const { uid, role } = req.body;
-
-    if (!uid || !role) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Требуется uid и role'
-      });
-    }
-
-    if (!['admin', 'user'].includes(role)) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Роль должна быть "admin" или "user"'
-      });
-    }
-
-    const dbConfig = req.app.locals.db;
-
-    if (dbConfig.provider === 'firebase') {
-      await dbConfig.admin.auth().setCustomUserClaims(uid, {
-        role,
-        admin: role === 'admin'
-      });
-    } else if (dbConfig.provider === 'pocketbase') {
-      const dbAdapter = createDbAdapter(dbConfig);
-      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
-      await dbAdapter.client.collection(usersCollection).update(uid, { role });
-    }
-
-    res.json({
-      success: true,
-      message: `Роль пользователя ${role} установлена успешно`
-    });
-  } catch (error) {
-    console.error('Set role error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message
-    });
-  }
-});
-
-/**
- * GET /api/auth/users
- * Получить список всех пользователей (только админ)
- */
-router.get('/users', requireAdmin, async (req, res) => {
-  try {
-    const dbConfig = req.app.locals.db;
-    let users = [];
-
-    if (dbConfig.provider === 'firebase') {
-      const listUsersResult = await dbConfig.admin.auth().listUsers();
-      users = listUsersResult.users.map(userRecord => ({
-        uid: userRecord.uid,
-        email: userRecord.email,
-        displayName: userRecord.displayName,
-        role: userRecord.customClaims?.admin ? 'admin' : 'user',
-        createdAt: userRecord.metadata.creationTime,
-        lastLoginAt: userRecord.metadata.lastSignInTime
-      }));
-    } else if (dbConfig.provider === 'pocketbase') {
-      const dbAdapter = createDbAdapter(dbConfig);
-      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
-      const records = await dbAdapter.client.collection(usersCollection).getFullList();
-      users = records.map(r => ({
-        uid: r.id,
-        email: r.email,
-        displayName: r.displayName,
-        username: r.username,
-        role: r.role || 'user',
-        createdAt: r.created,
-        lastLoginAt: r.lastLoginAt
-      }));
-    }
-
-    res.json({ users });
-  } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message
-    });
-  }
-});
-
-/**
- * POST /api/auth/users
- * Создать нового пользователя (только админ)
- */
-router.post('/users', requireAdmin, async (req, res) => {
-  try {
-    const { username, email, password, displayName, role = 'user' } = req.body;
-
-    if (!username && !email) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Требуется username или email'
-      });
-    }
-
-    if (!password) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Требуется пароль'
-      });
-    }
-
-    const dbConfig = req.app.locals.db;
-    const finalEmail = email || `${username.toLowerCase()}@volleyball.local`;
-    const finalUsername = username || email.split('@')[0];
-    const finalDisplayName = displayName || finalUsername;
-
-    if (dbConfig.provider === 'firebase') {
-      const userRecord = await dbConfig.admin.auth().createUser({
-        email: finalEmail,
-        password,
-        displayName: finalDisplayName
-      });
-
-      await dbConfig.admin.auth().setCustomUserClaims(userRecord.uid, {
-        role,
-        admin: role === 'admin'
-      });
-
-      res.status(201).json({
-        success: true,
-        user: {
-          uid: userRecord.uid,
-          email: finalEmail,
-          username: finalUsername,
-          displayName: finalDisplayName,
-          role
-        }
-      });
-    } else if (dbConfig.provider === 'pocketbase') {
-      const dbAdapter = createDbAdapter(dbConfig);
-      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
-      const record = await dbAdapter.client.collection(usersCollection).create({
-        username: finalUsername.toLowerCase(),
-        email: finalEmail,
-        password,
-        passwordConfirm: password,
-        displayName: finalDisplayName,
-        role,
-        emailVisibility: true
-      });
-
-      res.status(201).json({
-        success: true,
-        user: {
-          uid: record.id,
-          email: record.email,
-          username: record.username,
-          displayName: record.displayName,
-          role
-        }
-      });
-    }
-  } catch (error) {
-    console.error('Create user error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message
-    });
-  }
-});
-
-/**
- * PUT /api/auth/users/:uid
- * Обновить пользователя (только админ)
- */
-router.put('/users/:uid', requireAdmin, async (req, res) => {
-  try {
-    const { uid } = req.params;
-    const { email, password, displayName, role } = req.body;
-
-    const dbConfig = req.app.locals.db;
-
-    if (dbConfig.provider === 'firebase') {
-      const updateData = {};
-      if (email) updateData.email = email;
-      if (password) updateData.password = password;
-      if (displayName !== undefined) updateData.displayName = displayName;
-
-      if (Object.keys(updateData).length > 0) {
-        await dbConfig.admin.auth().updateUser(uid, updateData);
-      }
-      if (role) {
-        await dbConfig.admin.auth().setCustomUserClaims(uid, {
-          role,
-          admin: role === 'admin'
-        });
-      }
-
-      const updatedUser = await dbConfig.admin.auth().getUser(uid);
-      res.json({
-        success: true,
-        user: {
-          uid: updatedUser.uid,
-          email: updatedUser.email,
-          displayName: updatedUser.displayName,
-          role: updatedUser.customClaims?.admin ? 'admin' : 'user'
-        }
-      });
-    } else if (dbConfig.provider === 'pocketbase') {
-      const dbAdapter = createDbAdapter(dbConfig);
-      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
-      const updateData = {};
-      if (email) updateData.email = email;
-      if (password) {
-        updateData.password = password;
-        updateData.passwordConfirm = password;
-      }
-      if (displayName !== undefined) updateData.displayName = displayName;
-      if (role) updateData.role = role;
-
-      const record = await dbAdapter.client.collection(usersCollection).update(uid, updateData);
-      res.json({
-        success: true,
-        user: {
-          uid: record.id,
-          email: record.email,
-          displayName: record.displayName,
-          role: record.role || 'user'
-        }
-      });
-    }
-  } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message
-    });
-  }
-});
-
-/**
- * DELETE /api/auth/users/:uid
- * Удалить пользователя (только админ)
- */
-router.delete('/users/:uid', requireAdmin, async (req, res) => {
-  try {
-    const { uid } = req.params;
-
-    if (uid === req.user.uid) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Нельзя удалить самого себя'
-      });
-    }
-
-    const dbConfig = req.app.locals.db;
-
-    if (dbConfig.provider === 'firebase') {
-      await dbConfig.admin.auth().deleteUser(uid);
-    } else if (dbConfig.provider === 'pocketbase') {
-      const dbAdapter = createDbAdapter(dbConfig);
-      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
-      await dbAdapter.client.collection(usersCollection).delete(uid);
-    }
-
-    res.json({
-      success: true,
-      message: 'Пользователь успешно удален'
-    });
-  } catch (error) {
-    console.error('Delete user error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message

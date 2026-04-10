@@ -2,57 +2,76 @@
 
 ## Обзор
 
-Система авторизации на основе **Firebase Authentication** с поддержкой двух ролей:
-- 👤 **Пользователь (user)** - базовый доступ к управлению табло и просмотру результатов
-- 🔧 **Администратор (admin)** - полный доступ, включая управление пользователями
+Система авторизации с поддержкой двух провайдеров (**Firebase** и **PocketBase**) и двух ролей:
+- 👤 **Пользователь (user)** — базовый доступ к управлению табло и просмотру результатов
+- 🔧 **Администратор (admin)** — полный доступ к админ-панели
 
 ## Компоненты системы
 
-### Серверная часть (Express + Firebase Admin SDK)
+### Серверная часть (Express)
 
 **Файлы:**
-- `server/src/middleware/auth.js` - middleware для проверки авторизации и ролей
-- `server/src/routes/auth.js` - API endpoints для аутентификации
-- `server/scripts/create-admin.js` - скрипт создания первого администратора
+- `server/src/middleware/auth.js` — middleware для проверки авторизации и ролей
+- `server/src/routes/auth.js` — API endpoints для аутентификации
 
 **API Endpoints:**
 
 | Метод | Endpoint | Описание | Доступ |
 |-------|----------|----------|--------|
 | `GET` | `/api/auth/me` | Информация о текущем пользователе | Auth |
-| `POST` | `/api/auth/set-role` | Установить роль пользователя | Admin |
-| `GET` | `/api/auth/users` | Список всех пользователей | Admin |
-| `POST` | `/api/auth/users` | Создать нового пользователя | Admin |
-| `PUT` | `/api/auth/users/:uid` | Обновить пользователя | Admin |
-| `DELETE` | `/api/auth/users/:uid` | Удалить пользователя | Admin |
+| `POST` | `/api/auth/token` | Информация о текущем токене | Auth |
+
+> **Управление пользователями** осуществляется через админ-панель провайдера:
+> - **Firebase Console** → Authentication → Users
+> - **PocketBase Admin Dashboard** → `http://your-server:8090/_/` → Collections → scoreusers
 
 ### Клиентская часть
 
 **Файлы:**
-- `login.html` - страница входа
-- `admin.html` - админ-панель для управления пользователями
-- `js/auth.js` - общий модуль авторизации
+- `login.html` — страница входа
+- `admin.html` — админ-панель (просмотр пользователей и логов входа)
+- `js/auth.js` — общий модуль авторизации
+- `js/db-interface.js` — единый интерфейс работы с БД
+
+## Провайдеры
+
+Система поддерживает два провайдера, переключаемых через `DB_CONFIG.provider` (клиент) и `DB_PROVIDER` (сервер):
+
+| Провайдер | Коллекция пользователей | Тип | Вход |
+|---|---|---|---|
+| **Firebase** | `users` (Firestore) | Firebase Auth | Email/Password |
+| **PocketBase** | `scoreusers` | Auth collection | Username/Password или Email/Password |
 
 ## Быстрый старт
 
 ### 1. Создание первого администратора
 
-```bash
-cd server
+Через админ-панель провайдера:
 
-# Через Node.js
-node scripts/create-admin.js admin@example.com YourPassword123 "Admin User"
+**Firebase:**
+```
+Firebase Console → Authentication → Users → Add user
+Email: admin@volleyball.local
+Password: Admin@12345
 
-# Или через API (если уже есть админ)
-curl -X POST http://localhost:3000/api/auth/users \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
-  -d '{
-    "email": "admin@example.com",
-    "password": "YourPassword123",
-    "displayName": "Admin User",
-    "role": "admin"
-  }'
+Затем в Firestore → users → документ "admin":
+{
+  "uid": "<UID>",
+  "email": "admin@volleyball.local",
+  "username": "admin",
+  "displayName": "Администратор",
+  "role": "admin"
+}
+```
+
+**PocketBase:**
+```
+Откройте http://your-server:8090/_/
+Collections → scoreusers → Create new record
+username: admin
+email: admin@volleyball.local
+password: Admin@12345
+role: admin
 ```
 
 ### 2. Запуск сервера
@@ -65,10 +84,10 @@ npm run dev
 ### 3. Вход в систему
 
 1. Откройте `http://localhost:3000/login.html`
-2. Введите email и пароль
+2. Введите **username** (или email) и пароль
 3. После успешного входа:
-   - **Администраторы** → перенаправляются на `admin.html`
-   - **Пользователи** → перенаправляются на `ctl.html`
+   - **Администраторы** → перенаправляются на страницу с `?redirect=admin.html`
+   - **Пользователи** → перенаправляются на `index.html`
 
 ## Доступ к страницам
 
@@ -88,30 +107,21 @@ npm run dev
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    
-    <!-- Модуль авторизации -->
+    <script src="credentials.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
     <script src="js/auth.js"></script>
-    
+
     <script>
-        // Проверка авторизации при загрузке
         window.addEventListener('DOMContentLoaded', async () => {
             const authorized = await AuthModule.checkAuth('user');
-            if (!authorized) {
-                // Перенаправление на login.html выполнится автоматически
-                return;
-            }
-            
-            // Страница загружена и авторизована
+            if (!authorized) return;
+
             console.log('User role:', AuthModule.getCurrentRole());
         });
     </script>
 </head>
 <body>
-    <!-- Контент страницы -->
-    
     <button onclick="AuthModule.logout()">Выйти</button>
 </body>
 </html>
@@ -120,22 +130,9 @@ npm run dev
 ### Для страниц с доступом только для админов
 
 ```javascript
-// Проверка прав администратора
 const authorized = await AuthModule.checkAuth('admin');
-if (!authorized) {
-    // Пользователь будет перенаправлен на ctl.html
-    return;
-}
+if (!authorized) return; // Перенаправление на ctl.html
 ```
-
-## Хранение паролей
-
-Пароли хранятся в **Firebase Authentication** и хешируются автоматически с использованием алгоритма **bcrypt**. Firebase обеспечивает:
-
-- ✅ Хеширование на стороне сервера
-- ✅ Защита от brute-force атак
-- ✅ Безопасное хранение в зашифрованном виде
-- ✅ Соответствие стандартам безопасности
 
 ## Ролевая модель
 
@@ -143,99 +140,63 @@ if (!authorized) {
 - ✅ Просмотр онлайн результатов (`online.html`)
 - ✅ Управление табло (`ctl.html`)
 - ✅ Создание игр (`index.html`)
-- ✅ Изменение счета
-- ✅ Управление сетами
+- ✅ Изменение счёта и управление сетами
 
 ### Администратор (admin)
 - ✅ Все права пользователя
-- ✅ Управление пользователями (`admin.html`)
-- ✅ Создание/редактирование/удаление пользователей
-- ✅ Назначение ролей
-- ✅ Просмотр статистики входов
+- ✅ Админ-панель (`admin.html`) — просмотр пользователей и логов входа
+- ✅ Управление пользователями через провайдер (Firebase Console / PocketBase Admin)
 
-## Безопасность
+## Конфигурация
 
-### Серверная защита
-- Middleware `requireAuth` проверяет Firebase ID токен
-- Middleware `requireAdmin` проверяет права администратора
-- Custom claims хранятся в токене Firebase
+### Клиент (credentials.js)
 
-### Клиентская защита
-- Проверка авторизации при загрузке страницы
-- Автоматическое перенаправление неавторизованных пользователей
-- Токены обновляются через Firebase SDK
+```js
+var CREDENTIALS = {
+  firebase: {
+    apiKey: "...",
+    authDomain: "...",
+    projectId: "...",
+    // ...
+  },
+  pocketbase: {
+    url: 'http://localhost:8090',
+    user_email: 'app@example.com',
+    user_password: 'app_password'
+  }
+};
+```
 
-### Рекомендации
-1. Используйте HTTPS в production
-2. Настройте CORS для ограничения доменов
-3. Регулярно обновляйте Firebase SDK
-4. Используйте сложные пароли (минимум 6 символов)
-
-## Конфигурация Firebase
-
-Firebase конфигурация находится в файлах:
-- `js/auth.js` - клиентская конфигурация
-- `server/src/config/firebase.js` - серверная конфигурация
-
-**Переменные окружения для сервера:**
+### Сервер (.env)
 
 ```env
-# .env файл в папке server/
+DB_PROVIDER=pocketbase  # или firebase
 
-# Вариант 1: Файл ключа
-FIREBASE_KEY_FILE_PATH=./serviceAccountKey.json
-
-# Вариант 2: Переменные окружения
+# Firebase
 FIREBASE_PROJECT_ID=myvolleyscore
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@myvolleyscore.iam.gserviceaccount.com
+FIREBASE_CLIENT_EMAIL=...
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
-# Порт сервера
-PORT=3000
+# PocketBase
+POCKETBASE_URL=http://localhost:8090
+POCKETBASE_ADMIN_EMAIL=admin@volleyball.local
+POCKETBASE_ADMIN_PASSWORD=your_admin_password
 
-# Разрешенные CORS домены
-ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+PORT=3000
+ALLOWED_ORIGINS=*
 ```
 
 ## Устранение неполадок
 
-### Ошибка "Firebase initialization error"
-- Проверьте наличие файла `.env` в папке `server/`
-- Убедитесь, что `serviceAccountKey.json` существует
-- Проверьте переменные окружения
-
 ### Ошибка "Unauthorized" при запросах
 - Проверьте срок действия токена
-- Убедитесь, что токен передается в заголовке `Authorization: Bearer <token>`
-- Проверьте, что пользователь существует в Firebase Auth
+- Убедитесь, что токен передаётся в заголовке `Authorization: Bearer <token>`
+- Проверьте, что пользователь существует
 
 ### Ошибка "Forbidden" на admin.html
 - Убедитесь, что пользователь имеет роль `admin`
-- Проверьте custom claims через Firebase Console
 - Перезайдите в систему для обновления токена
 
-## Миграция существующих пользователей
-
-Если у вас уже есть пользователи в Firebase Auth без ролей:
-
-```javascript
-// Скрипт для установки роли существующему пользователю
-const admin = require('firebase-admin');
-admin.initializeApp();
-
-async function setRole(uid, role) {
-    await admin.auth().setCustomUserClaims(uid, {
-        role: role,
-        admin: role === 'admin'
-    });
-}
-
-// Пример
-setRole('USER_UID_HERE', 'admin');
-```
-
-## Дополнительные ресурсы
-
-- [Firebase Authentication Documentation](https://firebase.google.com/docs/auth)
-- [Firebase Admin SDK](https://firebase.google.com/docs/admin/setup)
-- [Custom Claims](https://firebase.google.com/docs/auth/admin/custom-claims)
+### Ошибка CORS (PocketBase)
+- Запустите PocketBase с флагом: `./pocketbase serve --http="0.0.0.0:8090" --origins="*"`
+- Или настройте reverse proxy с CORS заголовками

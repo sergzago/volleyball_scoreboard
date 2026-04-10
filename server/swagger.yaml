@@ -1,0 +1,1034 @@
+openapi: 3.0.3
+info:
+  title: Volleyball Scoreboard API
+  description: |
+    API для управления табло волейбольного матча и системой авторизации.
+
+    ## Провайдеры данных
+    Система поддерживает два провайдера, переключаемых через переменную окружения `DB_PROVIDER`:
+    - **firebase** — Firebase Firestore + Firebase Auth
+    - **pocketbase** — PocketBase (self-hosted)
+
+    ## Аутентификация
+    1. Получите токен через `POST /api/auth/login`
+    2. Используйте его в заголовке `Authorization: Bearer <token>` для защищённых эндпоинтов
+    Эндпоинты `/api/scoreboard/*` и `/api/matches/*` — публичные.
+
+    ## Управление пользователями
+    Создание, редактирование и удаление пользователей осуществляется **не через API**,
+    а через админ-панель провайдера:
+    - **Firebase Console** → Authentication → Users
+    - **PocketBase Admin** → `http://your-server:8090/_/` → Collections → scoreusers
+  version: 1.0.0
+  contact:
+    name: Volleyball Scoreboard
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Аутентификация и информация о пользователе
+  - name: Scoreboard
+    description: Управление табло матча (счёт, сеты, команды, настройки)
+  - name: Matches
+    description: История и результаты матчей
+
+paths:
+  /health:
+    get:
+      summary: Проверка работоспособности сервера
+      tags:
+        - System
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Сервер работает
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # ===================== AUTH =====================
+
+  /api/auth/login:
+    post:
+      summary: Войти в систему и получить токен
+      description: |
+        Аутентификация пользователя по username/email и паролю.
+        Возвращает Bearer-токен для использования в заголовке `Authorization` последующих запросов.
+
+        **Firebase:** email = `username@volleyball.local` (если передан только username)
+        **PocketBase:** принимает username или email
+      tags:
+        - Auth
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - identity
+                - password
+              properties:
+                identity:
+                  type: string
+                  description: Username или email
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  description: Пароль пользователя
+                  example: Admin@12345
+      responses:
+        '200':
+          description: Успешный вход, получен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Отсутствуют обязательные поля
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      summary: Информация о текущем пользователе
+      description: Возвращает данные пользователя, идентифицированного по Bearer-токену
+      tags:
+        - Auth
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Данные пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/token:
+    post:
+      summary: Информация о текущем токене
+      description: Возвращает информацию о пользователе, связанном с переданным токеном
+      tags:
+        - Auth
+      operationId: getTokenInfo
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Информация о токене
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenInfoResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ===================== SCOREBOARD =====================
+
+  /api/scoreboard:
+    post:
+      summary: Создать новую игру
+      description: |
+        Создаёт новое табло с указанным `game_id`.
+        Возвращает 409 Conflict если игра с таким ID уже существует.
+        Все поля кроме `game_id` опциональны — используются значения по умолчанию.
+      tags:
+        - Scoreboard
+      operationId: createScoreboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScoreboard'
+      responses:
+        '201':
+          description: Игра создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+        '400':
+          description: Отсутствует game_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Игра с таким ID уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/scoreboard/{game_id}:
+    get:
+      summary: Получить состояние табло
+      description: Возвращает все поля текущего матча
+      tags:
+        - Scoreboard
+      operationId: getScoreboard
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор матча
+      responses:
+        '200':
+          description: Состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+        '404':
+          description: Матч не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Обновить произвольные поля табло
+      description: Позволяет обновить любые поля, кроме `lastEdited` (устанавливается автоматически)
+      tags:
+        - Scoreboard
+      operationId: updateScoreboard
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreboardUpdate'
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/score:
+    post:
+      summary: Изменить счёт (добавить/убрать очко)
+      description: |
+        Основное действие — изменение счёта команды. Автоматически обрабатывает:
+        - Проверку победы в сете
+        - Автоматическую смену площадок (пляжный — каждые N суммарных очков, классический — 8 очков на тай-брейке)
+        - Фиксацию истории сетов
+        - Сохранение результата матча при завершении
+      tags:
+        - Scoreboard
+      operationId: updateScore
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - team
+                - delta
+              properties:
+                team:
+                  type: string
+                  enum: [home, away]
+                  description: Команда, которой начисляется/снимается очко
+                delta:
+                  type: integer
+                  enum: [1, -1]
+                  description: +1 — добавить очко, -1 — убрать
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+        '400':
+          description: Ошибка валидации (отрицательный счёт и т.д.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/scoreboard/{game_id}/new-set:
+    post:
+      summary: Начать новый сет
+      description: Обнуляет счёт, инкрементирует номер сета
+      tags:
+        - Scoreboard
+      operationId: newSet
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/swap-sides:
+    post:
+      summary: Смена сторон площадок
+      description: Меняет home_side / away_side и очищает уведомления о смене
+      tags:
+        - Scoreboard
+      operationId: swapSides
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/period:
+    post:
+      summary: Изменить период/сет
+      description: Переключает период (вперёд/назад), обнуляет счёт, фиксирует фолы
+      tags:
+        - Scoreboard
+      operationId: updatePeriod
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - delta
+              properties:
+                delta:
+                  type: integer
+                  enum: [1, -1]
+                  description: +1 — следующий период, -1 — предыдущий
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+        '400':
+          description: Период вне допустимого диапазона
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/scoreboard/{game_id}/display:
+    post:
+      summary: Настроить отображение табло
+      tags:
+        - Scoreboard
+      operationId: updateDisplay
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - show
+              properties:
+                show:
+                  type: integer
+                  enum: [0, 1, 2, 4, 6, 14]
+                  description: Режим отображения (битовая маска элементов)
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/label:
+    post:
+      summary: Обновить кастомную метку табло
+      tags:
+        - Scoreboard
+      operationId: updateLabel
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - custom_label
+              properties:
+                custom_label:
+                  type: string
+                  description: Текст метки, отображаемый на табло
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/teams:
+    put:
+      summary: Обновить информацию о командах
+      tags:
+        - Scoreboard
+      operationId: updateTeams
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamsUpdate'
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/settings:
+    patch:
+      summary: Обновить настройки табло
+      description: Обновляет `invert_tablo`, `unlimited_score`, `two_wins_mode`
+      tags:
+        - Scoreboard
+      operationId: updateSettings
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdate'
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/mode:
+    post:
+      summary: Переключить режим (пляжный/классический)
+      tags:
+        - Scoreboard
+      operationId: toggleMode
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - beach_mode
+              properties:
+                beach_mode:
+                  type: boolean
+                  description: true — пляжный волейбол, false — классический
+      responses:
+        '200':
+          description: Обновлённое состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  /api/scoreboard/{game_id}/reset:
+    post:
+      summary: Сбросить табло
+      description: Обнуляет счёт, сеты, команды (имена и цвета сохраняются если keep_settings=true)
+      tags:
+        - Scoreboard
+      operationId: resetScoreboard
+      parameters:
+        - name: game_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keep_settings:
+                  type: boolean
+                  default: true
+                  description: Сохранить имена и цвета команд
+      responses:
+        '200':
+          description: Сброшенное состояние табло
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+
+  # ===================== MATCHES =====================
+
+  /api/matches:
+    get:
+      summary: Получить список матчей
+      description: Возвращает список завершённых матчей с пагинацией и фильтрами
+      tags:
+        - Matches
+      operationId: listMatches
+      parameters:
+        - name: tournament
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по названию турнира
+        - name: game_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [classic, beach]
+          description: Тип матча
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Максимальное количество записей
+      responses:
+        '200':
+          description: Список матчей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Match'
+
+    post:
+      summary: Сохранить результат матча
+      description: Записывает результат текущего матча в историю
+      tags:
+        - Matches
+      operationId: saveMatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - game_id
+              properties:
+                game_id:
+                  type: string
+                  description: Идентификатор матча
+                setHistory:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      home:
+                        type: integer
+                      away:
+                        type: integer
+                  description: История сетов (если не указан, берётся из табло)
+                overallHome:
+                  type: integer
+                  description: Итоговый счёт домашней команды (сеты/фолы)
+                overallAway:
+                  type: integer
+                  description: Итоговый счёт гостевой команды
+      responses:
+        '201':
+          description: Результат сохранён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '400':
+          description: game_id не указан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/matches/{id}:
+    get:
+      summary: Получить детали матча
+      tags:
+        - Matches
+      operationId: getMatch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор матча
+      responses:
+        '200':
+          description: Детали матча
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '404':
+          description: Матч не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Bearer-токен, полученный через `POST /api/auth/login`.
+        
+        **Пример:**
+        ```
+        curl -X POST /api/auth/login -d '{"identity":"admin","password":"..."}'
+        # → { "token": "eyJ..." }
+        
+        curl /api/auth/me -H "Authorization: Bearer eyJ..."
+        ```
+
+  schemas:
+    # ---------- Auth ----------
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        provider:
+          type: string
+          enum: [firebase, pocketbase]
+          example: pocketbase
+        timestamp:
+          type: string
+          format: date-time
+
+    CurrentUserResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            uid:
+              type: string
+              example: abc123
+            email:
+              type: string
+              example: admin@volleyball.local
+            role:
+              type: string
+              enum: [admin, user]
+              example: admin
+            claims:
+              type: object
+              properties:
+                role:
+                  type: string
+                admin:
+                  type: boolean
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Bearer-токен для заголовка Authorization
+          example: eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+        refreshToken:
+          type: string
+          description: Refresh token (для обновления access token)
+          example: AOEToken...
+        expiresIn:
+          type: integer
+          description: Время жизни токена в секундах
+          example: 3600
+        user:
+          type: object
+          properties:
+            uid:
+              type: string
+            email:
+              type: string
+            username:
+              type: string
+            role:
+              type: string
+              enum: [admin, user]
+            displayName:
+              type: string
+
+    TokenInfoResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Используйте токен из заголовка Authorization
+        user:
+          type: object
+          properties:
+            uid:
+              type: string
+            email:
+              type: string
+            role:
+              type: string
+
+    # ---------- Scoreboard ----------
+
+    Scoreboard:
+      type: object
+      properties:
+        id:
+          type: string
+          description: game_id
+        home_team:
+          type: string
+          example: Динамо
+        away_team:
+          type: string
+          example: Зенит
+        home_color:
+          type: string
+          example: '#ff0000'
+        away_color:
+          type: string
+          example: '#00ff00'
+        tournament_name:
+          type: string
+          example: НВЛ
+        venue:
+          type: string
+          description: Название зала / площадки
+          example: Спорткомплекс «Олимп»
+        home_score:
+          type: integer
+          example: 15
+        away_score:
+          type: integer
+          example: 12
+        home_sets:
+          type: integer
+          example: 1
+        away_sets:
+          type: integer
+          example: 0
+        home_fouls:
+          type: integer
+          example: 1
+        away_fouls:
+          type: integer
+          example: 0
+        current_period:
+          type: integer
+          example: 2
+        beach_current_set:
+          type: integer
+          example: 1
+        period_count:
+          type: integer
+          example: 5
+        beach_mode:
+          type: boolean
+          example: false
+        beach_match_finished:
+          type: boolean
+          example: false
+        classic_match_finished:
+          type: boolean
+          example: false
+        two_wins_mode:
+          type: boolean
+          description: Режим «две победы» (классический)
+          example: false
+        unlimited_score:
+          type: boolean
+          description: Безлимитный счёт без проверки победы в сете
+          example: false
+        invert_tablo:
+          type: boolean
+          example: false
+        serving_team:
+          type: string
+          enum: [home, away]
+        status:
+          type: string
+          enum: [not_started, in_progress, finished, paused]
+        show:
+          type: integer
+          example: 0
+        custom_label:
+          type: string
+          example: Табло
+        home_side:
+          type: string
+          enum: [left, right]
+          example: left
+        away_side:
+          type: string
+          enum: [left, right]
+          example: right
+        set_history:
+          type: array
+          items:
+            type: object
+            properties:
+              home:
+                type: integer
+              away:
+                type: integer
+        beach_switch_message:
+          type: string
+        classic_switch_needed:
+          type: boolean
+        classic_switch_message:
+          type: string
+        classic_switch_shown:
+          type: boolean
+        classic_tiebreak_switch_done:
+          type: boolean
+        lastEdited:
+          type: string
+          format: date-time
+        created:
+          type: string
+          format: date-time
+
+    CreateScoreboard:
+      type: object
+      required:
+        - game_id
+      properties:
+        game_id:
+          type: string
+          description: Уникальный идентификатор игры
+          example: game1
+        home_team:
+          type: string
+          default: Team1
+        away_team:
+          type: string
+          default: Team2
+        home_color:
+          type: string
+          default: '#ff0000'
+        away_color:
+          type: string
+          default: '#00ff00'
+        tournament_name:
+          type: string
+          default: НВЛ
+        venue:
+          type: string
+          description: Название зала / площадки
+        custom_label:
+          type: string
+          default: Табло
+        beach_mode:
+          type: boolean
+          default: false
+        two_wins_mode:
+          type: boolean
+          default: false
+        invert_tablo:
+          type: boolean
+          default: false
+        unlimited_score:
+          type: boolean
+          default: false
+
+    ScoreboardUpdate:
+      type: object
+      description: Произвольные поля для обновления (любые поля Scoreboard кроме lastEdited)
+      additionalProperties: true
+
+    TeamsUpdate:
+      type: object
+      properties:
+        home_team:
+          type: string
+        home_color:
+          type: string
+        away_team:
+          type: string
+        away_color:
+          type: string
+        tournament_name:
+          type: string
+        venue:
+          type: string
+          description: Название зала / площадки
+
+    SettingsUpdate:
+      type: object
+      properties:
+        invert_tablo:
+          type: boolean
+          description: Инвертировать расположение команд
+        unlimited_score:
+          type: boolean
+          description: Безлимитный счёт
+        two_wins_mode:
+          type: boolean
+          description: Режим «две победы» (классический волейбол, 3 сета максимум)
+
+    # ---------- Matches ----------
+
+    Match:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Автоматически сгенерированный ID
+        game_id:
+          type: string
+          example: game1
+        date_time:
+          type: string
+          format: date-time
+        home_team:
+          type: string
+          example: Динамо
+        away_team:
+          type: string
+          example: Зенит
+        tournament_name:
+          type: string
+          example: НВЛ
+        overall_score:
+          type: string
+          example: "2:1"
+        sets_score:
+          type: array
+          items:
+            type: object
+            properties:
+              home:
+                type: integer
+              away:
+                type: integer
+        game_type:
+          type: string
+          enum: [classic, beach]
+        two_wins_mode:
+          type: boolean
+        is_deleted:
+          type: boolean
+        deleted_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    # ---------- Error ----------
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: game_id is required

@@ -38,6 +38,57 @@ class ScoreboardService {
   }
 
   /**
+   * Создать новую игру
+   */
+  async createScoreboard(gameId, data = {}) {
+    checkDb(this.db);
+
+    const existing = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (existing) {
+      throw new Error(`Scoreboard with id "${gameId}" already exists`);
+    }
+
+    const beachEnabled = !!data.beach_mode;
+    const twoWinsMode = !!data.two_wins_mode;
+
+    const scoreboard = {
+      id: gameId,
+      home_team: data.home_team || 'Team1',
+      away_team: data.away_team || 'Team2',
+      home_color: data.home_color || '#ff0000',
+      away_color: data.away_color || '#00ff00',
+      tournament_name: data.tournament_name || 'НВЛ',
+      venue: data.venue || '',
+      home_score: 0,
+      away_score: 0,
+      home_sets: 0,
+      away_sets: 0,
+      home_fouls: 0,
+      away_fouls: 0,
+      current_period: 1,
+      beach_mode: beachEnabled,
+      beach_current_set: 1,
+      period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
+      show: 0,
+      custom_label: data.custom_label || 'Табло',
+      home_side: 'left',
+      away_side: 'right',
+      beach_switch_message: '',
+      beach_match_finished: false,
+      classic_match_finished: false,
+      classic_tiebreak_switch_done: true,
+      two_wins_mode: twoWinsMode,
+      invert_tablo: !!data.invert_tablo,
+      unlimited_score: !!data.unlimited_score,
+      set_history: [],
+      created: this.db.serverTimestamp(),
+      lastEdited: this.db.serverTimestamp(),
+    };
+
+    return this.db.setDoc(VOLLEYBALL_COLLECTION, gameId, scoreboard);
+  }
+
+  /**
    * Обновить произвольные поля табло
    */
   async updateScoreboard(gameId, data) {
@@ -282,7 +333,7 @@ class ScoreboardService {
   }
 
   /**
-   * Обновить команды
+   * Обновить команды и зал
    */
   async updateTeams(gameId, teamsData) {
     const update = {
@@ -292,6 +343,9 @@ class ScoreboardService {
       away_color: teamsData.away_color,
       tournament_name: teamsData.tournament_name || 'НВЛ',
     };
+    if (teamsData.venue !== undefined) {
+      update.venue = teamsData.venue;
+    }
     return this.updateScoreboard(gameId, update);
   }
 

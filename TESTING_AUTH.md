@@ -2,57 +2,49 @@
 
 ## Быстрый старт
 
-### 1. Настройка Firebase credentials
+### 1. Настройка credentials
 
-Убедитесь, что у вас есть файл `serviceAccountKey.json` в папке `server/` или настроены переменные окружения.
+Убедитесь, что файл `credentials.js` заполнен корректными данными (см. `credentials.example.js`).
 
-**Вариант А: Файл ключа**
-```bash
-cd server
-# Положите serviceAccountKey.json в папку server/
-```
+**Для сервера** — файл `server/.env`:
+```env
+DB_PROVIDER=pocketbase  # или firebase
 
-**Вариант Б: Переменные окружения**
-```bash
-cd server
-cat > .env << EOF
+# PocketBase
+POCKETBASE_URL=http://localhost:8090
+POCKETBASE_ADMIN_EMAIL=admin@volleyball.local
+POCKETBASE_ADMIN_PASSWORD=your_admin_password
+
+# Firebase (если DB_PROVIDER=firebase)
 FIREBASE_PROJECT_ID=myvolleyscore
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@myvolleyscore.iam.gserviceaccount.com
+FIREBASE_CLIENT_EMAIL=...
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
 PORT=3000
-EOF
+ALLOWED_ORIGINS=*
 ```
 
 ### 2. Создание первого администратора
 
-```bash
-cd server
-node scripts/create-admin.js admin@example.com Admin123456 "Admin User"
+Через админ-панель провайдера:
+
+**PocketBase:**
+```
+Откройте http://localhost:8090/_/
+Collections → scoreusers → Create new record
+username: admin
+email: admin@volleyball.local
+password: Admin123456
+role: admin
 ```
 
-Ожидаемый вывод:
+**Firebase:**
 ```
-🏐 Volleyball Scoreboard - Создание администратора
+Firebase Console → Authentication → Users → Add user
+Email: admin@volleyball.local, Password: Admin123456
 
-✅ Firebase инициализирован с файлом ключа
-✅ Firestore готов к работе
-
-📝 Создание администратора...
-   Email: admin@example.com
-   Имя: Admin User
-   Роль: ADMIN
-
-✅ Пользователь создан: UID123456
-✅ Права администратора установлены
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎉 Администратор успешно создан!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   UID: UID123456
-   Email: admin@example.com
-   DisplayName: Admin User
-   Role: admin
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Firestore → users → документ "admin":
+{ uid: "<UID>", email: "...", username: "admin", displayName: "Admin", role: "admin" }
 ```
 
 ### 3. Запуск сервера
@@ -62,125 +54,49 @@ cd server
 npm run dev
 ```
 
-Ожидаемый вывод:
-```
-🏐 Volleyball Scoreboard API server running on port 3000
-📊 Health check: http://localhost:3000/health
-📋 API endpoints: ...
-```
-
 ### 4. Проверка работы
 
 #### Тест 1: Health check
 ```bash
 curl http://localhost:3000/health
 ```
-
-Ожидаемый ответ:
-```json
-{"status":"ok","timestamp":"2026-03-05T..."}
-```
+Ожидаемый ответ: `{"status":"ok","provider":"pocketbase",...}`
 
 #### Тест 2: Страница входа
 1. Откройте `http://localhost:3000/login.html`
-2. Должна отобразиться форма входа
-3. Введите credentials администратора
-4. Нажмите "Войти"
-5. Должна произойти переадресация на `admin.html`
+2. Введите username и пароль администратора
+3. Должен произойти успешный вход
 
 #### Тест 3: Админ-панель
-1. Откройте `http://localhost:3000/admin.html`
-2. Должна отобразиться панель управления пользователями
-3. Попробуйте создать нового пользователя:
-   - Email: `user@example.com`
-   - Пароль: `User123456`
-   - Роль: `user`
-4. Новый пользователь должен появиться в списке
+1. Откройте `http://localhost:3000/admin.html` (с ?redirect=admin.html)
+2. Должна отобразиться панель с списком пользователей
 
 #### Тест 4: Страница управления табло
 1. Откройте `http://localhost:3000/ctl.html`
 2. Если не авторизованы → переадресация на `login.html`
-3. После входа → отображается панель управления
 
 #### Тест 5: Онлайн результаты
 1. Откройте `http://localhost:3000/online.html`
-2. Страница должна быть доступна без авторизации
-3. В шапке должна быть кнопка "Войти"
-4. После входа → отображается информация о пользователе
+2. Страница доступна без авторизации
 
 ### 5. Тестирование API
 
 #### Получить информацию о текущем пользователе
-
 ```bash
-# Сначала получите токен через Firebase SDK (в браузере)
-# Затем используйте в запросе
 curl http://localhost:3000/api/auth/me \
   -H "Authorization: Bearer YOUR_ID_TOKEN"
-```
-
-#### Список пользователей (только админ)
-
-```bash
-curl http://localhost:3000/api/auth/users \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
 Ожидаемый ответ:
 ```json
 {
-  "users": [
-    {
-      "uid": "...",
-      "email": "admin@example.com",
-      "displayName": "Admin User",
-      "role": "admin",
-      "createdAt": "...",
-      "lastLoginAt": "..."
-    },
-    {
-      "uid": "...",
-      "email": "user@example.com",
-      "displayName": "user",
-      "role": "user",
-      "createdAt": "...",
-      "lastLoginAt": "..."
-    }
-  ]
+  "user": {
+    "uid": "...",
+    "email": "admin@volleyball.local",
+    "role": "admin",
+    "claims": { "role": "admin", "admin": true }
+  }
 }
-```
-
-#### Создать пользователя (только админ)
-
-```bash
-curl -X POST http://localhost:3000/api/auth/users \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Test123456",
-    "displayName": "Test User",
-    "role": "user"
-  }'
-```
-
-#### Обновить пользователя (только админ)
-
-```bash
-curl -X PUT http://localhost:3000/api/auth/users/USER_UID \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
-  -d '{
-    "displayName": "Updated Name",
-    "role": "admin"
-  }'
-```
-
-#### Удалить пользователя (только админ)
-
-```bash
-curl -X DELETE http://localhost:3000/api/auth/users/USER_UID \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
 ### 6. Проверка безопасности
@@ -189,76 +105,40 @@ curl -X DELETE http://localhost:3000/api/auth/users/USER_UID \
 ```bash
 curl http://localhost:3000/api/auth/me
 ```
-
 Ожидаемый ответ:
 ```json
-{
-  "error": "Unauthorized",
-  "message": "Требуется авторизация. Пожалуйста, войдите в систему."
-}
+{ "error": "Unauthorized", "message": "Требуется авторизация..." }
 ```
 
 #### Тест: Доступ пользователя к админке
 1. Войдите как пользователь с ролью `user`
-2. Попробуйте открыть `admin.html`
-3. Должна произойти переадресация на `ctl.html`
+2. Попробуйте открыть `admin.html` → переадресация на `ctl.html`
 
 #### Тест: Неверный токен
 ```bash
 curl http://localhost:3000/api/auth/me \
   -H "Authorization: Bearer invalid_token"
 ```
-
-Ожидаемый ответ:
-```json
-{
-  "error": "Unauthorized",
-  "message": "Неверный или истекший токен авторизации."
-}
-```
+Ожидаемый ответ: `401 Unauthorized`
 
 ### 7. Проверка ролевой модели
 
 | Страница | Без авторизации | User | Admin |
 |----------|----------------|------|-------|
-| `login.html` | ✅ Доступно | ✅ Доступно | ✅ Доступно |
-| `online.html` | ✅ Доступно | ✅ Доступно | ✅ Доступно |
-| `ctl.html` | ❌ Redirect | ✅ Доступно | ✅ Доступно |
-| `admin.html` | ❌ Redirect | ❌ Redirect | ✅ Доступно |
+| `login.html` | ✅ | ✅ | ✅ |
+| `online.html` | ✅ | ✅ | ✅ |
+| `ctl.html` | ❌ Redirect | ✅ | ✅ |
+| `admin.html` | ❌ Redirect | ❌ Redirect | ✅ |
 | `GET /api/auth/me` | ❌ 401 | ✅ 200 | ✅ 200 |
-| `GET /api/auth/users` | ❌ 401 | ❌ 403 | ✅ 200 |
 
 ### 8. Возможные ошибки и решения
 
-**Ошибка: "Firebase initialization error"**
-- Проверьте наличие `serviceAccountKey.json`
-- Проверьте переменные окружения в `.env`
-
-**Ошибка: "Unauthorized" при входе**
-- Проверьте, что пользователь существует в Firebase Console
-- Проверьте правильность email/password
-
-**Ошибка: "Forbidden" на admin.html**
-- Убедитесь, что пользователь имеет роль `admin`
-- Проверьте custom claims в Firebase Console
-
-**Ошибка: CORS при запросах**
-- Настройте `ALLOWED_ORIGINS` в `.env`
-- Проверьте заголовки запросов
-
-### 9. Очистка тестовых данных
-
-Для удаления тестовых пользователей:
-
-1. Откройте [Firebase Console](https://console.firebase.google.com/project/myvolleyscore/authentication/users)
-2. Перейдите в раздел Authentication → Users
-3. Удалите тестовых пользователей
-
-Или через API (нужен админ токен):
-```bash
-curl -X DELETE http://localhost:3000/api/auth/users/USER_UID \
-  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
-```
+| Ошибка | Решение |
+|--------|---------|
+| Firebase/PocketBase init error | Проверьте credentials и .env |
+| Unauthorized при входе | Проверьте username/password в провайдере |
+| Forbidden на admin.html | Проверьте роль пользователя, перезайдите |
+| CORS (PocketBase) | Запустите с `--origins="*"` или настройте proxy |
 
 ## Чек-лист успешного тестирования
 
@@ -266,35 +146,11 @@ curl -X DELETE http://localhost:3000/api/auth/users/USER_UID \
 - [ ] Health check возвращает 200 OK
 - [ ] Страница входа отображается
 - [ ] Вход с неверными данными показывает ошибку
-- [ ] Вход администратора перенаправляет на admin.html
-- [ ] Вход пользователя перенаправляет на ctl.html
-- [ ] Создание пользователя работает
-- [ ] Редактирование пользователя работает
-- [ ] Удаление пользователя работает
-- [ ] ctl.html требует авторизации
-- [ ] admin.html требует прав администратора
-- [ ] online.html доступна без авторизации
+- [ ] Вход администратора работает
+- [ ] Вход пользователя перенаправляет на index.html
+- [ ] `ctl.html` требует авторизации
+- [ ] `admin.html` требует прав администратора
+- [ ] `online.html` доступна без авторизации
 - [ ] Выход из системы работает
-- [ ] API endpoints возвращают правильные ответы
-
-## Дополнительные тесты
-
-### Нагрузка
-```bash
-# 100 запросов к API
-for i in {1..100}; do
-  curl http://localhost:3000/api/auth/me \
-    -H "Authorization: Bearer YOUR_TOKEN" &
-done
-wait
-```
-
-### Безопасность паролей
-- [ ] Пароль < 6 символов отклоняется
-- [ ] Специальные символы поддерживаются
-- [ ] Unicode в паролях работает
-
-### Сессионная модель
-- [ ] Токен обновляется
-- [ ] Выход из системы инвалидирует сессию
-- [ ] Multiple devices работают корректно
+- [ ] API `/api/auth/me` возвращает данные пользователя
+- [ ] API без токена возвращает 401
