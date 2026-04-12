@@ -22,7 +22,7 @@ var CREDENTIALS = (typeof CREDENTIALS !== 'undefined') ? CREDENTIALS : { firebas
 
 var DB_CONFIG = {
   // Текущий провайдер: 'firebase' | 'pocketbase'
-  provider: 'pocketbase',
+  provider: 'firebase',
 
   // ============================================================================
   // FIREBASE КОНФИГУРАЦИЯ (из credentials.js)
@@ -38,8 +38,8 @@ var DB_CONFIG = {
   // НАЗВАНИЯ КОЛЛЕКЦИЙ (отдельно для каждого провайдера)
   // ============================================================================
   firebaseCollections: {
-    VOLLEYBALL: 'volleyball',
-    MATCHES: 'matches',
+    VOLLEYBALL: 'volleyball1',
+    MATCHES: 'matches1',
     USERS: 'users',
     AUTH_LOG: 'auth_log'
   },

@@ -13,7 +13,7 @@ var CREDENTIALS = {
   // FIREBASE УЧЕТНЫЕ ДАННЫЕ
   // ============================================================================
   firebase: {
-    apiKey: "AIzaSyBCezRf1nI1SSFw8LDcHZ-ocQEBx30",
+    apiKey: "AIzaSyBCezRf1nI1dlLFwDgW8LDcHZ-ocQEBx30",
     authDomain: "myvolleyscore.firebaseapp.com",
     projectId: "myvolleyscore",
     storageBucket: "myvolleyscore.firebasestorage.app",

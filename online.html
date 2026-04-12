@@ -567,7 +567,12 @@
                     
                     // Load finished games
                     loadFinishedGames(today, tomorrow);
-                    
+
+                    // Periodically reload finished games to catch newly finished matches
+                    setInterval(function() {
+                        loadFinishedGames(today, tomorrow);
+                    }, 10000); // Every 10 seconds
+
                     updateLastUpdateTime();
                 })
                 .catch(function(error) {
@@ -648,24 +653,26 @@
         }
         
         function isGameFinished(data, gameType) {
-            // Сначала проверяем явные флаги завершенности матча
+            // Пляжный волейбол
             if (gameType === 'beach') {
-                // Пляжный волейбол: проверяем флаг завершенности матча
-                if (data.beach_match_finished === true) {
-                    return true;
-                }
-                // Если флаг не установлен, проверяем количество выигранных сетов
+                if (data.beach_match_finished === true) return true;
                 var setsWon = calculateSetsWon(data, gameType);
                 return setsWon.homeSets >= 2 || setsWon.awaySets >= 2;
-            } else {
-                // Классический волейбол: проверяем флаг завершенности матча
-                if (data.classic_match_finished === true) {
-                    return true;
-                }
-                // Если флаг не установлен, проверяем количество выигранных сетов
-                var setsWon = calculateSetsWon(data, gameType);
-                return setsWon.homeSets >= 3 || setsWon.awaySets >= 3;
             }
+            // Классический волейбол
+            if (gameType === 'classic') {
+                if (data.classic_match_finished === true) return true;
+                // Проверяем по количеству выигранных сетов (fouls)
+                var homeFouls = parseInt(data.home_fouls, 10) || 0;
+                var awayFouls = parseInt(data.away_fouls, 10) || 0;
+                var twoWinsMode = !!data.two_wins_mode;
+                var setsToWin = twoWinsMode ? 2 : 3;
+                if (homeFouls >= setsToWin || awayFouls >= setsToWin) return true;
+                // Fallback: проверяем по set_history
+                var setsWon = calculateSetsWon(data, gameType);
+                return setsWon.homeSets >= setsToWin || setsWon.awaySets >= setsToWin;
+            }
+            return false;
         }
         
         function hasGameStateChanged(gameId, newData) {

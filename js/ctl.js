@@ -8,6 +8,13 @@ var CLASSIC_SETS_TO_WIN_TWO = 2;
 var CLASSIC_MAX_SETS_TWO = 3;
 var CLASSIC_TIEBREAK_POINTS_TO_WIN = 15;
 
+// Данные для отложенного завершения матча (ожидание подтверждения пользователя)
+var pendingMatchFinish = null;
+// Запоминваем, был ли матч уже завершён ПРЕЖДЕ чем мы начали играть
+var matchWasAlreadyFinished = false;
+// Счётчик обновлений подписки — для определения первой загрузки
+var _subscribeCallCount = 0;
+
 // scoreboard_data определена в common.js
 
 // Получение информации о текущем пользователе
@@ -36,6 +43,91 @@ function getCurrentUserInfo() {
   return {};
 }
 
+/**
+ * Показать модальное окно подтверждения завершения матча.
+ * Сохраняет pending-данные и ждёт выбора пользователя.
+ * НЕ показывает диалог, если матч уже был завершён до текущего действия.
+ */
+function showMatchFinishDialog(update, setHistory, overallHome, overallAway, mode) {
+  console.log('[MATCH] showMatchFinishDialog вызван. mode:', mode, 'matchWasAlreadyFinished:', matchWasAlreadyFinished,
+    'beach_match_finished:', scoreboard_data['beach_match_finished'], 'classic_match_finished:', scoreboard_data['classic_match_finished']);
+
+  // Не показываем диалог, если матч уже был завершён при загрузке страницы
+  if (matchWasAlreadyFinished) {
+    // Матч уже завершён — просто обновляем БД без диалога
+    console.log('[MATCH] Диалог пропущен — матч загружен завершённым');
+    saveMatchResult(setHistory, overallHome, overallAway);
+    update_db(update);
+    return;
+  }
+
+  var homeTeam = scoreboard_data['home_team'] || 'Команда 1';
+  var awayTeam = scoreboard_data['away_team'] || 'Команда 2';
+  var scoreText = overallHome + ':' + overallAway;
+  var winner = overallHome > overallAway ? homeTeam : awayTeam;
+
+  $('#matchFinishText').html(
+    'Игра завершена!<br>' +
+    'Победитель: <b>' + winner + '</b> (' + scoreText + ')<br><br>' +
+    'Завершить игру?'
+  );
+
+  // Сохраняем данные для последующего использования
+  pendingMatchFinish = {
+    update: update,
+    setHistory: setHistory,
+    overallHome: overallHome,
+    overallAway: overallAway,
+    mode: mode
+  };
+
+  $('#matchFinishModal').removeClass('dialog-hidden');
+}
+
+/**
+ * Подтвердить завершение матча — сохранить результат и обновить БД.
+ */
+function confirmMatchFinish() {
+  if (!pendingMatchFinish) return;
+
+  var data = pendingMatchFinish;
+  saveMatchResult(data.setHistory, data.overallHome, data.overallAway);
+  update_db(data.update);
+
+  // Обновляем UI кнопок
+  var matchFinished = true;
+  var pendingNewSet = false;
+  $(".score-btn").prop('disabled', true);
+  $(".new-set-btn").prop('disabled', true);
+  $(".beach-match-status").removeClass("hidden").text("Матч завершён");
+
+  pendingMatchFinish = null;
+  $('#matchFinishModal').addClass('dialog-hidden');
+}
+
+/**
+ * Отменить завершение матча — НЕ фиксировать счёт и результат сета.
+ * Возвращаем игру в состояние до выигрышного очка.
+ */
+function cancelMatchFinish() {
+  if (!pendingMatchFinish) return;
+
+  // НЕ вызываем update_db — счёт и результат сета НЕ фиксируются.
+  // Очко, которое привело к завершению матча, не засчитывается.
+  // Кнопки очков разблокируются, игра продолжается с текущим счётом.
+
+  // Обновляем UI — сбрасываем статус ожидания
+  $(".score-btn").prop('disabled', false);
+  $(".new-set-btn").prop('disabled', true);
+  $(".beach-match-status").addClass("hidden").text("");
+
+  // Сбрасываем флаг — теперь диалог может снова появиться при завершении
+  matchWasAlreadyFinished = false;
+
+  pendingMatchFinish = null;
+  $('#matchFinishModal').addClass('dialog-hidden');
+}
+
 // Подписка на изменения после загрузки DOM
 $(document).ready(function() {
   // Инициализируем DB
@@ -50,6 +142,19 @@ $(document).ready(function() {
         }
         $(".hidden").removeClass("hidden");
         scoreboard_data = data;
+
+        // Проверяем завершение матча ТОЛЬКО при первой загрузке (не при каждом обновлении)
+        _subscribeCallCount++;
+        if (_subscribeCallCount === 1) {
+          var beachMode = !!scoreboard_data['beach_mode'];
+          var beachFinished = beachMode && scoreboard_data['beach_match_finished'];
+          var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
+          if (beachFinished || classicFinished) {
+            matchWasAlreadyFinished = true;
+            console.log('[MATCH] Матч загружен в завершённом состоянии. beachFinished:', beachFinished, 'classicFinished:', classicFinished, 'matchWasAlreadyFinished:', matchWasAlreadyFinished);
+          }
+        }
+
       $('.away_team').html(scoreboard_data['away_team'])
       $('.home_team').html(scoreboard_data['home_team'])
       var disp=scoreboard_data['show'];
@@ -97,21 +202,21 @@ $(document).ready(function() {
     }
     var beachFinished = beachMode && scoreboard_data['beach_match_finished'];
     var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
-    if(beachFinished || classicFinished){
-      $(".beach-match-status").removeClass("hidden").text("Матч завершён");
+    // Учитываем pendingMatchFinish — матч в процессе подтверждения
+    var matchPending = !!pendingMatchFinish;
+    if(beachFinished || classicFinished || matchPending){
+      $(".beach-match-status").removeClass("hidden").text(matchPending ? "Ожидание подтверждения..." : "Матч завершён");
     }else{
       $(".beach-match-status").addClass("hidden").text("");
     }
-    var matchFinished = beachFinished || classicFinished;
+    var matchFinished = beachFinished || classicFinished || matchPending;
     var pendingNewSet = !!scoreboard_data['pending_new_set'];
     var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
 
-    // Блокировка кнопок в блоке "Сет" (очки) после завершения сета
-    // Кнопки доступны только когда сет идет (не pendingNewSet и не matchFinished)
+    // Блокировка кнопок в блоке "Сет" (очки) после завершения сета или при ожидании подтверждения
     var scoreButtonsDisabled = pendingNewSet || matchFinished;
 
     // Блокировка кнопок в блоке "Счёт" (фолы) в середине сета
-    // Кнопки доступны только в начале сета (0:0) или при ожидании нового сета
     var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
 
     // Disable score buttons after set finished (pending new set)
@@ -125,8 +230,8 @@ $(document).ready(function() {
     $(".foul-btn").filter(function(){
       return parseInt($(this).text(),10) < 0;
     }).prop('disabled', matchFinished || foulButtonsDisabled);
-    
-    // New Set button enabled only when there's a pending new set
+
+    // New Set button enabled only when there's a pending new set (and not waiting for confirmation)
     $(".new-set-btn").prop('disabled', !pendingNewSet || matchFinished);
     // Highlight button with red background when pending new set
     if(pendingNewSet && !matchFinished){
@@ -134,9 +239,9 @@ $(document).ready(function() {
     }else{
       $(".new-set-btn").css('background-color', '').css('color', '');
     }
-    // Period buttons: enable only at initial moment or after set/match end
+    // Period buttons: enable only at initial moment or after set/match end (but not during confirmation)
     var unlimitedScore = !!scoreboard_data['unlimited_score'];
-    var enablePeriodButtons = unlimitedScore || startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished'];
+    var enablePeriodButtons = (unlimitedScore || startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished']) && !matchPending;
     var periodDisabled = !enablePeriodButtons;
     $(".period-btn").prop('disabled', periodDisabled);
 
@@ -394,7 +499,7 @@ function nextSetHistory(homeScore, awayScore){
 
 function handleBeachScore(team, delta){
   // Проверка завершенности матча для обоих режимов
-  if(scoreboard_data['beach_match_finished'] || scoreboard_data['classic_match_finished'])
+  if(scoreboard_data['beach_match_finished'] || scoreboard_data['classic_match_finished'] || pendingMatchFinish)
     return;
   var scoreKey=team+'_score';
   var otherKey=team=='home'?'away_score':'home_score';
@@ -431,7 +536,7 @@ function handleBeachScore(team, delta){
 
 function applySetWin(team, homeScore, awayScore, baseUpdate){
   var beachMode = !!scoreboard_data['beach_mode'];
-  
+
   if(beachMode) {
     // Логика пляжного волейбола
     var homeSets=ensureNumber(scoreboard_data['home_sets']);
@@ -465,10 +570,17 @@ function applySetWin(team, homeScore, awayScore, baseUpdate){
     }
     var updatedHistory = nextSetHistory(homeScore, awayScore);
     update['set_history']=updatedHistory;
-    if(matchFinished) {
-      saveMatchResult(updatedHistory, homeSets, awaySets);
+
+    if(matchFinished && !matchWasAlreadyFinished) {
+      // Показываем диалог подтверждения завершения матча
+      console.log('[MATCH] applySetWin (beach): matchFinished=true, показываем диалог');
+      showMatchFinishDialog(update, updatedHistory, homeSets, awaySets, 'beach');
+    } else {
+      update_db(update);
+      if(matchFinished) {
+        console.log('[MATCH] applySetWin (beach): matchFinished=true, но matchWasAlreadyFinished=true — диалог пропущен');
+      }
     }
-    update_db(update);
   } else {
     // Логика классического волейбола - используем fouls для подсчета сетов
     var homeFouls=ensureNumber(scoreboard_data['home_fouls']);
@@ -504,10 +616,19 @@ function applySetWin(team, homeScore, awayScore, baseUpdate){
     update['away_score']=awayScore;
     var updatedHistory = nextSetHistory(homeScore, awayScore);
     update['set_history']=updatedHistory;
-    if(matchFinished) {
+
+    if(matchFinished && !matchWasAlreadyFinished) {
+      // Показываем диалог подтверждения завершения матча
+      console.log('[MATCH] applySetWin (classic): matchFinished=true, показываем диалог');
+      showMatchFinishDialog(update, updatedHistory, homeFouls, awayFouls, 'classic');
+    } else if(matchFinished && matchWasAlreadyFinished) {
+      // Матч уже был завершён — просто сохраняем и обновляем
+      console.log('[MATCH] applySetWin (classic): matchFinished=true, но matchWasAlreadyFinished=true — диалог пропущен');
       saveMatchResult(updatedHistory, homeFouls, awayFouls);
+      update_db(update);
+    } else {
+      update_db(update);
     }
-    update_db(update);
   }
 }
 
@@ -637,14 +758,23 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
   update['away_score']=awayFinal;
   var updatedHistory = nextSetHistory(homeFinal, awayFinal);
   update['set_history']=updatedHistory;
-  if(matchFinished) {
+
+  if(matchFinished && !matchWasAlreadyFinished) {
+    // Показываем диалог подтверждения завершения матча
+    console.log('[MATCH] applyClassicSetWin: matchFinished=true, показываем диалог');
+    showMatchFinishDialog(update, updatedHistory, homeFouls, awayFouls, 'classic');
+  } else if(matchFinished && matchWasAlreadyFinished) {
+    // Матч уже был завершён — просто сохраняем и обновляем
+    console.log('[MATCH] applyClassicSetWin: matchFinished=true, но matchWasAlreadyFinished=true — диалог пропущен');
     saveMatchResult(updatedHistory, homeFouls, awayFouls);
+    update_db(update);
+  } else {
+    update_db(update);
   }
-  update_db(update);
 }
 
 function handleClassicScore(team, delta){
-  if(scoreboard_data['classic_match_finished'])
+  if(scoreboard_data['classic_match_finished'] || pendingMatchFinish)
     return;
   var scoreKey=team+'_score';
   var otherKey=team=='home'?'away_score':'home_score';
@@ -728,6 +858,9 @@ $(document).ready(function(){
   });
 
   $(".score-btn").click(function(){
+    // Блокировка при ожидании подтверждения завершения матча
+    if(pendingMatchFinish) return;
+
     var button=$(this);
     var delta=parseInt(button.text(),10)
     if(isNaN(delta))
@@ -826,7 +959,19 @@ $(document).ready(function(){
     update_db(update);
   });
 
+  // Обработчики кнопок модального окна подтверждения завершения матча
+  $("#matchFinishYes").click(function(){
+    confirmMatchFinish();
+  });
+
+  $("#matchFinishNo").click(function(){
+    cancelMatchFinish();
+  });
+
   $(".reset-btn").click(function(){
+    // Блокировка при ожидании подтверждения завершения матча
+    if(pendingMatchFinish) return;
+
     var beachEnabled=isBeachMode();
     var invertTablo = !!scoreboard_data['invert_tablo'];
     var userInfo = getCurrentUserInfo();
@@ -862,21 +1007,31 @@ $(document).ready(function(){
       away_side:'right',
       classic_tiebreak_switch_done:true,
       invert_tablo:invertTablo,
+      unlimited_score:false,
+      two_wins_mode:false,
+      // Сбрасываем все pending-поля, чтобы разблокировать кнопки "Смена сторон" и "Новый сет"
+      pending_new_set: DB.deleteField(),
+      next_period: DB.deleteField(),
+      next_beach_set: DB.deleteField(),
+      pending_home_side: DB.deleteField(),
+      pending_away_side: DB.deleteField(),
+      pending_classic_tiebreak_switch_done: DB.deleteField(),
+      classic_switch_needed: DB.deleteField(),
+      classic_switch_shown: DB.deleteField(),
+      classic_switch_message: DB.deleteField(),
       lastEdited: DB.serverTimestamp(),
       username: userInfo.username || '',
       displayname: userInfo.displayname || ''
     };
 
-    // Если есть last_match_id, помечаем матч как удаленный
-    if (lastMatchId) {
-      DB.matches.softDelete(lastMatchId).catch(function(error) {
-        console.error('Error marking match as deleted: ', error);
-      });
-    }
+    // Сбрасываем флаг — новая игра, диалог должен снова появиться
+    matchWasAlreadyFinished = false;
 
     scoreboard_collection.doc(game_id).set(resetData)
       .then(function(result) {
         console.log('Scoreboard reset complete:', result);
+        // НЕ удаляем последний матч — он должен отображаться в завершенных
+        // на странице online.html для просмотра результатов
         // Принудительно обновляем UI из результата
         if (result) {
           scoreboard_data = result;
@@ -902,6 +1057,9 @@ $(document).ready(function(){
       });
   });
   $(".period-btn").click(function(){
+    // Блокировка при ожидании подтверждения завершения матча
+    if(pendingMatchFinish) return;
+
     var button=$(this);
     var delta=parseInt(button.text(),10)
     if(isNaN(delta))
