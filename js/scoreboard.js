@@ -26,6 +26,95 @@ var DEFAULT_SCOREBOARD_DATA = {
   "invert_tablo": false
 };
 
+/**
+ * Определяет тип бейджа для команды
+ * @param {string} team - 'home' или 'away'
+ * @param {object} data - данные табло
+ * @returns {string|null} - 'matchball', 'setball' или null
+ */
+function getMatchBadgeType(team, data) {
+  var homeScore = parseInt(data.home_score, 10);
+  var awayScore = parseInt(data.away_score, 10);
+  var homeSets = data.home_sets || 0;
+  var awaySets = data.away_sets || 0;
+  var beachMode = data.beach_mode || false;
+  var currentSet = data.beach_current_set || 1;
+  
+  console.log('getMatchBadgeType: team=', team, 'homeScore=', homeScore, 'awayScore=', awayScore, 'homeSets=', homeSets, 'awaySets=', awaySets, 'beachMode=', beachMode);
+  
+  // Если счет не числовой (между сетами) - бейдж не нужен
+  if (isNaN(homeScore) || isNaN(awayScore)) {
+    console.log('getMatchBadgeType: scores are NaN');
+    return null;
+  }
+  
+  // Проверяем, завершен ли текущий сет (счет показывает '-' или match_finished)
+  if (data.classic_match_finished) {
+    console.log('getMatchBadgeType: match finished');
+    return null;
+  }
+  
+  // Определяем очки для победы в сете
+  var pointsToWin;
+  var setsToWinMatch;
+  
+  if (beachMode) {
+    // Пляжный волейбол: до 21 очка, до 2 сетов
+    pointsToWin = 21;
+    setsToWinMatch = 2;
+  } else {
+    // Классический волейбол
+    // Проверяем, это тай-брейк (5-й сет)?
+    var totalSetsPlayed = (data.set_history || []).length;
+    var isTiebreak = totalSetsPlayed === 4; // 5-й сет
+    
+    if (isTiebreak) {
+      pointsToWin = GAME_CONSTANTS.CLASSIC_TIEBREAK_POINTS_TO_WIN || 15;
+    } else {
+      pointsToWin = GAME_CONSTANTS.CLASSIC_POINTS_TO_WIN || 25;
+    }
+    setsToWinMatch = 3; // Классический - до 3 сетов
+  }
+  
+  console.log('getMatchBadgeType: pointsToWin=', pointsToWin, 'setsToWinMatch=', setsToWinMatch, 'isTiebreak=', (data.set_history || []).length === 4);
+  
+  // Проверяем сетбол - команда близка к победе в сете
+  var teamScore = team === 'home' ? homeScore : awayScore;
+  var opponentScore = team === 'home' ? awayScore : homeScore;
+  var teamSets = team === 'home' ? homeSets : awaySets;
+  
+  // Сетбол/матчбол возможен только если сет еще идет
+  // (ни одна команда еще не достигла очков для победы)
+  if (homeScore >= pointsToWin || awayScore >= pointsToWin) {
+    // Сет уже завершен, бейдж не показываем
+    console.log('getMatchBadgeType: set finished');
+    return null;
+  }
+  
+  var isSetball = false;
+  var isMatchball = false;
+  
+  // Сетбол: команда может выиграть сет следующим очком
+  if (teamScore >= pointsToWin - 1 && teamScore > opponentScore) {
+    isSetball = true;
+  }
+  
+  // Матчбол: команда может выиграть матч следующим выигранным сетом
+  if (isSetball && (teamSets + 1) >= setsToWinMatch) {
+    isMatchball = true;
+  }
+  
+  console.log('getMatchBadgeType: isSetball=', isSetball, 'isMatchball=', isMatchball);
+  
+  if (isMatchball) {
+    return 'matchball';
+  } else if (isSetball) {
+    return 'setball';
+  }
+  
+  return null;
+}
+
 // Подписка на изменения через DB интерфейс (вызывается после DB.init)
 function startScoreboardSubscription() {
 console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
@@ -85,7 +174,7 @@ DB.scoreboard.subscribe(
     $('.home_score').html(scoreboard_data['home_score'])
     $('.home_fouls').html(beachMode ? homeSets : scoreboard_data['home_fouls'])
     $(".home_color").css("background-color",scoreboard_data['home_color'])
-    
+
     // Обновляем общий счет по сетам на табло
     $('.away_sets').html(awaySets);
     $('.home_sets').html(homeSets);
@@ -104,9 +193,90 @@ DB.scoreboard.subscribe(
     if (typeof updateBottomSetsDisplay === 'function') {
       updateBottomSetsDisplay(scoreboard_data['set_history']);
     }
+    // Обновляем бейджи сетбола/матчбола для sb.html
+    if (typeof updateMatchBadges === 'function') {
+      updateMatchBadges(scoreboard_data);
+    }
     // Обновляем порядок на табло (функция сама проверит наличие элементов)
     updateTabloSides();
   });
+}
+
+/**
+ * Обновляет бейджи сетбола/матчбола на табло
+ * @param {object} data - данные табло
+ */
+function updateMatchBadges(data) {
+  var homeBadgeType = getMatchBadgeType('home', data);
+  var awayBadgeType = getMatchBadgeType('away', data);
+  
+  console.log('updateMatchBadges: homeBadgeType=', homeBadgeType, 'awayBadgeType=', awayBadgeType);
+  
+  // Обновляем только верхнее табло
+  updateSingleScoreboardBadges('.scoreboard > .match-badges-container', homeBadgeType, awayBadgeType);
+}
+
+/**
+ * Обновляет бейджи для одного табло
+ * @param {string} containerSelector - селектор контейнера
+ * @param {string|null} homeBadgeType - тип бейджа домашней команды
+ * @param {string|null} awayBadgeType - тип бейджа гостевой команды
+ */
+function updateSingleScoreboardBadges(containerSelector, homeBadgeType, awayBadgeType) {
+  var $container = $(containerSelector);
+  console.log('updateSingleScoreboardBadges: selector=', containerSelector, 'found=', $container.length);
+  
+  if (!$container.length) {
+    console.warn('Container not found for:', containerSelector);
+    return;
+  }
+
+  // Верхний бейдж (home)
+  var $homeBadge = $container.find('.home-match-badge');
+  console.log('home badge found:', $homeBadge.length, 'type:', homeBadgeType);
+  if ($homeBadge.length) {
+    updateSingleBadge($homeBadge, homeBadgeType);
+  }
+
+  // Нижний бейдж (away)
+  var $awayBadge = $container.find('.away-match-badge');
+  console.log('away badge found:', $awayBadge.length, 'type:', awayBadgeType);
+  if ($awayBadge.length) {
+    updateSingleBadge($awayBadge, awayBadgeType);
+  }
+
+  // Скрываем/показываем контейнер бейджей в зависимости от наличия активных бейджей
+  if (homeBadgeType === null && awayBadgeType === null) {
+    console.log('Hiding container');
+    $container.css('display', 'none');
+  } else {
+    console.log('Showing container');
+    $container.css('display', 'flex');
+  }
+}
+
+/**
+ * Обновляет один бейдж
+ * @param {jQuery} $badge - элемент бейджа
+ * @param {string|null} badgeType - тип бейджа
+ */
+function updateSingleBadge($badge, badgeType) {
+  console.log('updateSingleBadge: badgeType=', badgeType, 'element:', $badge.attr('class'));
+  
+  if (badgeType === null) {
+    $badge.css('display', 'none').removeClass('badge-setball badge-matchball').text('');
+  } else {
+    $badge.removeClass('badge-setball badge-matchball');
+    
+    if (badgeType === 'matchball') {
+      $badge.addClass('badge-matchball').text('МАТЧБОЛ');
+    } else if (badgeType === 'setball') {
+      $badge.addClass('badge-setball').text('СЕТБОЛ');
+    }
+    
+    $badge.css('display', 'inline-block');
+    console.log('Badge shown with type:', badgeType, 'classes:', $badge.attr('class'));
+  }
 }
 
 function renderSetHistory(history, showTop, showBottom){
@@ -232,7 +402,8 @@ function updateScoreboard1History(history){
   var el=$('#set-history-scoreboard1');
   if(el.length){
     if(text.length > 0){
-      el.text(text).show();
+      el.text(text);
+      // Не показываем здесь - управление видимостью в updateScoreboard1Display
     }else{
       el.text('').hide();
     }
