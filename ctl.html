@@ -139,6 +139,10 @@
       .modal-footer .btn {
         min-width: 80px;
       }
+      /* Стили для кнопок таймаута */
+      .timeout-btn {
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -187,12 +191,16 @@
                   <div class="score-field" id="home_score"></div>
                   <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
+                  <br>
+                  <button data-team="home" class="timeout-btn btn btn-warning" type="button">Т</button>
                 </div>
                 <div class="score-col away-col text-center">
                   <h4 class="away_team">away</h4>
                   <div class="score-field" id="away_score"></div>
                   <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
+                  <br>
+                  <button data-team="away" class="timeout-btn btn btn-warning" type="button">Т</button>
                 </div>
               </div>
             </div>

@@ -214,13 +214,44 @@ $(document).ready(function() {
     var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
 
     // Блокировка кнопок в блоке "Сет" (очки) после завершения сета или при ожидании подтверждения
-    var scoreButtonsDisabled = pendingNewSet || matchFinished;
+    // Также блокируем при активном таймауте
+    var isTimeoutActive = (parseInt(scoreboard_data['show'], 10) === 6);
+    var scoreButtonsDisabled = pendingNewSet || matchFinished || isTimeoutActive;
 
     // Блокировка кнопок в блоке "Счёт" (фолы) в середине сета
     var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
 
-    // Disable score buttons after set finished (pending new set)
+    // Disable score buttons after set finished (pending new set) or during timeout
     $(".score-btn").prop('disabled', scoreButtonsDisabled);
+
+    // Timeout buttons: disabled at start of set (0:0), after set end, after match end
+    // Also disable the other button when one team's timeout is active (show=6)
+    // Also disable when team has used all timeouts (classic: 2, beach: 1)
+    // Note: timeout buttons should NOT be disabled during timeout (they toggle it off)
+    var timeoutBaseDisabled = (pendingNewSet || matchFinished || startOfSet);
+    var beachMode = isBeachMode();
+    var maxTimeouts = beachMode ? 1 : 2;
+
+    var homeTimeouts = parseInt(scoreboard_data['home_timeouts'], 10) || 0;
+    var awayTimeouts = parseInt(scoreboard_data['away_timeouts'], 10) || 0;
+    var homeTimeoutsExhausted = homeTimeouts >= maxTimeouts;
+    var awayTimeoutsExhausted = awayTimeouts >= maxTimeouts;
+
+    if(isTimeoutActive){
+      var currentLabel = scoreboard_data['custom_label'] || '';
+      var homeTeam = scoreboard_data['home_team'] || '';
+      var awayTeam = scoreboard_data['away_team'] || '';
+      var isHomeTimeout = currentLabel === 'Таймаут ' + homeTeam;
+      var isAwayTimeout = currentLabel === 'Таймаут ' + awayTeam;
+      // Home button: disabled if away timeout is active, or home exhausted limits AND home timeout is NOT currently active
+      $(".timeout-btn[data-team='home']").prop('disabled', timeoutBaseDisabled || isAwayTimeout || (homeTimeoutsExhausted && !isHomeTimeout));
+      // Away button: disabled if home timeout is active, or away exhausted limits AND away timeout is NOT currently active
+      $(".timeout-btn[data-team='away']").prop('disabled', timeoutBaseDisabled || isHomeTimeout || (awayTimeoutsExhausted && !isAwayTimeout));
+    } else {
+      // When no timeout is active, check if each team has exhausted their timeouts
+      $(".timeout-btn[data-team='home']").prop('disabled', timeoutBaseDisabled || homeTimeoutsExhausted);
+      $(".timeout-btn[data-team='away']").prop('disabled', timeoutBaseDisabled || awayTimeoutsExhausted);
+    }
 
     // Disable foul buttons in middle of set
     $(".foul-btn").filter(function(){
@@ -336,7 +367,9 @@ function performNewSetUpdate(){
   var update = {
     home_score: 0,
     away_score: 0,
-    beach_switch_message: ''
+    beach_switch_message: '',
+    home_timeouts: 0,
+    away_timeouts: 0
   };
   if(isBeachMode()){
     var nextSet = scoreboard_data['next_beach_set'];
@@ -567,6 +600,8 @@ function applySetWin(team, homeScore, awayScore, baseUpdate){
       update['away_score']=awayScore;
       update['next_beach_set']=nextSet;
       update['pending_new_set']=true;
+      update['home_timeouts']=0;
+      update['away_timeouts']=0;
     }
     var updatedHistory = nextSetHistory(homeScore, awayScore);
     update['set_history']=updatedHistory;
@@ -638,7 +673,9 @@ function toggleBeachMode(enabled){
     beach_match_finished:false,
     set_history:[],
     classic_match_finished:false,
-    classic_tiebreak_switch_done:true
+    classic_tiebreak_switch_done:true,
+    home_timeouts: 0,
+    away_timeouts: 0
   };
   if(enabled){
     update['home_sets']=0;
@@ -668,7 +705,9 @@ function toggleTwoWinsMode(enabled){
     two_wins_mode:enabled,
     classic_match_finished:false,
     set_history:[],
-    beach_match_finished:false
+    beach_match_finished:false,
+    home_timeouts: 0,
+    away_timeouts: 0
   };
   if(enabled){
     update['home_fouls']=0;
@@ -749,6 +788,8 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
     update['pending_classic_tiebreak_switch_done'] = flip.classic_tiebreak_switch_done;
     update['next_period'] = nextPeriod;
     update['pending_new_set'] = true;
+    update['home_timeouts'] = 0;
+    update['away_timeouts'] = 0;
   }else{
     update['classic_tiebreak_switch_done']=true;
   }
@@ -892,6 +933,8 @@ $(document).ready(function(){
             update['next_beach_set'] = null;
             update['pending_new_set'] = null;
             update['beach_match_finished'] = false;
+            update['home_timeouts'] = 0;
+            update['away_timeouts'] = 0;
           }else{
             // classic revert: decrement sets counter stored in fouls field and reduce winner's score by 1
             if(winner === 'home'){
@@ -910,6 +953,8 @@ $(document).ready(function(){
             update['pending_classic_tiebreak_switch_done'] = null;
             update['pending_new_set'] = null;
             update['classic_match_finished'] = false;
+            update['home_timeouts'] = 0;
+            update['away_timeouts'] = 0;
           }
           update_db(update);
           return;
@@ -943,6 +988,73 @@ $(document).ready(function(){
       custom_label: $("#custom_label").val(),
     };
     console.log(update);
+    update_db(update);
+  });
+
+  $(".timeout-btn").click(function(){
+    // Блокировка при ожидании подтверждения завершения матча
+    if(pendingMatchFinish) return;
+
+    var team = $(this).data('team');
+    var teamName = team === 'home' ? scoreboard_data['home_team'] : scoreboard_data['away_team'];
+    var timeoutLabel = 'Таймаут ' + teamName;
+    var currentShow = parseInt(scoreboard_data['show'], 10) || 0;
+    var beachMode = isBeachMode();
+    var maxTimeouts = beachMode ? 1 : 2;
+    var homeTimeouts = parseInt(scoreboard_data['home_timeouts'], 10) || 0;
+    var awayTimeouts = parseInt(scoreboard_data['away_timeouts'], 10) || 0;
+
+    var update;
+    // Если уже режим show=6 (верх надпись+низ), переключаем на show=1 (только низ)
+    if(currentShow === 6){
+      // Проверяем, это таймаут той же команды?
+      var currentLabel = scoreboard_data['custom_label'] || '';
+      var homeTeam = scoreboard_data['home_team'] || '';
+      var awayTeam = scoreboard_data['away_team'] || '';
+      var isHomeTimeoutActive = currentLabel === 'Таймаут ' + homeTeam;
+      var isAwayTimeoutActive = currentLabel === 'Таймаут ' + awayTeam;
+
+      if(team === 'home'){
+        if(isHomeTimeoutActive){
+          // Та же команда — выключаем таймаут, счетчик НЕ уменьшаем
+          update = {
+            show: 1,
+            custom_label: scoreboard_data['custom_label']
+          };
+        } else {
+          // Другая команда была активна — блокируем переключение, ничего не делаем
+          return;
+        }
+      } else {
+        // away team
+        if(isAwayTimeoutActive){
+          // Та же команда — выключаем таймаут, счетчик НЕ уменьшаем
+          update = {
+            show: 1,
+            custom_label: scoreboard_data['custom_label']
+          };
+        } else {
+          // Другая команда была активна — блокируем переключение, ничего не делаем
+          return;
+        }
+      }
+    } else {
+      // Нет активного таймаута — проверяем лимит
+      var timeoutKey = team === 'home' ? 'home_timeouts' : 'away_timeouts';
+      var currentTimeouts = team === 'home' ? homeTimeouts : awayTimeouts;
+
+      if(currentTimeouts >= maxTimeouts){
+        // Лимит исчерпан — ничего не делаем
+        return;
+      }
+
+      update = {
+        show: 6,
+        custom_label: timeoutLabel,
+        [timeoutKey]: currentTimeouts + 1
+      };
+    }
+    console.log('Timeout button clicked:', update);
     update_db(update);
   });
 
@@ -996,6 +1108,8 @@ $(document).ready(function(){
       venue: $("#in_venue").val() || "",
       home_sets:0,
       away_sets:0,
+      home_timeouts:0,
+      away_timeouts:0,
       beach_mode:beachEnabled,
       beach_current_set:1,
       beach_switch_message:'',
@@ -1184,7 +1298,9 @@ $(document).ready(function(){
     var update = {
       home_score: 0,
       away_score: 0,
-      beach_switch_message: ''
+      beach_switch_message: '',
+      home_timeouts: 0,
+      away_timeouts: 0
     };
     // Если пляжный режим — выставляем следующий beach set, если он отложен
     if(isBeachMode()){

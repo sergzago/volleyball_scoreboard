@@ -713,6 +713,14 @@
      */
     update: function(gameId, data) {
       if (provider === 'firebase') {
+        // Обрабатываем маркеры удаления полей для Firebase
+        var setData = {};
+        Object.keys(data).forEach(function(key) {
+          if (data[key] !== '__PB_DELETE_FIELD__') {
+            setData[key] = data[key];
+          }
+        });
+
         return firebase.firestore()
           .collection(DB_CONFIG.collections.VOLLEYBALL)
           .doc(gameId)
@@ -725,6 +733,19 @@
               .then(function(snapshot) {
                 return snapshot.exists ? Object.assign({ id: snapshot.id }, snapshot.data()) : null;
               });
+          })
+          .catch(function(err) {
+            // Документ не существует — создаём через set
+            if (err.code === 'not-found') {
+              return firebase.firestore()
+                .collection(DB_CONFIG.collections.VOLLEYBALL)
+                .doc(gameId)
+                .set(setData, { merge: true })
+                .then(function() {
+                  return Object.assign({ id: gameId }, setData);
+                });
+            }
+            throw err;
           });
       }
 
