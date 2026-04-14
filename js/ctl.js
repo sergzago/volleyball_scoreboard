@@ -981,7 +981,7 @@ $(document).ready(function(){
 
     // Формируем данные для сброса
     var resetData = {
-      show:0,
+      show:1, // По умолчанию верхнее табло активно
       home_score:0,
       home_fouls:0,
       away_score:0,

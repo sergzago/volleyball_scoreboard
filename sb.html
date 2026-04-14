@@ -27,7 +27,7 @@
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            overflow: visible; /* Чтобы бейджи не обрезались */
+            overflow: visible;
         }
 
         /* Верхний лейбл (custom_label) */
@@ -54,11 +54,11 @@
             height: 64px; /* Уменьшено с 80px на 20% */
             color: white;
             border-radius: 4px;
-            overflow: hidden;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            overflow: visible;
+            box-shadow: none; /*0 4px 10px rgba(0,0,0,0.3);*/
             opacity: 1;
             transition: opacity 1s ease, transform 1s ease;
-            position: relative; /* Для позиционирования бейджей */
+            position: relative;
         }
 
         .scoreboard.hidden {
@@ -277,6 +277,7 @@
             padding: 3px; /* Уменьшено с 4px */
             position: relative;
             background-color: #1a2b3c;
+            box-sizing: border-box; /* Чтобы padding включался в высоту */
         }
 
         /* Логотип из Base64 */
@@ -418,20 +419,39 @@
             background-color: #5aa0c4; /* Голубой цвет для общего счета (как у сетов) */
         }
 
-        /* Контейнер бейджей сетбола/матчбола */
-        .match-badges-container {
-            position: absolute;
-            right: -75px;
-            top: 0;
-            display: none; /* Скрыт по умолчанию */
-            flex-direction: column;
-            width: 70px;
+        /* Правая часть: Счет и бейджи */
+        .scores-and-badges {
+            display: flex;
+            align-items: flex-start;
+            height: 100%;
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+        }
+
+        /* Область бейджей */
+        .match-badges-area {
+            display: none;
+            position: relative;
+            height: 100%;
+            width: auto;
+            margin-left: 6px;
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+            isolation: isolate;
         }
 
         /* Бейджи сетбола/матчбола */
         .match-badge {
-            display: inline-block;
-            padding: 2px 6px;
+            position: absolute;
+            right: 0;
+            display: none;
+            padding: 3px 6px;
             border-radius: 3px;
             font-size: 9px;
             font-weight: bold;
@@ -441,24 +461,27 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             animation: badge-pulse 2s ease-in-out infinite;
             line-height: 1;
+            height: 16px;
+            box-sizing: border-box;
+            color: white;
         }
 
         .badge-setball {
-            background-color: #ff9800;
-            color: white;
+            background-color: #5aa0c4;
         }
 
         .badge-matchball {
-            background-color: #f44336;
-            color: white;
+            background-color: #5aa0c4;
         }
 
         .home-match-badge {
-            margin-top: 12px;
+            position: relative;
+            top: 7px;
         }
 
         .away-match-badge {
-            margin-top: 32px;
+            position: relative;
+            top: 38px;
         }
 
         /* Блок истории сетов под основным табло */
@@ -519,24 +542,26 @@
                 </div>
             </div>
 
-            <!-- Правая часть: Счет -->
-            <div class="scores-area">
-                <!-- Колонка общего счета (серая) -->
-                <div class="score-column total-score">
-                    <div class="home_fouls" style="text-align: center;"></div>
-                    <div class="away_fouls" style="text-align: center;"></div>
+            <!-- Правая часть: Счет и бейджи -->
+            <div class="scores-and-badges">
+                <div class="scores-area">
+                    <!-- Колонка общего счета (серая) -->
+                    <div class="score-column total-score">
+                        <div class="home_fouls" style="text-align: center;"></div>
+                        <div class="away_fouls" style="text-align: center;"></div>
+                    </div>
+                    <!-- Колонка очков (розовая) -->
+                    <div class="score-column points-score">
+                        <div class="home_score" style="text-align: left;"></div>
+                        <div class="away_score" style="text-align: left;"></div>
+                    </div>
                 </div>
-                <!-- Колонка очков (розовая) -->
-                <div class="score-column points-score">
-                    <div class="home_score" style="text-align: left;"></div>
-                    <div class="away_score" style="text-align: left;"></div>
-                </div>
-            </div>
 
-            <!-- Бейджи сетбола/матчбола -->
-            <div class="match-badges-container">
-                <div class="home-match-badge"></div>
-                <div class="away-match-badge"></div>
+                <!-- Бейджи сетбола/матчбола -->
+                <div class="match-badges-area">
+                    <div class="home-match-badge"></div>
+                    <div class="away-match-badge"></div>
+                </div>
             </div>
         </div>
 
