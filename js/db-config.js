@@ -38,8 +38,8 @@ var DB_CONFIG = {
   // НАЗВАНИЯ КОЛЛЕКЦИЙ (отдельно для каждого провайдера)
   // ============================================================================
   firebaseCollections: {
-    VOLLEYBALL: 'volleyball1',
-    MATCHES: 'matches1',
+    VOLLEYBALL: 'volleyball',
+    MATCHES: 'matches',
     USERS: 'users',
     AUTH_LOG: 'auth_log'
   },
