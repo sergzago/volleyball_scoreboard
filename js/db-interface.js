@@ -887,6 +887,21 @@
       return function() {
         pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe('*');
       };
+    },
+
+    /**
+     * Удалить игру из коллекции volleyball
+     */
+    delete: function(gameId) {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection(DB_CONFIG.collections.VOLLEYBALL)
+          .doc(gameId)
+          .delete();
+      }
+
+      var pb = getPocketBaseClient();
+      return pb.collection(DB_CONFIG.collections.VOLLEYBALL).delete(gameId);
     }
   };
 
@@ -985,6 +1000,21 @@
         is_deleted: true,
         deleted_at: toPbDate(new Date())
       });
+    },
+
+    /**
+     * Удалить матч из коллекции matches
+     */
+    delete: function(matchId) {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection(DB_CONFIG.collections.MATCHES)
+          .doc(matchId)
+          .delete();
+      }
+
+      var pb = getPocketBaseClient();
+      return pb.collection(DB_CONFIG.collections.MATCHES).delete(matchId);
     }
   };
 
