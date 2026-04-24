@@ -22,7 +22,7 @@ var CREDENTIALS = (typeof CREDENTIALS !== 'undefined') ? CREDENTIALS : { firebas
 
 var DB_CONFIG = {
   // Текущий провайдер: 'firebase' | 'pocketbase'
-  provider: 'firebase',
+  provider: 'pocketbase',
 
   // ============================================================================
   // FIREBASE КОНФИГУРАЦИЯ (из credentials.js)
