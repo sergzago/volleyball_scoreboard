@@ -497,25 +497,39 @@
         var deleteMatchId = null;
 
         // Initialize
-        function init() {
-            // Проверка авторизации
-            checkAuth().then(function(currentUser) {
-                user = currentUser;
-                // Проверка прав администратора (например, по полю admin в пользователе)
-                isAdmin = user && (user.admin === true || user.role === 'admin');
-                showMainContent();
-                loadMatches();
-            }).catch(function() {
+        async function init() {
+            // Сначала инициализируем DB
+            try {
+                await DB.init();
+            } catch (e) {
+                console.error('DB init failed:', e);
+                document.getElementById('authContent').innerHTML = '<div class="no-games">Ошибка подключения к БД</div>';
+                return;
+            }
+
+            // Проверка авторизации через AuthModule
+            try {
+                const isAuthenticated = await AuthModule.checkAuth('user', null);
+                if (isAuthenticated) {
+                    user = AuthModule.getCurrentUser();
+                    isAdmin = user && (user.admin === true || user.role === 'admin');
+                    showMainContent();
+                    loadMatches();
+                } else {
+                    showAuthMessage();
+                }
+            } catch (e) {
+                console.error('Auth check failed:', e);
                 showAuthMessage();
-            });
+            }
         }
 
         // Проверка авторизации
         function checkAuth() {
             return new Promise(function(resolve, reject) {
-                // Используем auth.js функции
-                if (window.Auth && Auth.getCurrentUser) {
-                    var currentUser = Auth.getCurrentUser();
+                // Используем AuthModule из auth.js
+                if (window.AuthModule && AuthModule.getCurrentUser) {
+                    var currentUser = AuthModule.getCurrentUser();
                     if (currentUser) {
                         resolve(currentUser);
                     } else {
@@ -565,10 +579,9 @@
 
             // Настройка обработчиков событий
             document.getElementById('teamFilter').addEventListener('input', function(e) {
-                teamFilter = e.target.value.trim().toLowerCase();
-                filterMatches();
-                renderPagination();
-                renderMatches();
+                teamFilter = e.target.value.trim();
+                currentPage = 1;
+                loadMatches();
             });
 
             document.getElementById('matchesPerPage').addEventListener('change', function(e) {
@@ -669,30 +682,34 @@
             var container = document.getElementById('gamesContainer');
             container.innerHTML = '<div class="loading">Загрузка матчей...</div>';
 
-            matches_collection = createMatchesCollection();
+            // Загружаем матчи с серверной фильтрацией по команде
+            var queryFilters = {
+                sort: 'date_time',
+                order: 'desc'
+            };
+            if (teamFilter) {
+                queryFilters.team = teamFilter;
+            }
 
-            // Загружаем все матчи, сортируя по дате в обратном порядке (последние сначала)
-            matches_collection
-                .orderBy('date_time', 'desc')
-                .get()
-                .then(function(querySnapshot) {
+            DB.matches.query(queryFilters)
+                .then(function(results) {
                     allMatches = [];
-                    querySnapshot.forEach(function(doc) {
-                        var data = doc.data();
-                        // Конвертация даты из Firestore
+                    results.forEach(function(item) {
+                        var data = item;
+                        // Конвертация даты из Firestore/PocketBase
                         if (data.date_time && data.date_time.toDate) {
                             data.date_time = data.date_time.toDate();
                         } else if (data.date_time && typeof data.date_time === 'string') {
                             data.date_time = new Date(data.date_time);
                         }
                         allMatches.push({
-                            id: doc.id,
+                            id: item.id,
                             data: data
                         });
                     });
 
-                    // Применение фильтров и сортировка
-                    filterMatches();
+                    // filteredMatches теперь равен allMatches (фильтрация на сервере)
+                    filteredMatches = allMatches;
                     renderPagination();
                     renderMatches();
                     updateLastUpdateTime();
@@ -703,18 +720,11 @@
                 });
         }
 
-        // Фильтрация матчей
+        // Фильтрация матчей (теперь используется серверная фильтрация)
         function filterMatches() {
-            filteredMatches = allMatches.filter(function(match) {
-                if (!teamFilter) return true;
-                
-                var homeTeam = (match.data.home_team || '').toLowerCase();
-                var awayTeam = (match.data.away_team || '').toLowerCase();
-                
-                return homeTeam.includes(teamFilter) || awayTeam.includes(teamFilter);
-            });
-
-            // Обновление количества страниц
+            // Фильтрация выполняется на сервере в loadMatches()
+            // Эта функция оставлена для совместимости
+            filteredMatches = allMatches;
             totalPages = Math.max(1, Math.ceil(filteredMatches.length / matchesPerPage));
             currentPage = Math.min(currentPage, totalPages);
         }

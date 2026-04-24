@@ -912,7 +912,7 @@
 
     /**
      * Запрос матчей по фильтру
-     * @param {Object} filters — { dateFrom, dateTo, gameId, ... }
+     * @param {Object} filters — { dateFrom, dateTo, team, ... }
      */
     query: function(filters) {
       filters = filters || {};
@@ -931,6 +931,15 @@
           snapshot.forEach(function(doc) {
             var data = doc.data();
             if (data.is_deleted) return; // Пропускаем удалённые
+            // Фильтр по команде (клиентская фильтрация для Firebase)
+            if (filters.team) {
+              var teamLower = filters.team.toLowerCase();
+              var homeTeam = (data.home_team || '').toLowerCase();
+              var awayTeam = (data.away_team || '').toLowerCase();
+              if (!homeTeam.includes(teamLower) && !awayTeam.includes(teamLower)) {
+                return;
+              }
+            }
             results.push({ id: doc.id, ...data });
           });
           return results;
@@ -945,6 +954,10 @@
       }
       if (filters.dateTo) {
         filterStr += ' && date_time <= "' + toPbDate(filters.dateTo) + '"';
+      }
+      if (filters.team) {
+        var teamEscaped = filters.team.replace(/"/g, '\\"');
+        filterStr += ' && (home_team ~ "' + teamEscaped + '" || away_team ~ "' + teamEscaped + '")';
       }
 
       return pb.collection(DB_CONFIG.collections.MATCHES).getFullList({
