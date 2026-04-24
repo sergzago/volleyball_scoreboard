@@ -12,6 +12,9 @@ window.AuthModule = (function() {
     let currentUser = null;
     let currentRole = null;
     let idToken = null;
+    
+    // Флаг для предотвращения автоматического редиректа при logout
+    let skipRedirectOnLogout = false;
 
     /**
      * Проверка авторизации пользователя
@@ -32,7 +35,9 @@ window.AuthModule = (function() {
         return new Promise((resolve, reject) => {
             DB.auth.onAuthStateChanged(async (user) => {
                 if (!user) {
-                    if (redirectUrl) {
+                    // Проверяем, если redirectUrl явно указан как null, то не перенаправляем
+                    // Также проверяем, если мы в процессе logout, не перенаправляем
+                    if (redirectUrl !== null && redirectUrl && redirectUrl !== 'login.html') {
                         window.location.href = redirectUrl;
                     }
                     resolve(false);
@@ -45,7 +50,7 @@ window.AuthModule = (function() {
                 // Проверяем роль
                 if (requiredRole === 'admin' && currentRole !== 'admin') {
                     // Если требуется админ, а у пользователя роль user
-                    if (redirectUrl) {
+                    if (redirectUrl !== null && redirectUrl) {
                         window.location.href = 'ctl.html';
                     }
                     resolve(false);
@@ -81,31 +86,40 @@ window.AuthModule = (function() {
         return idToken;
     }
 
-    /**
-     * Выход из системы
-     * @returns {Promise<void>}
-     */
-    async function logout() {
-        // Если авторизация отключена, просто перенаправляем на главную
-        if (!isAuthEnabled) {
-            window.location.href = 'index.html';
-            return;
-        }
+     /**
+      * Выход из системы
+      * @returns {Promise<void>}
+      */
+     async function logout() {
+         // Если авторизация отключена, просто перенаправляем на главную
+         if (!isAuthEnabled) {
+             window.location.href = 'index.html';
+             return;
+         }
 
-        try {
-            // Убедимся что DB инициализирован
-            await DB.init();
-            await DB.auth.logout();
-            currentUser = null;
-            currentRole = null;
-            idToken = null;
-            window.location.href = 'login.html';
-        } catch (error) {
-            console.error('Logout error:', error);
-            // Даже при ошибке перенаправляем
-            window.location.href = 'login.html';
-        }
-    }
+         try {
+             // Убедимся что DB инициализирован
+             await DB.init();
+             await DB.auth.logout();
+             currentUser = null;
+             currentRole = null;
+             idToken = null;
+             // Не перенаправляем на login.html, оставляем пользователя на текущей странице
+             // Обновляем UI для отображения состояния "не авторизован"
+             if (typeof window.updateUserInfo === 'function') {
+                 window.updateUserInfo();
+             }
+         } catch (error) {
+             console.error('Logout error:', error);
+             // Даже при ошибке обновляем UI
+             currentUser = null;
+             currentRole = null;
+             idToken = null;
+             if (typeof window.updateUserInfo === 'function') {
+                 window.updateUserInfo();
+             }
+         }
+     }
 
     /**
      * Получение заголовков для API запросов

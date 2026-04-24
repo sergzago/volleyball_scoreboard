@@ -465,6 +465,10 @@
         <div class="page-header">
             <h1>Список матчей</h1>
             <img class="logo-img" src="" alt="Logo">
+        <div class="auth-controls">
+            <span id="userInfo">Загрузка...</span>
+            <button class="btn btn-secondary" id="authButton">Войти</button>
+        </div>
         </div>
 
         <div id="authContent">
@@ -523,23 +527,10 @@
                 return;
             }
 
-            // Проверка авторизации через AuthModule
-            try {
-                // Сохраняем текущий URL для возможного возврата после авторизации
-                const currentUrl = window.location.href;
-                const isAuthenticated = await AuthModule.checkAuth('user', `login.html?redirect=${encodeURIComponent(currentUrl)}`);
-                if (isAuthenticated) {
-                    user = AuthModule.getCurrentUser();
-                    isAdmin = user && (user.admin === true || user.role === 'admin');
-                    showMainContent();
-                    loadMatches();
-                } else {
-                    showAuthMessage();
-                }
-            } catch (e) {
-                console.error('Auth check failed:', e);
-                showAuthMessage();
-            }
+            // Показываем основной контент без проверки авторизации
+            // Авторизация будет происходить только по кнопке
+            showMainContent();
+            loadMatches();
         }
 
         // Проверка авторизации
@@ -559,16 +550,6 @@
             });
         }
 
-        // Показать сообщение об авторизации
-        function showAuthMessage() {
-            var authContent = document.getElementById('authContent');
-            authContent.innerHTML = `
-                <div class="no-games">
-                    <p>Для просмотра списка матчей необходимо авторизоваться.</p>
-                    <p><a href="login.html" style="color: #1695A3; text-decoration: underline;">Перейти к авторизации</a></p>
-                </div>
-            `;
-        }
 
         // Показать основной контент
         function showMainContent() {
@@ -1084,10 +1065,164 @@
             });
         }
 
+        // Обновление информации о пользователе
+        function updateUserInfo() {
+            const userInfo = document.getElementById('userInfo');
+            const authButton = document.getElementById('authButton');
+            
+            if (user) {
+                // Пользователь авторизован
+                userInfo.textContent = `${user.email || user.displayName || 'Пользователь'}`;
+                authButton.textContent = 'Выйти';
+            authButton.onclick = function(event) {
+                console.log('Button clicked - authButton.onclick called');
+                console.log('User state:', user);
+                // Предотвращаем стандартное поведение кнопки
+                event.preventDefault();
+                console.log('Prevented default behavior');
+                // При выходе из системы не перенаправляем на login.html
+                // просто очищаем состояние и обновляем UI
+                // Выполняем logout через DB напрямую, чтобы избежать перенаправления
+                console.log('Calling logoutFromSystem()');
+                logoutFromSystem();
+                console.log('logoutFromSystem() completed');
+            };
+            } else {
+                // Пользователь не авторизован
+                userInfo.textContent = 'Гость';
+                authButton.textContent = 'Войти';
+                authButton.onclick = function() {
+                    handleAuthClick();
+                };
+            }
+        }
+
+        // Выход из системы без перенаправления
+        function logoutFromSystem() {
+            // Предотвращаем любые возможные перенаправления
+            if (event && event.preventDefault) {
+                event.preventDefault();
+            }
+            
+            // Выполняем logout через DB напрямую
+            DB.init().then(function() {
+                return DB.auth.logout();
+            }).then(function() {
+                // После logout очищаем локальные переменные
+                user = null;
+                isAdmin = false;
+                updateUserInfo();
+                // Обновляем страницу для отображения изменений
+                location.reload();
+            }).catch(function(error) {
+                console.error('Logout error:', error);
+                // Даже при ошибке очищаем локальные переменные и обновляем UI
+                user = null;
+                isAdmin = false;
+                updateUserInfo();
+                // Обновляем страницу для отображения изменений
+                location.reload();
+            });
+            
+            // Добавляем принудительную остановку любого потенциального redirect
+            return false;
+        }
+
+        // Обработка клика по кнопке авторизации
+        function handleAuthClick() {
+            console.log('handleAuthClick called, user:', user); // Отладка
+            console.log('Attempting to click auth button'); // Добавим лог
+            
+            if (user) {
+                // Если пользователь авторизован, выход
+                console.log('Logging out user');
+                AuthModule.logout();
+            } else {
+                // Если пользователь не авторизован, переход на страницу входа
+                console.log('Redirecting to login');
+                const currentUrl = window.location.href;
+                console.log('About to redirect to:', `login.html?redirect=${encodeURIComponent(currentUrl)}`);
+                // Используем setTimeout для более надежного редиректа
+                setTimeout(function() {
+                    window.location.href = `login.html?redirect=${encodeURIComponent(currentUrl)}`;
+                    console.log('Redirect completed');
+                }, 10);
+            }
+        }
+
         // Запуск приложения после загрузки DOM
-        document.addEventListener('DOMContentLoaded', function() {
-            init();
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('DOM loaded, checking AuthModule availability');
+            console.log('AuthModule exists:', typeof window.AuthModule !== 'undefined');
+            if (typeof window.AuthModule !== 'undefined') {
+                console.log('AuthModule methods:', Object.keys(window.AuthModule));
+            }
+            
+            await init();
             loadLogoImage();
+            
+            // Проверяем наличие авторизованного пользователя при загрузке
+            console.log('Checking current user on load...');
+            try {
+                // Используем checkAuth для проверки состояния авторизации
+                await AuthModule.checkAuth('user', null); // null для redirectUrl означает не редиректить
+                const currentUser = AuthModule.getCurrentUser();
+                console.log('Current user on load:', currentUser);
+                if (currentUser) {
+                    user = currentUser;
+                    isAdmin = user && (user.admin === true || user.role === 'admin');
+                } else {
+                    user = null;
+                    isAdmin = false;
+                }
+                updateUserInfo();
+            } catch (error) {
+                console.log('Auth check failed:', error);
+                user = null;
+                isAdmin = false;
+                updateUserInfo();
+            }
+            
+        // Добавляем обработчик события для кнопки авторизации
+            const authButton = document.getElementById('authButton');
+            if (authButton) {
+                console.log('Adding click event listener to authButton');
+                // Удаляем глобальный обработчик и используем только прямой обработчик
+                // который будет правильно обрабатывать как вход, так и выход
+                authButton.onclick = function(event) {
+                    console.log('Auth button clicked!');
+                    console.log('User before click:', user);
+                    // Предотвращаем стандартное поведение кнопки
+                    event.preventDefault();
+                    // Вызываем соответствующую функцию в зависимости от состояния пользователя
+                    if (user) {
+                        console.log('User is logged in, calling logoutFromSystem');
+                        logoutFromSystem();
+                    } else {
+                        console.log('User is not logged in, calling handleAuthClick');
+                        handleAuthClick();
+                    }
+                };
+            } else {
+                console.log('authButton element not found');
+            }
+            
+            // Добавляем слушатель события для обновления при возврате с login.html
+            window.addEventListener('pageshow', function(event) {
+                // При возврате со страницы login.html обновляем информацию о пользователе
+                // Используем pageshow вместо pagehide для обновления после авторизации
+                console.log('pageshow event triggered, checking user...');
+                const currentUser = AuthModule.getCurrentUser();
+                console.log('Current user on pageshow:', currentUser);
+                if (currentUser) {
+                    user = currentUser;
+                    isAdmin = user && (user.admin === true || user.role === 'admin');
+                } else {
+                    user = null;
+                    isAdmin = false;
+                }
+                updateUserInfo();
+            });
         });
 
         // Глобальные функции для пагинации
