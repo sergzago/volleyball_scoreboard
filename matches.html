@@ -974,6 +974,7 @@
                 return;
             }
 
+<<<<<<< HEAD
             var matchId = matchData.id;
             var isVolleyball = matchData.isVolleyball;
 
@@ -999,6 +1000,13 @@
                     .catch(function(error) {
                         console.error('Error deleting volleyball game:', error);
                         alert('Ошибка при удалении матча');
+=======
+            DB.matches.softDelete(matchId)
+                .then(function() {
+                    // Удаляем матч из массива
+                    allMatches = allMatches.filter(function(match) {
+                        return match.id !== matchId;
+>>>>>>> 5b3096f (Fix match deletion in matches.html\n\n- Replace direct DB.matches.delete() call with DB.matches.softDelete() method\n- Use proper soft deletion mechanism from db-interface.js\n- Maintain existing confirmation modal functionality\n- Ensure proper match removal from UI after deletion)
                     });
             } else {
                 // Удаление из коллекции matches
