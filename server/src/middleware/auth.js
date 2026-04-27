@@ -31,25 +31,35 @@ async function requireAuth(req, res, next) {
         claims: decodedToken.claims || {}
       };
     } else if (dbConfig.provider === 'pocketbase') {
-      // PocketBase: проверяем токен через SDK
+      // PocketBase: проверяем токен через сохранение в authStore SDK
       const { client } = dbConfig;
-      const usersCollection = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
-      const record = await client.collection(usersCollection).getFirstListItem(`token = "${token}"`)
-        .catch(() => null);
 
-      if (!record) {
+      try {
+        // Сохраняем токен в authStore — PocketBase SDK автоматически расшифрует JWT
+        // и заполнит client.authStore.model
+        client.authStore.save(token, null);
+
+        if (!client.authStore.isValid || !client.authStore.model) {
+          return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'Неверный или истекший токен авторизации.'
+          });
+        }
+
+        const record = client.authStore.model;
+
+        req.user = {
+          uid: record.id,
+          email: record.email,
+          role: record.role || 'user',
+          claims: { role: record.role || 'user', admin: record.role === 'admin' }
+        };
+      } catch {
         return res.status(401).json({
           error: 'Unauthorized',
           message: 'Неверный или истекший токен авторизации.'
         });
       }
-
-      req.user = {
-        uid: record.id,
-        email: record.email,
-        role: record.role || 'user',
-        claims: { role: record.role || 'user', admin: record.role === 'admin' }
-      };
     } else {
       return res.status(500).json({
         error: 'Internal Server Error',

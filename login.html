@@ -276,7 +276,8 @@
                 }
 
                 if (user) {
-                    showLoading();
+                    // Не показываем спиннер — пользователь уже авторизован,
+                    // просто делаем мгновенный редирект
                     try {
                         // Для admin.html всегда проверяем роль через DB
                         if (isAdminPage) {
@@ -332,9 +333,9 @@
                     // Генерируем email из username
                     const email = username.toLowerCase() + '@volleyball.local';
 
-                    // Вход через Firebase Auth с email
-                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                    const user = userCredential.user;
+                    // Вход через DB.auth.login (PocketBase / Firebase)
+                    const userInfo = await DB.auth.login(username, password);
+                    const user = { uid: userInfo.uid, email: userInfo.email, displayName: userInfo.displayName, role: userInfo.role };
 
                     // Записываем вход в auth_log
                     try {
@@ -368,19 +369,13 @@
                         console.error('Failed to write auth_log:', err);
                     }
 
-                    // Проверяем роль через DB
-                    const userData = await DB.users.get(username.toLowerCase());
-
-                    let role = 'user';
-                    if (userData && userData.role) {
-                        role = userData.role === 'admin' ? 'admin' : 'user';
-                    }
+                    // Роль уже получена из DB.auth.login — не делаем лишний запрос
+                    let role = userInfo.role || 'user';
 
                     // Для admin.html проверяем права администратора
                     if (isAdminPage && role !== 'admin') {
-                        hideLoading();
                         showError('Доступ запрещен. Требуются права администратора.');
-                        await auth.signOut();
+                        await DB.auth.logout();
                         return;
                     }
 
@@ -390,23 +385,20 @@
                     isLoggingIn = false;
 
                     // Возвращаемся на страницу, с которой пришли
-                    setTimeout(() => {
-                        if (redirectUrl) {
-                            window.location.href = redirectUrl;
-                        } else {
-                            // Если redirectUrl нет, перенаправляем на index.html
-                            window.location.href = 'index.html';
-                        }
-                    }, 1000);
+                    if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                    } else {
+                        window.location.href = 'index.html';
+                    }
 
                 } catch (error) {
                     // Сбрасываем флаг при ошибке
                     isLoggingIn = false;
-                    hideLoading();
                     console.error('Login error:', error);
 
                     let errorMsg = error.message || 'Ошибка входа. Проверьте логин и пароль.';
-                    // Проверяем код ошибки
+
+                    // Обработка ошибок Firebase
                     if (error.code === 'auth/user-not-found') {
                         errorMsg = 'Пользователь не найден';
                     } else if (error.code === 'auth/wrong-password') {
@@ -419,30 +411,28 @@
                         errorMsg = 'Неверное имя пользователя';
                     } else if (error.code === 'auth/network-request-failed') {
                         errorMsg = 'Ошибка сети. Проверьте интернет-соединение.';
-                    } else if (error.code === 'auth/invalid-credential' || error.code === 'INVALID_LOGIN_CREDENTIALS') {
-                        // Firebase v9+ использует 'auth/invalid-credential'
+                    } else if (error.code === 'auth/invalid-credential') {
                         errorMsg = 'Пользователь не найден или неверный пароль';
-                    } else {
-                        // Пытаемся извлечь сообщение из JSON ошибки
-                        if (error.message && typeof error.message === 'string') {
-                            try {
-                                const parsed = JSON.parse(error.message);
-                                if (parsed.error && parsed.error.message) {
-                                    const firebaseMsg = parsed.error.message;
-                                    if (firebaseMsg.includes('INVALID_LOGIN_CREDENTIALS') || 
-                                        firebaseMsg.includes('USER_NOT_FOUND')) {
-                                        errorMsg = 'Пользователь не найден или неверный пароль';
-                                    } else if (firebaseMsg.includes('WRONG_PASSWORD')) {
-                                        errorMsg = 'Неверный пароль';
-                                    }
-                                }
-                            } catch (e) {
-                                // Не JSON, используем стандартное сообщение
-                            }
+                    }
+                    // Обработка ошибок PocketBase
+                    else if (error.status === 400) {
+                        errorMsg = 'Пользователь не найден или неверный пароль';
+                    } else if (error.status === 0 || (error.message && error.message.includes('Failed to fetch'))) {
+                        errorMsg = 'Ошибка сети. Проверьте интернет-соединение или доступность сервера.';
+                    }
+                    // Общая обработка текстовых сообщений
+                    else if (error.message && typeof error.message === 'string') {
+                        const msg = error.message;
+                        if (msg.includes('Failed to authenticate') || msg.includes('Invalid login')) {
+                            errorMsg = 'Пользователь не найден или неверный пароль';
+                        } else if (msg.includes('Failed to fetch') || msg.includes('Network')) {
+                            errorMsg = 'Ошибка сети. Проверьте интернет-соединение.';
                         }
                     }
 
                     showError(errorMsg);
+                } finally {
+                    hideLoading();
                 }
             });
 

@@ -57,9 +57,9 @@ const EXCLUDE_FIELDS = ['_firestore_deleted', 'created_at', 'updated_at'];
 async function authenticatePocketBase() {
   console.log('🔐 Авторизация в PocketBase...');
   try {
-    await pb.admins.authWithPassword(
-      DB_CONFIG.pocketbase.adminEmail,
-      DB_CONFIG.pocketbase.adminPassword
+    await pb.collection('app_users').authWithPassword(
+      'app@volleyball.local',
+      'iakWTB2IabF-r00'
     );
     console.log('✅ Авторизация успешна');
   } catch (error) {
@@ -174,11 +174,6 @@ async function migrateCollection(collectionName) {
   // Получение данных из Firebase
   const documents = await getFirebaseCollection(fbCollection);
   
-  if (documents.length === 0) {
-    console.log('⏭️  Нет данных для миграции');
-    return { success: 0, failed: 0 };
-  }
-  
   let successCount = 0;
   let failedCount = 0;
   
@@ -275,6 +270,35 @@ async function migrateUsersWithAuth() {
 }
 
 /**
+ * Полная очистка всех данных из коллекций PocketBase перед миграцией
+ */
+async function cleanAllPocketBaseData() {
+  console.log(`\n🧹 Полная очистка данных PocketBase...`);
+
+  const collectionsToClean = [
+    { name: DB_CONFIG.pocketbaseCollections.VOLLEYBALL, label: 'volleyball' },
+    { name: DB_CONFIG.pocketbaseCollections.MATCHES, label: 'matches' },
+    { name: DB_CONFIG.pocketbaseCollections.AUTH_LOG, label: 'auth_log' },
+  ];
+
+  for (const { name, label } of collectionsToClean) {
+    try {
+      const records = await pb.collection(name).getFullList({ perPage: 10000 });
+      console.log(`   ${label}: найдено ${records.length} записей для удаления`);
+      for (const record of records) {
+        await pb.collection(name).delete(record.id);
+        console.log(`   🗑️  ${label}/${record.id} удалён`);
+      }
+      console.log(`   ✅ ${label}: очищена`);
+    } catch (error) {
+      console.error(`   ⚠️  Ошибка очистки ${label}: ${error.message}`);
+    }
+  }
+
+  console.log('✅ Полная очистка завершена');
+}
+
+/**
  * Основная функция миграции
  */
 async function main() {
@@ -288,17 +312,20 @@ async function main() {
     // Авторизация в PocketBase
     await authenticatePocketBase();
     
+    // Полная очистка данных в PocketBase перед миграцией
+    await cleanAllPocketBaseData();
+    
     const results = {};
     
-    // Миграция обычных коллекций
+    // Миграция всех коллекций (volleyball, matches, auth_log)
     const collections = ['volleyball', 'matches', 'auth_log'];
     
     for (const collection of collections) {
       results[collection] = await migrateCollection(collection);
     }
     
-    // Миграция пользователей (с обработкой auth)
-    results.users = await migrateUsersWithAuth();
+    // Пользователи закомментированы согласно требованиям
+    // results.users = await migrateUsersWithAuth();
     
     // Итоговая статистика
     const totalSuccess = Object.values(results).reduce((sum, r) => sum + r.success, 0);

@@ -314,7 +314,7 @@
         <div class="navbar-right">
             <span class="user-info" id="userInfo">Загрузка...</span>
             <a href="matches.html" class="btn btn-secondary" style="text-decoration: none;">Матчи</a>
-            <button class="btn btn-secondary" onclick="logout()">Выйти</button>
+            <button class="btn btn-secondary" onclick="AuthModule.logout().then(function() { window.location.href = 'login.html'; })">Выйти</button>
         </div>
     </div>
 
@@ -435,20 +435,42 @@
             console.error('DB init failed:', err);
         });
 
-        // PocketBase client для админских операций
+        // PocketBase client для админских операций.
+        // Проблема: authWithPassword перезаписывает токен в localStorage,
+        // из-за чего реальный пользователь подменяется на app@volleyball.local
+        // при переходе на другие страницы.
+        // Решение: сохраняем токен пользователя из localStorage перед auth,
+        // и восстанавливаем его сразу после.
         var _adminPbClient = null;
         function getPocketBaseClientForAdmin() {
             if (_adminPbClient) return Promise.resolve(_adminPbClient);
             if (typeof PocketBase === 'undefined') return Promise.resolve(null);
+
+            var AUTH_KEY = 'pocketbase_auth';
+            var savedUserAuth = localStorage.getItem(AUTH_KEY);
+
             _adminPbClient = new PocketBase(DB_CONFIG.pocketbase.url);
-            // Авторизуемся как технический пользователь приложения
             return _adminPbClient.collection('app_users').authWithPassword(
                 DB_CONFIG.pocketbase.user_email,
                 DB_CONFIG.pocketbase.user_password
             ).then(function() {
+                // Восстанавливаем токен реального пользователя в localStorage.
+                // Админский клиент сохранил токен в authStore.token (в памяти),
+                // поэтому API-запросы продолжат работать с админским токеном.
+                // Основной клиент DB читает свой authStore, не затронутый этой заменой.
+                if (savedUserAuth) {
+                    localStorage.setItem(AUTH_KEY, savedUserAuth);
+                } else {
+                    localStorage.removeItem(AUTH_KEY);
+                }
                 return _adminPbClient;
             }).catch(function(err) {
                 console.error('Ошибка авторизации app_user:', err?.message || err);
+                if (savedUserAuth) {
+                    localStorage.setItem(AUTH_KEY, savedUserAuth);
+                } else {
+                    localStorage.removeItem(AUTH_KEY);
+                }
                 return null;
             });
         }
@@ -652,6 +674,9 @@
                 var provider = DB.getProvider();
                 if (provider === 'pocketbase') {
                     var pb = await getPocketBaseClientForAdmin();
+                    if (!pb) {
+                        throw new Error('Не удалось подключиться к PocketBase');
+                    }
                     var records = await pb.collection(DB_CONFIG.collections.USERS).getFullList({ sort: '+created' });
 
                     // Загружаем auth_log для последнего входа каждого пользователя
@@ -1071,6 +1096,10 @@
                 var provider = DB.getProvider();
                 if (provider === 'pocketbase') {
                     var pb = await getPocketBaseClientForAdmin();
+                    if (!pb) {
+                        contentDiv.innerHTML = '<div class="alert alert-error">Не удалось подключиться к PocketBase</div>';
+                        return;
+                    }
                     var authLogs = await pb.collection('auth_log').getFullList({
                         filter: 'username = "' + username + '"',
                         sort: '-loginAt',

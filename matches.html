@@ -560,14 +560,6 @@
                         <label for="teamFilter">Фильтр по команде:</label>
                         <input type="text" id="teamFilter" placeholder="Введите название команды...">
                     </div>
-                    <div class="pagination-control">
-                        <label for="matchesPerPage">Показывать по:</label>
-                        <select id="matchesPerPage">
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </div>
                     <button class="refresh-btn" id="refreshBtn">Обновить</button>
                 </div>
                 <div class="games-container" id="gamesContainer">
@@ -581,13 +573,6 @@
                 teamFilter = e.target.value.trim();
                 currentPage = 1;
                 filterMatches(); // Применяем фильтр локально ко всем матчам
-                renderPagination();
-                renderMatches();
-            });
-
-            document.getElementById('matchesPerPage').addEventListener('change', function(e) {
-                matchesPerPage = parseInt(e.target.value);
-                currentPage = 1;
                 renderPagination();
                 renderMatches();
             });
@@ -926,17 +911,39 @@
         // Отображение пагинации
         function renderPagination() {
             var paginationContainer = document.getElementById('pagination');
-            
-            if (totalPages <= 1) {
-                paginationContainer.innerHTML = '';
-                return;
-            }
+
+            var startIndex = (currentPage - 1) * matchesPerPage + 1;
+            var endIndex = Math.min(currentPage * matchesPerPage, filteredMatches.length);
 
             var html = '';
 
-            // Кнопка "Предыдущая"
+            // Нижняя панель: выбор количества строк + счётчик + навигация
+            html += '<div class="pagination-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">';
+
+            // Слева: выбор количества строк на странице
+            html += '<div class="pagination-page-size">';
+            html += '<label for="matchesPerPageBottom">Показывать по:</label> ';
+            html += '<select id="matchesPerPageBottom" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">';
+            html += '<option value="20"' + (matchesPerPage === 20 ? ' selected' : '') + '>20</option>';
+            html += '<option value="50"' + (matchesPerPage === 50 ? ' selected' : '') + '>50</option>';
+            html += '<option value="100"' + (matchesPerPage === 100 ? ' selected' : '') + '>100</option>';
+            html += '</select>';
+            html += '</div>';
+
+            // По центру: счётчик записей
+            html += '<div class="pagination-info" style="color: #555; font-size: 14px;">';
+            html += filteredMatches.length + ' матчей (показаны ' + startIndex + '–' + endIndex + ')';
+            html += '</div>';
+
+            // Справа: навигация по страницам
+            html += '<div class="pagination-buttons" style="display: flex; gap: 5px;">';
+
+            // Кнопка «Первая»
+            html += '<button onclick="changePage(1)" ' + (currentPage === 1 ? 'disabled' : '') + ' title="Первая страница">«</button>';
+
+            // Кнопка «Предыдущая»
             html += '<button onclick="changePage(' + Math.max(1, currentPage - 1) + ')" ' + 
-                (currentPage === 1 ? 'disabled' : '') + '>&lt;</button>';
+                (currentPage === 1 ? 'disabled' : '') + ' title="Предыдущая"><</button>';
 
             // Определение диапазона страниц для отображения
             var startPage = Math.max(1, currentPage - 2);
@@ -953,11 +960,29 @@
                     (i === currentPage ? 'class="current"' : '') + '>' + i + '</button>';
             }
 
-            // Кнопка "Следующая"
+            // Кнопка «Следующая»
             html += '<button onclick="changePage(' + Math.min(totalPages, currentPage + 1) + ')" ' + 
-                (currentPage === totalPages ? 'disabled' : '') + '>&gt;</button>';
+                (currentPage === totalPages ? 'disabled' : '') + ' title="Следующая">></button>';
+
+            // Кнопка «Последняя»
+            html += '<button onclick="changePage(' + totalPages + ')" ' + (currentPage === totalPages ? 'disabled' : '') + ' title="Последняя страница">»</button>';
+
+            html += '</div>'; // .pagination-buttons
+            html += '</div>'; // .pagination-footer
 
             paginationContainer.innerHTML = html;
+
+            // Обработчик смены количества строк
+            var selectEl = document.getElementById('matchesPerPageBottom');
+            if (selectEl) {
+                selectEl.addEventListener('change', function(e) {
+                    matchesPerPage = parseInt(e.target.value);
+                    currentPage = 1;
+                    filterMatches();
+                    renderPagination();
+                    renderMatches();
+                });
+            }
         }
 
         // Смена страницы

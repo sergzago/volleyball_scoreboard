@@ -367,10 +367,14 @@
         } else if (provider === 'pocketbase') {
           // Динамически загружаем PocketBase SDK если нужно
           loadPocketBaseSdk().then(function() {
-            // Создаём клиент сразу после загрузки SDK
-            if (typeof PocketBase !== 'undefined') {
-              client = new PocketBase(DB_CONFIG.pocketbase.url);
-            }
+              // Создаём клиент сразу после загрузки SDK
+              if (typeof PocketBase !== 'undefined') {
+                client = new PocketBase(DB_CONFIG.pocketbase.url);
+                // Отключаем автоматическую отмену запросов (если метод доступен)
+                if (typeof client.autoCancellation === 'function') {
+                  client.autoCancellation(false);
+                }
+              }
             initialized = true;
             resolve();
           }).catch(reject);
@@ -436,7 +440,7 @@
               displayName: authData.record.name || authData.record.username || loginUsername
             };
           })
-          .catch(function() {
+          .catch(function(firstError) {
             // Fallback: пробуем войти по email
             var loginEmail = username.toLowerCase() + '@volleyball.local';
             return pb.collection(usersCollection).authWithPassword(loginEmail, password)
@@ -448,6 +452,16 @@
                   uid: authData.record.id,
                   displayName: authData.record.name || loginUsername
                 };
+              })
+              .catch(function(secondError) {
+                // Обе попытки не удались — выбрасываем понятную ошибку
+                var message = 'Пользователь не найден или неверный пароль';
+                if (firstError && (firstError.message || '').toString().includes('Failed to fetch')) {
+                  message = 'Ошибка сети. Проверьте интернет-соединение или доступность сервера.';
+                } else if (secondError && (secondError.message || '').toString().includes('Failed to fetch')) {
+                  message = 'Ошибка сети. Проверьте интернет-соединение или доступность сервера.';
+                }
+                throw new Error(message);
               });
           });
       });
@@ -490,19 +504,36 @@
         return;
       }
 
-      // PocketBase — проверяем сессию в настраиваемой коллекции пользователей
+      // PocketBase — подписываемся на изменения authStore (реактивно)
       var pb = getPocketBaseClient();
+      var unsubscribe = pb.authStore.onChange(function(token, model) {
+        if (model) {
+          callback({
+            username: model.username || (model.email ? model.email.split('@')[0] : ''),
+            email: model.email,
+            uid: model.id,
+            role: model.role || 'user',
+            displayName: model.name || model.username
+          });
+        } else {
+          callback(null);
+        }
+      });
+
+      // Вызываем callback немедленно с текущим состоянием
+      // (как Firebase onAuthStateChanged — срабатывает сразу при подписке)
       if (pb.authStore.isValid && pb.authStore.model) {
         var record = pb.authStore.model;
-        // Если есть username — используем его, иначе берём из email
         callback({
-          username: record.username || record.email.split('@')[0],
+          username: record.username || (record.email ? record.email.split('@')[0] : ''),
           email: record.email,
           uid: record.id,
           role: record.role || 'user',
           displayName: record.name || record.username
         });
       } else {
+        // Важно: вызываем callback(null) для совместимости с AuthModule.checkAuth()
+        // и страницами, которые ожидают немедленного ответа при отсутствии сессии
         callback(null);
       }
     },

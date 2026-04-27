@@ -341,56 +341,49 @@
     </div>
 
     <script>
-        // Проверка авторизации при загрузке страницы
+        // Проверка авторизации при загрузке страницы через AuthModule
         window.addEventListener('DOMContentLoaded', async () => {
-            // Если авторизация отключена, показываем контент без проверки
-            if (typeof ENABLE_AUTH !== 'undefined' && ENABLE_AUTH === 0) {
-                document.getElementById('userInfo').textContent = 'Гость (авторизация отключена)';
-                document.getElementById('adminLink').style.display = 'inline';
-                return;
-            }
-
-            try {
-                // Сначала инициализируем DB
-                await DB.init();
-            } catch (e) {
-                console.error('DB init failed:', e);
-                document.getElementById('userInfo').textContent = 'Ошибка подключения к БД';
-                return;
-            }
-
             // Сохраняем текущий URL с параметрами для возврата после авторизации
             const currentPath = window.location.pathname + window.location.search;
 
-            DB.auth.onAuthStateChanged(async (user) => {
-                if (!user) {
-                    // Перенаправляем на login с параметром redirect
-                    window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
-                    return;
+            try {
+                // Используем централизованный AuthModule для проверки
+                const isAuthorized = await AuthModule.checkAuth('user', 'login.html?redirect=' + encodeURIComponent(currentPath));
+
+                if (!isAuthorized) {
+                    return; // AuthModule сам сделает редирект
                 }
 
-                // Получаем роль через DB
-                try {
-                    const username = user.email.split('@')[0];
-                    const userData = await DB.users.get(username);
+                const user = AuthModule.getCurrentUser();
+                const role = AuthModule.getCurrentRole();
 
-                    let role = 'user';
-                    if (userData && userData.role) {
-                        role = userData.role === 'admin' ? 'admin' : 'user';
-                    }
-
-                    // Отображение информации о пользователе
+                if (user) {
                     document.getElementById('userInfo').textContent = user.email + ' (' + (role === 'admin' ? 'Админ' : 'Пользователь') + ')';
 
-                    // Показываем ссылку на админку если администратор
                     if (role === 'admin') {
                         document.getElementById('adminLink').style.display = 'inline';
                     }
-                } catch (error) {
-                    console.error('Auth error:', error);
-                    window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
                 }
-            });
+
+                // Подписываемся на изменения авторизации через DB
+                DB.auth.onAuthStateChanged(async (updatedUser) => {
+                    if (!updatedUser) {
+                        window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
+                        return;
+                    }
+                    // Обновляем UI
+                    const updatedRole = updatedUser.role || 'user';
+                    document.getElementById('userInfo').textContent = updatedUser.email + ' (' + (updatedRole === 'admin' ? 'Админ' : 'Пользователь') + ')';
+                    if (updatedRole === 'admin') {
+                        document.getElementById('adminLink').style.display = 'inline';
+                    } else {
+                        document.getElementById('adminLink').style.display = 'none';
+                    }
+                });
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = 'login.html?redirect=' + encodeURIComponent(currentPath);
+            }
         });
     </script>
   </body>

@@ -3,7 +3,7 @@
  * Поддерживает Firebase и PocketBase
  */
 
-const provider = process.env.DB_PROVIDER || 'firebase';
+const provider = process.env.DB_PROVIDER || 'pocketbase';
 
 let dbInstance = null;
 
