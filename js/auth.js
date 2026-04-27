@@ -29,8 +29,13 @@ window.AuthModule = (function() {
             return true;
         }
 
-        // Инициализируем DB
-        await DB.init();
+        // Убеждаемся что DB инициализирован
+        try {
+            await DB.init();
+        } catch (error) {
+            console.error('Failed to initialize DB in checkAuth:', error);
+            return false;
+        }
 
         return new Promise((resolve, reject) => {
             DB.auth.onAuthStateChanged(async (user) => {
@@ -98,8 +103,12 @@ window.AuthModule = (function() {
          }
 
          try {
-             // Убедимся что DB инициализирован
-             await DB.init();
+             // Убеждаемся что DB инициализирован
+             try {
+                 await DB.init();
+             } catch (error) {
+                 console.error('Failed to initialize DB in logout:', error);
+             }
              await DB.auth.logout();
              currentUser = null;
              currentRole = null;

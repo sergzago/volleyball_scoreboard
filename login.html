@@ -229,12 +229,18 @@
             window.location.href = 'index.html';
         }
 
-        // Инициализация DB
+        // Инициализация DB wrapper
         const auth = {
-            onAuthStateChanged: function(cb) {
-                DB.init().then(function() {
+            onAuthStateChanged: async function(cb) {
+                try {
+                    await DB.init();
+                    // После инициализации DB, вызываем onAuthStateChanged
                     DB.auth.onAuthStateChanged(cb);
-                });
+                } catch (error) {
+                    console.error('Failed to initialize DB in auth wrapper:', error);
+                    // Вызываем callback с null, чтобы обработать случай ошибки инициализации
+                    cb(null);
+                }
             },
             signInWithEmailAndPassword: async function(email, password) {
                 const username = email.split('@')[0];
@@ -251,10 +257,16 @@
         let redirectUrl = null;
         let isLoggingIn = false; // Флаг для предотвращения редиректа во время входа
 
-        // Ждем загрузки DOM
+        // Ждем загрузки DOM и инициализируем DB
         document.addEventListener('DOMContentLoaded', async () => {
-            await DB.init();
-
+            try {
+                await DB.init();
+            } catch (error) {
+                console.error('Failed to initialize DB:', error);
+                showError('Ошибка инициализации системы. Попробуйте обновить страницу.');
+                return;
+            }
+            
             loginFormElement = document.getElementById('loginFormElement');
             loginBtn = document.getElementById('loginBtn');
             usernameInput = document.getElementById('username');
@@ -268,7 +280,7 @@
             redirectUrl = urlParams.get('redirect');
 
             // Проверка: если уже авторизован, перенаправляем
-            DB.auth.onAuthStateChanged(async (user) => {
+            DB.auth.onAuthStateChanged((user) => {
                 // Если正在进行 вход, не делаем редирект
                 if (isLoggingIn) {
                     console.log('Login in progress, skipping redirect');
@@ -282,14 +294,9 @@
                         // Для admin.html всегда проверяем роль через DB
                         if (isAdminPage) {
                             const username = user.email.split('@')[0];
-                            const userData = await DB.users.get(username);
-
-                            let role = 'user';
-                            if (userData && userData.role) {
-                                role = userData.role === 'admin' ? 'admin' : 'user';
-                            }
-
-                            if (role !== 'admin') {
+                            
+                            // Проверяем роль из данных пользователя
+                            if (user.role !== 'admin') {
                                 hideLoading();
                                 showError('Доступ запрещен. Требуются права администратора.');
                                 return;
@@ -337,37 +344,40 @@
                     const userInfo = await DB.auth.login(username, password);
                     const user = { uid: userInfo.uid, email: userInfo.email, displayName: userInfo.displayName, role: userInfo.role };
 
-                    // Записываем вход в auth_log
-                    try {
-                        const usernameLower = username.toLowerCase();
-                        const loginTime = new Date().toISOString();
-
-                        // Получаем IP-адрес
-                        let ipAddress = 'unknown';
+                    // Записываем вход в auth_log (асинхронно, не блокируем основной поток)
+                    (async () => {
                         try {
-                            const ipResponse = await fetch('https://api.ipify.org?format=json');
-                            const ipData = await ipResponse.json();
-                            ipAddress = ipData.ip || 'unknown';
-                        } catch (ipErr) {
-                            // Не критично, продолжаем без IP
-                        }
+                            const usernameLower = username.toLowerCase();
+                            const loginTime = new Date().toISOString();
 
-                        // Записываем в auth_log через DB
-                        await DB.auth.logAuthEvent({
-                            username: usernameLower,
-                            uid: user.uid,
-                            email: user.email,
-                            loginAt: loginTime,
-                            timestamp: loginTime,
-                            ipAddress: ipAddress,
-                            ip_address: ipAddress,
-                            userAgent: navigator.userAgent,
-                            user_agent: navigator.userAgent,
-                            isAdminPage: isAdminPage
-                        });
-                    } catch (err) {
-                        console.error('Failed to write auth_log:', err);
-                    }
+                            // Получаем IP-адрес (не критично для основного потока)
+                            let ipAddress = 'unknown';
+                            try {
+                                const ipResponse = await fetch('https://api.ipify.org?format=json', { mode: 'cors' });
+                                const ipData = await ipResponse.json();
+                                ipAddress = ipData.ip || 'unknown';
+                            } catch (ipErr) {
+                                // Не критично, продолжаем без IP
+                                console.debug('Could not fetch IP address:', ipErr);
+                            }
+
+                            // Записываем в auth_log через DB
+                            await DB.auth.logAuthEvent({
+                                username: usernameLower,
+                                uid: user.uid,
+                                email: user.email,
+                                loginAt: loginTime,
+                                timestamp: loginTime,
+                                ipAddress: ipAddress,
+                                ip_address: ipAddress,
+                                userAgent: navigator.userAgent,
+                                user_agent: navigator.userAgent,
+                                isAdminPage: isAdminPage
+                            });
+                        } catch (err) {
+                            console.error('Failed to write auth_log:', err);
+                        }
+                    })();
 
                     // Роль уже получена из DB.auth.login — не делаем лишний запрос
                     let role = userInfo.role || 'user';
