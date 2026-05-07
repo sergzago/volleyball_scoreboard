@@ -237,6 +237,9 @@ $(document).ready(function() {
     var homeTimeoutsExhausted = homeTimeouts >= maxTimeouts;
     var awayTimeoutsExhausted = awayTimeouts >= maxTimeouts;
 
+    // Handle blinking effect for active timeout buttons
+    $(".timeout-btn").removeClass('blinking');
+    
     if(isTimeoutActive){
       var currentLabel = scoreboard_data['custom_label'] || '';
       var homeTeam = scoreboard_data['home_team'] || '';
@@ -247,6 +250,13 @@ $(document).ready(function() {
       $(".timeout-btn[data-team='home']").prop('disabled', timeoutBaseDisabled || isAwayTimeout || (homeTimeoutsExhausted && !isHomeTimeout));
       // Away button: disabled if home timeout is active, or away exhausted limits AND away timeout is NOT currently active
       $(".timeout-btn[data-team='away']").prop('disabled', timeoutBaseDisabled || isHomeTimeout || (awayTimeoutsExhausted && !isAwayTimeout));
+      
+      // Add blinking class to the active timeout button
+      if(isHomeTimeout){
+        $(".timeout-btn[data-team='home']").addClass('blinking');
+      } else if(isAwayTimeout){
+        $(".timeout-btn[data-team='away']").addClass('blinking');
+      }
     } else {
       // When no timeout is active, check if each team has exhausted their timeouts
       $(".timeout-btn[data-team='home']").prop('disabled', timeoutBaseDisabled || homeTimeoutsExhausted);
