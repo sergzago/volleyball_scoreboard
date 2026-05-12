@@ -516,21 +516,16 @@
         var teamFilter = '';
         var deleteMatchId = null;
 
-        // Initialize
-        async function init() {
-            // Сначала инициализируем DB
+        // Initialize DB (без показа контента — вызывается после проверки авторизации)
+        async function initDB() {
             try {
                 await DB.init();
             } catch (e) {
                 console.error('DB init failed:', e);
                 document.getElementById('authContent').innerHTML = '<div class="no-games">Ошибка подключения к БД</div>';
-                return;
+                return false;
             }
-
-            // Показываем основной контент без проверки авторизации
-            // Авторизация будет происходить только по кнопке
-            showMainContent();
-            loadMatches();
+            return true;
         }
 
         // Проверка авторизации
@@ -1183,10 +1178,11 @@
                 console.log('AuthModule methods:', Object.keys(window.AuthModule));
             }
             
-            await init();
-            loadLogoImage();
+            // 1. Сначала инициализируем БД
+            var dbReady = await initDB();
+            if (!dbReady) return;
             
-            // Проверяем наличие авторизованного пользователя при загрузке
+            // 2. Проверяем авторизацию ПЕРЕД загрузкой контента
             console.log('Checking current user on load...');
             try {
                 // Используем checkAuth для проверки состояния авторизации
@@ -1208,7 +1204,12 @@
                 updateUserInfo();
             }
             
-        // Добавляем обработчик события для кнопки авторизации
+            // 3. Теперь показываем контент и загружаем матчи (isAdmin уже известен)
+            showMainContent();
+            loadMatches();
+            loadLogoImage();
+            
+            // Добавляем обработчик события для кнопки авторизации
             const authButton = document.getElementById('authButton');
             if (authButton) {
                 console.log('Adding click event listener to authButton');
@@ -1242,6 +1243,11 @@
                 if (currentUser) {
                     user = currentUser;
                     isAdmin = user && (user.admin === true || user.role === 'admin');
+                    
+                    // Перезагружаем матчи, чтобы показать кнопки удаления для админа
+                    if (isAdmin) {
+                        loadMatches();
+                    }
                 } else {
                     user = null;
                     isAdmin = false;
