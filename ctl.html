@@ -333,6 +333,7 @@
       </div>
     </div>
 
+
     <!-- Модальное окно подтверждения завершения матча -->
     <div id="matchFinishModal" class="modal-overlay dialog-hidden">
       <div class="modal-dialog">
@@ -346,6 +347,24 @@
           <div class="modal-footer">
             <button id="matchFinishNo" class="btn btn-warning" type="button">Нет</button>
             <button id="matchFinishYes" class="btn btn-success" type="button">Да</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно таймаута с таймером 30 секунд -->
+    <div id="timeoutModal" class="modal-overlay dialog-hidden">
+      <div class="modal-dialog" style="text-align:center;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="timeoutModalTitle">⏸️ Таймаут</h3>
+          </div>
+          <div class="modal-body">
+            <div style="font-size:72px; font-weight:bold; color:#e74c3c; font-family:monospace; margin:20px 0;" id="timeoutTimerDisplay">30</div>
+            <p style="font-size:18px; color:#555;" id="timeoutTeamName">Команда</p>
+          </div>
+          <div class="modal-footer" style="justify-content:center;">
+            <button id="timeoutModalClose" class="btn btn-warning" type="button">Закрыть таймаут</button>
           </div>
         </div>
       </div>

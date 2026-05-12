@@ -8,12 +8,18 @@ var CLASSIC_SETS_TO_WIN_TWO = 2;
 var CLASSIC_MAX_SETS_TWO = 3;
 var CLASSIC_TIEBREAK_POINTS_TO_WIN = 15;
 
+
 // Данные для отложенного завершения матча (ожидание подтверждения пользователя)
 var pendingMatchFinish = null;
 // Запоминваем, был ли матч уже завершён ПРЕЖДЕ чем мы начали играть
 var matchWasAlreadyFinished = false;
 // Счётчик обновлений подписки — для определения первой загрузки
 var _subscribeCallCount = 0;
+
+// Таймер таймаута 30 секунд
+var timeoutTimerInterval = null;
+var timeoutRemainingSeconds = 0;
+var timeoutTeam = null; // команда, взявшая таймаут ('home' или 'away')
 
 // scoreboard_data определена в common.js
 
@@ -1001,6 +1007,69 @@ $(document).ready(function(){
     update_db(update);
   });
 
+
+  /**
+   * Показать модальное окно таймаута с таймером 30 секунд
+   */
+  function showTimeoutModal(teamName) {
+    // Останавливаем предыдущий таймер, если был
+    stopTimeoutTimer();
+
+    timeoutRemainingSeconds = 30;
+    $('#timeoutTimerDisplay').text(timeoutRemainingSeconds);
+    $('#timeoutTeamName').text('⏸️ Таймаут: ' + teamName);
+    $('#timeoutModalTitle').text('⏸️ Таймаут - ' + teamName);
+    $('#timeoutModal').removeClass('dialog-hidden');
+
+    // Запускаем обратный отсчёт
+    timeoutTimerInterval = setInterval(function() {
+      timeoutRemainingSeconds--;
+      $('#timeoutTimerDisplay').text(timeoutRemainingSeconds);
+
+      // Когда остаётся 5 секунд, меняем цвет на оранжевый для визуального предупреждения
+      if (timeoutRemainingSeconds <= 5) {
+        $('#timeoutTimerDisplay').css('color', '#e67e22');
+      }
+      if (timeoutRemainingSeconds <= 3) {
+        $('#timeoutTimerDisplay').css('color', '#e74c3c');
+      }
+
+      if (timeoutRemainingSeconds <= 0) {
+        // Таймер истёк — автоматически закрываем таймаут
+        stopTimeoutTimer();
+        $('#timeoutModal').addClass('dialog-hidden');
+        $('#timeoutTimerDisplay').css('color', '#e74c3c');
+
+        // Отправляем обновление в БД для выключения таймаута
+        var update = {
+          show: 1,
+          custom_label: scoreboard_data['custom_label']
+        };
+        update_db(update);
+      }
+    }, 1000);
+  }
+
+  /**
+   * Остановить таймер таймаута
+   */
+  function stopTimeoutTimer() {
+    if (timeoutTimerInterval) {
+      clearInterval(timeoutTimerInterval);
+      timeoutTimerInterval = null;
+    }
+    timeoutRemainingSeconds = 0;
+  }
+
+  /**
+   * Скрыть модальное окно таймаута и остановить таймер
+   */
+  function hideTimeoutModal() {
+    stopTimeoutTimer();
+    $('#timeoutTimerDisplay').css('color', '#e74c3c');
+    $('#timeoutModal').addClass('dialog-hidden');
+  }
+
   $(".timeout-btn").click(function(){
     // Блокировка при ожидании подтверждения завершения матча
     if(pendingMatchFinish) return;
@@ -1066,6 +1135,30 @@ $(document).ready(function(){
     }
     console.log('Timeout button clicked:', update);
     update_db(update);
+
+    // Управление модальным окном таймаута
+    if (currentShow === 6) {
+      // Таймаут выключается — скрываем модальное окно
+      hideTimeoutModal();
+    } else {
+      // Таймаут включается — показываем модальное окно с таймером
+      showTimeoutModal(teamName);
+    }
+  });
+
+  // Кнопка закрытия таймаута в модальном окне
+  $("#timeoutModalClose").click(function(){
+    hideTimeoutModal();
+
+    // Отправляем обновление в БД для выключения таймаута
+    var currentShow = parseInt(scoreboard_data['show'], 10) || 0;
+    if (currentShow === 6) {
+      var update = {
+        show: 1,
+        custom_label: scoreboard_data['custom_label']
+      };
+      update_db(update);
+    }
   });
 
   $(".names-btn").click(function(){
