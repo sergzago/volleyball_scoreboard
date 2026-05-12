@@ -121,14 +121,39 @@ function cleanDocumentData(data) {
   return cleaned;
 }
 
+
 /**
- * Создание записи в PocketBase
+ * Проверка существования записи в PocketBase по ID
+ */
+async function recordExistsInPocketBase(collectionName, recordId) {
+  try {
+    await pb.collection(collectionName).getOne(recordId);
+    return true;
+  } catch (error) {
+    if (error.status === 404) {
+      return false;
+    }
+    // Другие ошибки (например, сетевые) пробрасываем дальше
+    throw error;
+  }
+}
+
+/**
+ * Создание записи в PocketBase с предварительной проверкой по ID
  */
 async function createPocketBaseRecord(collectionName, data) {
   const { id, ...restData } = data;
   const cleanedData = cleanDocumentData(restData);
   
   try {
+    // Предварительная проверка: существует ли запись с таким ID
+    const exists = await recordExistsInPocketBase(collectionName, id);
+    
+    if (exists) {
+      console.log(`   ⏭️  Запись с ID=${id} уже существует, пропускаем`);
+      return null;
+    }
+    
     // Попытка создать с тем же ID
     const record = await pb.collection(collectionName).create({
       id: id,
@@ -136,7 +161,7 @@ async function createPocketBaseRecord(collectionName, data) {
     });
     return record;
   } catch (error) {
-    // Если ID уже существует, создаем без указания ID
+    // Если ID уже существует (рейс-кондишн), создаем без указания ID
     if (error.status === 400 || error.message.includes('id')) {
       try {
         const record = await pb.collection(collectionName).create(cleanedData);
@@ -149,6 +174,68 @@ async function createPocketBaseRecord(collectionName, data) {
     
     console.error(`   ⚠️  Ошибка: ${error.message}`);
     return null;
+  }
+}
+
+/**
+ * Безопасное преобразование значения даты в объект Date
+ * Поддерживает Firestore Timestamp, ISO строки и строки дат в любом формате
+ */
+function toDate(value) {
+  if (!value) return null;
+  
+  // Firestore Timestamp (объект с toDate)
+  if (typeof value === 'object' && value.toDate) {
+    return value.toDate();
+  }
+  
+  // Строка или число
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+/**
+ * Получение последней даты из коллекции PocketBase для коллекции
+ * Возвращает объект Date или null, если коллекция пуста
+ */
+async function getLastDateFromPocketBase(pbCollection, collectionName) {
+  // Определяем поле даты в зависимости от коллекции
+  const dateField = collectionName === 'matches' ? 'date_time' : 'lastEdited';
+  
+  try {
+    // Получаем самую последнюю запись из PocketBase по дате
+    // Используем '1=1' как всегда истинный фильтр вместо пустой строки
+    const lastRecord = await pb.collection(pbCollection).getFirstListItem(
+      '1=1',
+      {
+        sort: `-${dateField}`,
+        perPage: 1
+      }
+    );
+    
+    if (!lastRecord) {
+      console.log('   Коллекция в PocketBase пуста');
+      return null;
+    }
+    
+    const lastDate = toDate(lastRecord[dateField]);
+    if (!lastDate) {
+      console.log(`   ⚠️  Не удалось распарсить дату из поля ${dateField} последней записи`);
+      return null;
+    }
+    
+    console.log(`📅 Последняя дата в PocketBase (${dateField}): ${lastDate.toISOString()}`);
+    return lastDate;
+  } catch (error) {
+    // Если нет записей в PocketBase (404) или любая другая ошибка
+    if (error.status === 404) {
+      console.log('⚠️  Коллекция в PocketBase пуста');
+      return null;
+    }
+    
+    console.error(`❌ Ошибка при получении последней даты: ${error.message}`);
+    throw error;
   }
 }
 
@@ -175,78 +262,74 @@ async function migrateCollection(collectionName) {
   if (collectionName === 'volleyball' || collectionName === 'matches') {
     console.log('🔍 Определяем последнюю дату в коллекции в PocketBase...');
     
-    try {
-      // Получаем последнюю запись из PocketBase по дате
-      const lastRecord = await pb.collection(pbCollection).getFirstListItem(
-        '',
-        {
-          sort: collectionName === 'matches' ? '-date_time' : '-lastEdited',
-          perPage: 1
+    // Получаем последнюю дату из PocketBase
+    const lastPbDate = await getLastDateFromPocketBase(pbCollection, collectionName);
+    
+    // Получаем все документы из Firebase
+    const allFirebaseDocuments = await getFirebaseCollection(fbCollection);
+    
+    // Если в PocketBase есть записи, фильтруем документы Firebase
+    let documents = allFirebaseDocuments;
+    
+    if (lastPbDate) {
+      // Определяем какое поле даты использовать для этой коллекции
+      const dateField = collectionName === 'matches' ? 'date_time' : 'lastEdited';
+      
+      console.log(`📊 Фильтрация записей по полю "${dateField}"...`);
+      
+      documents = allFirebaseDocuments.filter(doc => {
+        const docDate = toDate(doc[dateField]);
+        if (!docDate) {
+          // Если дата не распарсилась, включаем документ (на всякий случай)
+          console.log(`   ⚠️  Запись ${doc.id}: не удалось распарсить дату из поля "${dateField}", включаем в миграцию`);
+          return true;
         }
-      );
-      
-      const lastDate = collectionName === 'matches' ? lastRecord.date_time : lastRecord.lastEdited;
-      console.log(`📅 Последняя дата в PocketBase: ${lastDate}`);
-      
-      // Получаем все документы из Firebase
-      const allFirebaseDocuments = await getFirebaseCollection(fbCollection);
-      
-      // Фильтруем документы с датой после последней даты в PocketBase
-      const documents = allFirebaseDocuments.filter(doc => {
-        // Преобразуем даты в объекты Date для сравнения
-        const docDate = new Date(doc.date_time);
-        const pbDate = new Date(lastDate);
-        return docDate > pbDate;
+        const result = docDate > lastPbDate;
+        console.log(`   📌 Запись ${doc.id}: ${dateField}=${docDate.toISOString()} > ${lastPbDate.toISOString()} = ${result}`);
+        return result;
       });
       
-      console.log(`📥 Найдено ${documents.length} записей в Firebase с датой после ${lastDate}`);
+      console.log(`📥 Найдено ${documents.length} записей в Firebase с датой после ${lastPbDate.toISOString()}`);
       
       if (documents.length === 0) {
         console.log('⏭️  Нет новых записей для миграции');
         return { success: 0, failed: 0 };
       }
+    } else {
+      console.log(`📥 Коллекция пуста, мигрируем все ${documents.length} записей`);
+    }
+    
+    let successCount = 0;
+    let failedCount = 0;
+    
+    // Миграция каждого документа
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+      const progress = `[${i + 1}/${documents.length}]`;
       
-      let successCount = 0;
-      let failedCount = 0;
+      process.stdout.write(`   ${progress} Миграция записи ${doc.id}... `);
       
-      // Миграция каждого документа
-      for (let i = 0; i < documents.length; i++) {
-        const doc = documents[i];
-        const progress = `[${i + 1}/${documents.length}]`;
+      try {
+        const record = await createPocketBaseRecord(pbCollection, doc);
         
-        process.stdout.write(`   ${progress} Миграция записи ${doc.id}... `);
-        
-        try {
-          const record = await createPocketBaseRecord(pbCollection, doc);
-          
-          if (record) {
-            console.log('✅');
-            successCount++;
-          } else {
-            console.log('❌');
-            failedCount++;
-          }
-        } catch (error) {
-          console.log(`❌ ${error.message}`);
+        if (record) {
+          console.log('✅');
+          successCount++;
+        } else {
+          console.log('❌');
           failedCount++;
         }
-      }
-      
-      console.log(`\n📊 Результаты миграции ${collectionName}:`);
-      console.log(`   ✅ Успешно: ${successCount}`);
-      console.log(`   ❌ Ошибки: ${failedCount}`);
-      
-      return { success: successCount, failed: failedCount };
-    } catch (error) {
-      // Если нет записей в PocketBase, получаем все документы
-      if (error.status === 404) {
-        console.log('⚠️  Коллекция в PocketBase пуста, мигрируем все записи');
-      } else {
-        console.error(`❌ Ошибка при получении последней даты: ${error.message}`);
-        // Прерываем процесс при ошибке получения даты
-        throw error;
+      } catch (error) {
+        console.log(`❌ ${error.message}`);
+        failedCount++;
       }
     }
+    
+    console.log(`\n📊 Результаты миграции ${collectionName}:`);
+    console.log(`   ✅ Успешно: ${successCount}`);
+    console.log(`   ❌ Ошибки: ${failedCount}`);
+    
+    return { success: successCount, failed: failedCount };
   }
   
   // Получение данных из Firebase для других коллекций
