@@ -3,9 +3,34 @@
  * Поддерживает Firebase и PocketBase
  */
 
-const provider = process.env.DB_PROVIDER || 'pocketbase';
+// Приоритет: .env → db-config.js → pocketbase
+let provider = process.env.DB_PROVIDER;
+if (!provider) {
+  try {
+    const { DB_CONFIG } = require('../../../js/db-config');
+    provider = DB_CONFIG.provider || 'pocketbase';
+  } catch {
+    provider = 'pocketbase';
+  }
+}
 
 let dbInstance = null;
+
+async function authenticateWithAppUser(client) {
+  let userEmail, userPassword;
+  try {
+    const creds = require('../../../credentials.js');
+    userEmail = creds.pocketbase?.user_email;
+    userPassword = creds.pocketbase?.user_password;
+  } catch {}
+
+  if (userEmail && userPassword) {
+    await client.collection('app_users').authWithPassword(userEmail, userPassword);
+    console.log('✅ PocketBase authenticated as app_user');
+  } else {
+    console.log('⚠️ PocketBase connected without auth (no app_user credentials)');
+  }
+}
 
 /**
  * Инициализация соединения с БД
@@ -37,8 +62,19 @@ async function initializeDb() {
         });
         console.log('✅ Firebase initialized with service account env vars');
       } else {
-        admin.initializeApp();
-        console.log('✅ Firebase initialized with Application Default Credentials');
+        // Fallback: ищем serviceAccountKey.json в корне проекта
+        const fs = require('fs');
+        const path = require('path');
+        const keyFile = path.join(__dirname, '..', '..', '..', 'serviceAccountKey.json');
+        if (fs.existsSync(keyFile)) {
+          admin.initializeApp({
+            credential: admin.credential.cert(require(keyFile)),
+          });
+          console.log('✅ Firebase initialized with serviceAccountKey.json');
+        } else {
+          admin.initializeApp();
+          console.log('✅ Firebase initialized with Application Default Credentials');
+        }
       }
 
       dbInstance = {
@@ -52,20 +88,41 @@ async function initializeDb() {
       throw error;
     }
   } else if (provider === 'pocketbase') {
-    const PocketBase = require('pocketbase');
-    const url = process.env.POCKETBASE_URL || 'http://localhost:8090';
-    const adminEmail = process.env.POCKETBASE_ADMIN_EMAIL || 'admin@example.com';
-    const adminPassword = process.env.POCKETBASE_ADMIN_PASSWORD || '';
+    const PocketBase = require('pocketbase').default;
+
+    // Приоритет: .env → credentials.js → localhost:8090
+    let url = process.env.POCKETBASE_URL;
+    let adminEmail = process.env.POCKETBASE_ADMIN_EMAIL;
+    let adminPassword = process.env.POCKETBASE_ADMIN_PASSWORD;
+
+    if (!url) {
+      try {
+        const creds = require('../../../credentials.js');
+        if (creds.pocketbase && creds.pocketbase.url) {
+          url = creds.pocketbase.url;
+          console.log('ℹ️ PocketBase URL loaded from credentials.js');
+        }
+      } catch {}
+    }
+
+    url = url || 'http://localhost:8090';
+    adminEmail = adminEmail || 'admin@example.com';
+    adminPassword = adminPassword || '';
 
     try {
       const client = new PocketBase(url);
 
       // Авторизуемся как админ для серверных операций
       if (adminEmail && adminPassword) {
-        await client.admins.authWithPassword(adminEmail, adminPassword);
-        console.log('✅ PocketBase admin authenticated');
+        try {
+          await client.admins.authWithPassword(adminEmail, adminPassword);
+          console.log('✅ PocketBase admin authenticated');
+        } catch {
+          console.log('⚠️ PocketBase admin auth failed, trying app_users...');
+          await authenticateWithAppUser(client);
+        }
       } else {
-        console.log('⚠️ PocketBase connected without admin auth');
+        await authenticateWithAppUser(client);
       }
 
       dbInstance = {

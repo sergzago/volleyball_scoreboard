@@ -1,8 +1,11 @@
 const express = require('express');
 const { ScoreboardService } = require('../services/scoreboardService');
 const { createDbAdapter, MATCHES_COLLECTION } = require('../services/dbAdapter');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+router.use(requireAuth);
 
 function getService(req) {
   return new ScoreboardService(req.app.locals.db);
@@ -41,12 +44,14 @@ router.post('/', async (req, res, next) => {
  */
 router.get('/', async (req, res, next) => {
   try {
-    const { tournament, game_type, limit = 50 } = req.query;
+    const { tournament, game_type, limit } = req.query;
     const dbAdapter = createDbAdapter(req.app.locals.db);
+
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
 
     const filters = {
       orderBy: { field: 'date_time', direction: 'desc' },
-      limit: parseInt(limit),
+      limit: parsedLimit,
     };
 
     const where = [];

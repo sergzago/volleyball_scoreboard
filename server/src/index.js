@@ -5,15 +5,23 @@ const helmet = require('helmet');
 const { initializeDb } = require('./config/db');
 const { errorHandler } = require('./middleware/validators');
 
+// Создание Express приложения
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Глобальный обработчик ошибок БД (до инициализации)
+app.use((err, req, res, next) => {
+  console.error('Pre-init error:', err);
+  res.status(503).json({ error: 'Service Unavailable', message: 'Server initializing' });
+});
+
+module.exports = app;
+
 // Инициализация БД и запуск сервера
 initializeDb().then((dbConfig) => {
   const scoreboardRouter = require('./routes/scoreboard');
   const matchesRouter = require('./routes/matches');
   const authRouter = require('./routes/auth');
-
-  // Создание Express приложения
-  const app = express();
-  const PORT = process.env.PORT || 3000;
 
   // Сохраняем инстансы в app.locals для доступа в маршрутах
   app.locals.db = dbConfig;
@@ -88,8 +96,6 @@ initializeDb().then((dbConfig) => {
     console.log(`   POST   /api/matches`);
     console.log(`   GET    /api/matches`);
   });
-
-  module.exports = app;
 }).catch((err) => {
   console.error('❌ Failed to start server:', err.message);
   process.exit(1);

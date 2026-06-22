@@ -4,29 +4,31 @@
 function errorHandler(err, req, res, next) {
   console.error('Error:', err);
 
-  if (err.code === 'FIREBASE_NOT_CONFIGURED' || err.message?.includes('Firestore not initialized')) {
+  const msg = err.message || '';
+
+  if (err.code === 'FIREBASE_NOT_CONFIGURED' || msg.includes('Firestore not initialized')) {
     return res.status(503).json({
       error: 'Service Unavailable',
       message: 'Firestore not configured. Set Firebase credentials in .env',
     });
   }
 
-  if (err.message === 'Scoreboard not found') {
+  if (msg === 'Scoreboard not found') {
     return res.status(404).json({
       error: 'Not Found',
       message: err.message,
     });
   }
 
-  if (err.message === 'Score cannot be negative') {
+  if (msg === 'Score cannot be negative') {
     return res.status(400).json({
       error: 'Bad Request',
       message: err.message,
     });
   }
 
-  if (err.message.startsWith('Period must be between') || 
-      err.message.startsWith('Invalid show value')) {
+  if (msg.startsWith('Period must be between') || 
+      msg.startsWith('Invalid show value')) {
     return res.status(400).json({
       error: 'Bad Request',
       message: err.message,

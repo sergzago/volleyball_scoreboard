@@ -4,6 +4,34 @@
  */
 
 /**
+ * Декодирует и валидирует JWT (header + payload) без верификации подписи.
+ * Проверяет структуру заголовка и обязательные поля payload.
+ */
+function decodeAndValidateJwt(token) {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+
+  // Валидация заголовка
+  let header;
+  try {
+    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (!header.alg || !header.typ || header.typ !== 'JWT') return null;
+
+  // Валидация payload
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+
+  return payload;
+}
+
+/**
  * Middleware для проверки аутентификации пользователя
  */
 async function requireAuth(req, res, next) {
@@ -31,35 +59,29 @@ async function requireAuth(req, res, next) {
         claims: decodedToken.claims || {}
       };
     } else if (dbConfig.provider === 'pocketbase') {
-      // PocketBase: проверяем токен через сохранение в authStore SDK
-      const { client } = dbConfig;
+      const payload = decodeAndValidateJwt(token);
 
-      try {
-        // Сохраняем токен в authStore — PocketBase SDK автоматически расшифрует JWT
-        // и заполнит client.authStore.model
-        client.authStore.save(token, null);
-
-        if (!client.authStore.isValid || !client.authStore.model) {
-          return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'Неверный или истекший токен авторизации.'
-          });
-        }
-
-        const record = client.authStore.model;
-
-        req.user = {
-          uid: record.id,
-          email: record.email,
-          role: record.role || 'user',
-          claims: { role: record.role || 'user', admin: record.role === 'admin' }
-        };
-      } catch {
+      if (!payload || !payload.id || !payload.exp || payload.type !== 'auth') {
         return res.status(401).json({
           error: 'Unauthorized',
           message: 'Неверный или истекший токен авторизации.'
         });
       }
+
+      // Проверка срока действия
+      if (Date.now() >= payload.exp * 1000) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Токен авторизации истёк.'
+        });
+      }
+
+      req.user = {
+        uid: payload.id,
+        email: '',
+        role: 'user',
+        claims: { role: 'user', admin: false }
+      };
     } else {
       return res.status(500).json({
         error: 'Internal Server Error',

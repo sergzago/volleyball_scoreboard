@@ -21,6 +21,49 @@ try {
 
 const USERS_COLLECTION = process.env.POCKETBASE_USERS_COLLECTION || 'scoreusers';
 
+let pbReaderClient = null;
+
+async function getPbReaderClient() {
+  if (pbReaderClient) return pbReaderClient;
+
+  const PocketBase = require('pocketbase').default;
+  let pbUrl = process.env.POCKETBASE_URL;
+  if (!pbUrl) {
+    try {
+      const creds = require('../../../credentials.js');
+      if (creds.pocketbase && creds.pocketbase.url) pbUrl = creds.pocketbase.url;
+    } catch {}
+  }
+  pbUrl = pbUrl || 'http://localhost:8090';
+
+  let userEmail, userPassword;
+  try {
+    const creds = require('../../../credentials.js');
+    userEmail = creds.pocketbase?.user_email;
+    userPassword = creds.pocketbase?.user_password;
+  } catch {}
+
+  if (!userEmail || !userPassword) return null;
+
+  pbReaderClient = new PocketBase(pbUrl);
+  try {
+    await pbReaderClient.collection('app_users').authWithPassword(userEmail, userPassword);
+  } catch {
+    pbReaderClient = null;
+  }
+  return pbReaderClient;
+}
+
+async function getPbUserById(userId) {
+  const client = await getPbReaderClient();
+  if (!client) return null;
+  try {
+    return await client.collection(USERS_COLLECTION).getOne(userId);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * POST /api/auth/login
  * Войти по username/email и паролю, получить токен
@@ -100,16 +143,27 @@ router.post('/login', async (req, res) => {
 
     } else if (dbConfig.provider === 'pocketbase') {
       // PocketBase: авторизуемся через коллекцию scoreusers
-      const pb = dbConfig.client;
+      // Создаём отдельный клиент БЕЗ admin-сессии для user-auth,
+      // чтобы токен админа не конфликтовал с авторизацией пользователя
+      const PocketBase = require('pocketbase').default;
+      let pbUrl = process.env.POCKETBASE_URL;
+      if (!pbUrl) {
+        try {
+          const creds = require('../../../credentials.js');
+          if (creds.pocketbase && creds.pocketbase.url) pbUrl = creds.pocketbase.url;
+        } catch {}
+      }
+      pbUrl = pbUrl || 'http://localhost:8090';
+      const userClient = new PocketBase(pbUrl);
       let authData;
 
-      // Пробуем войти по username
+      // Пробуем войти по username (как делает фронтенд — сначала username, потом email)
       try {
-        authData = await pb.collection(USERS_COLLECTION).authWithPassword(identity.toLowerCase(), password);
+        const username = identity.includes('@') ? identity.split('@')[0].toLowerCase() : identity.toLowerCase();
+        authData = await userClient.collection(USERS_COLLECTION).authWithPassword(username, password);
       } catch {
-        // Fallback: пробуем по email
-        const email = identity.includes('@') ? identity : `${identity.toLowerCase()}@volleyball.local`;
-        authData = await pb.collection(USERS_COLLECTION).authWithPassword(email, password);
+        const email = identity.includes('@') ? identity.toLowerCase() : `${identity.toLowerCase()}@volleyball.local`;
+        authData = await userClient.collection(USERS_COLLECTION).authWithPassword(email, password);
       }
 
       res.json({
@@ -152,14 +206,24 @@ router.post('/login', async (req, res) => {
  */
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    res.json({
-      user: {
-        uid: req.user.uid,
-        email: req.user.email,
-        role: req.user.role,
-        claims: req.user.claims
+    const dbConfig = req.app.locals.db;
+    let user = {
+      uid: req.user.uid,
+      email: req.user.email,
+      role: req.user.role,
+      claims: req.user.claims
+    };
+
+    if (dbConfig.provider === 'pocketbase' && !user.email) {
+      const record = await getPbUserById(req.user.uid);
+      if (record) {
+        user.email = record.email || '';
+        user.role = record.role || 'user';
+        user.claims = { role: user.role, admin: user.role === 'admin' };
       }
-    });
+    }
+
+    res.json({ user });
   } catch (error) {
     res.status(500).json({
       error: 'Internal Server Error',
@@ -174,13 +238,24 @@ router.get('/me', requireAuth, async (req, res) => {
  */
 router.post('/token', requireAuth, async (req, res) => {
   try {
+    const dbConfig = req.app.locals.db;
+    let user = {
+      uid: req.user.uid,
+      email: req.user.email,
+      role: req.user.role
+    };
+
+    if (dbConfig.provider === 'pocketbase' && !user.email) {
+      const record = await getPbUserById(req.user.uid);
+      if (record) {
+        user.email = record.email || '';
+        user.role = record.role || 'user';
+      }
+    }
+
     res.json({
       message: 'Используйте токен из заголовка Authorization',
-      user: {
-        uid: req.user.uid,
-        email: req.user.email,
-        role: req.user.role
-      }
+      user
     });
   } catch (error) {
     res.status(500).json({

@@ -92,6 +92,10 @@ class ScoreboardService {
    * Обновить произвольные поля табло
    */
   async updateScoreboard(gameId, data) {
+    checkDb(this.db);
+    const existing = await this.db.getDoc(VOLLEYBALL_COLLECTION, gameId);
+    if (!existing) throw new Error('Scoreboard not found');
+
     const { lastEdited, ...updateData } = data;
     updateData.lastEdited = this.db.serverTimestamp();
     return this.db.updateDoc(VOLLEYBALL_COLLECTION, gameId, updateData);
@@ -318,6 +322,7 @@ class ScoreboardService {
    * Обновить отображение
    */
   async updateDisplay(gameId, showValue) {
+    checkDb(this.db);
     const validValues = [0, 1, 2, 4, 6, 14];
     if (!validValues.includes(showValue)) {
       throw new Error(`Invalid show value. Must be one of: ${validValues.join(', ')}`);
@@ -329,6 +334,7 @@ class ScoreboardService {
    * Обновить метку
    */
   async updateLabel(gameId, label) {
+    checkDb(this.db);
     return this.updateScoreboard(gameId, { custom_label: label });
   }
 
@@ -416,14 +422,16 @@ class ScoreboardService {
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
-      show: 0, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0,
+      show: 1, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0,
       current_period: 1, custom_label: 'Табло',
       away_team: keepSettings ? data.away_team : 'Team2',
       away_color: keepSettings ? data.away_color : '#00ff00',
       home_team: keepSettings ? data.home_team : 'Team1',
       home_color: keepSettings ? data.home_color : '#ff0000',
       tournament_name: keepSettings ? data.tournament_name : 'НВЛ',
+      venue: keepSettings ? data.venue : '',
       home_sets: 0, away_sets: 0,
+      home_timeouts: 0, away_timeouts: 0,
       beach_mode: beachEnabled, beach_current_set: 1, beach_switch_message: '',
       beach_match_finished: false,
       period_count: beachEnabled ? 3 : (twoWinsMode ? 3 : 5),
@@ -431,6 +439,7 @@ class ScoreboardService {
       home_side: 'left', away_side: 'right',
       classic_tiebreak_switch_done: true,
       two_wins_mode: twoWinsMode, invert_tablo: invertTablo,
+      unlimited_score: false,
       lastEdited: this.db.serverTimestamp(),
     };
 
@@ -514,9 +523,14 @@ class ScoreboardService {
   _classicSetWon(teamScore, opponentScore, data) {
     const period = this._ensureNumber(data.current_period);
     const twoWinsMode = !!data.two_wins_mode;
-    const target = twoWinsMode && period === 3
-      ? CLASSIC_TIEBREAK_POINTS_TO_WIN
-      : (period === 5 ? 15 : CLASSIC_POINTS_TO_WIN);
+    let target;
+
+    if (twoWinsMode) {
+      target = period === 3 ? CLASSIC_TIEBREAK_POINTS_TO_WIN : CLASSIC_POINTS_TO_WIN;
+    } else {
+      target = period === 5 ? CLASSIC_TIEBREAK_POINTS_TO_WIN : CLASSIC_POINTS_TO_WIN;
+    }
+
     if (teamScore < target) return false;
     return (teamScore - opponentScore) >= 2;
   }
