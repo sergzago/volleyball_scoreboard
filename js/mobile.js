@@ -961,6 +961,9 @@
     // Logout
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
 
+    // Theme toggle
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
     // Game ID
     document.getElementById('generateGameId').addEventListener('click', function() {
       document.getElementById('mobileGameId').value = generateUUID();
@@ -1381,9 +1384,26 @@
     });
   }
 
+  // ===== THEME =====
+
+  function initTheme() {
+    var saved = localStorage.getItem('mobile_theme');
+    if (saved === 'light') {
+      document.body.classList.add('light-theme');
+      document.getElementById('themeToggle').textContent = '☀️';
+    }
+  }
+
+  function toggleTheme() {
+    var isLight = document.body.classList.toggle('light-theme');
+    document.getElementById('themeToggle').textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('mobile_theme', isLight ? 'light' : 'dark');
+  }
+
   // ===== INIT =====
 
   function init() {
+    initTheme();
     initTabs();
     initEventHandlers();
     initAuth();

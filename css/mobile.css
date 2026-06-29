@@ -30,6 +30,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+body.light-theme {
+  --bg-dark: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-card-hover: #e8eaed;
+  --accent: #1a73e8;
+  --accent-light: #7c4dff;
+  --text-primary: #1a1a2e;
+  --text-secondary: #555566;
+  --text-muted: #888899;
+  --border: #d0d0dd;
+  --btn-secondary: #e0e0e6;
+  --btn-secondary-hover: #c8c8d0;
+  --shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -81,6 +96,24 @@ html, body {
   border-radius: var(--radius-sm);
   font-size: 12px;
   cursor: pointer;
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.theme-toggle:active {
+  background: var(--bg-card-hover);
 }
 
 /* ===== CONTENT AREA ===== */
@@ -419,7 +452,8 @@ html, body {
 }
 
 .score-controls .btn {
-  width: 88px;
+  flex: 1;
+  min-width: 0;
   height: 36px;
   padding: 0;
   font-size: 18px;
