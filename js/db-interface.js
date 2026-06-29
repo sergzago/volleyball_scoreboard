@@ -657,6 +657,21 @@
   // SCOREBOARD MODULE
   // ============================================================================
 
+  /**
+   * Поиск записи в volleyball по полю id (кастомному, не системному).
+   * PocketBase getOne/getFirstListItem используют системный id, а не кастомное поле.
+   */
+  function findVolleyballRecord(pb, gameId) {
+    return pb.collection(DB_CONFIG.collections.VOLLEYBALL)
+      .getFullList()
+      .then(function(records) {
+        for (var i = 0; i < records.length; i++) {
+          if (records[i].id === gameId) return records[i];
+        }
+        return null;
+      });
+  }
+
   var scoreboard = {
 
     /**
@@ -674,10 +689,9 @@
       }
 
       var pb = getPocketBaseClient();
-      return pb.collection(DB_CONFIG.collections.VOLLEYBALL).getOne(gameId)
-        .catch(function(err) {
-          if (err.status === 404) return null;
-          throw err;
+      return findVolleyballRecord(pb, gameId)
+        .catch(function() {
+          return null;
         });
     },
 
@@ -706,26 +720,23 @@
       var subscriptionKey = DB_CONFIG.collections.VOLLEYBALL + '_' + gameId;
 
       // Сначала получаем текущие данные
-      pb.collection(DB_CONFIG.collections.VOLLEYBALL).getOne(gameId)
+      findVolleyballRecord(pb, gameId)
         .then(function(record) {
-          onUpdate(record);
+          if (record) onUpdate(record);
         })
         .catch(function(err) {
-          if (err.status === 404) {
-            // Документ не существует — ждём создания
-            return;
-          }
           if (onError) onError(err);
         });
 
-      // Подписываемся на изменения
+      // Подписываемся на все изменения коллекции, фильтруем по полю id
       pb.collection(DB_CONFIG.collections.VOLLEYBALL)
-        .subscribe(gameId, function(e) {
+        .subscribe('*', function(e) {
           if (e.action === 'update' || e.action === 'create') {
-            onUpdate(e.record);
-          } else if (e.action === 'delete') {
-            onUpdate(null);
+            if (e.record && e.record.id === gameId) {
+              onUpdate(e.record);
+            }
           }
+          // delete events ignored — can't verify which record was deleted
         })
         .catch(function(err) {
           if (onError) onError(err);
@@ -792,25 +803,24 @@
         }
       });
 
-      // PocketBase: используем PATCH (upsert) — создаёт или обновляет
-      return pb.collection(DB_CONFIG.collections.VOLLEYBALL).update(gameId, updateData)
+      // PocketBase: сначала ищем запись по полю id, потом обновляем по системному ID
+      return findVolleyballRecord(pb, gameId)
         .then(function(record) {
-          // Если есть поля для удаления — удаляем их отдельным запросом
-          if (deleteFields.length > 0) {
-            var deleteData = {};
-            deleteFields.forEach(function(f) { deleteData[f] = null; });
-            return pb.collection(DB_CONFIG.collections.VOLLEYBALL).update(gameId, deleteData);
+          if (record) {
+            return pb.collection(DB_CONFIG.collections.VOLLEYBALL).update(record.id, updateData)
+              .then(function(updated) {
+                if (deleteFields.length > 0) {
+                  var deleteData = {};
+                  deleteFields.forEach(function(f) { deleteData[f] = null; });
+                  return pb.collection(DB_CONFIG.collections.VOLLEYBALL).update(record.id, deleteData);
+                }
+                return updated;
+              });
           }
-          return record;
-        })
-        .catch(function(err) {
-          if (err.status === 404) {
-            // Документ не существует — создаём
-            return pb.collection(DB_CONFIG.collections.VOLLEYBALL).create(
-              Object.assign({ id: gameId }, updateData)
-            );
-          }
-          throw err;
+          // Запись не найдена — создаём
+          return pb.collection(DB_CONFIG.collections.VOLLEYBALL).create(
+            Object.assign({ id: gameId }, updateData)
+          );
         });
     },
 
@@ -932,7 +942,12 @@
       }
 
       var pb = getPocketBaseClient();
-      return pb.collection(DB_CONFIG.collections.VOLLEYBALL).delete(gameId);
+      return findVolleyballRecord(pb, gameId)
+        .then(function(record) {
+          if (record) {
+            return pb.collection(DB_CONFIG.collections.VOLLEYBALL).delete(record.id);
+          }
+        });
     }
   };
 
