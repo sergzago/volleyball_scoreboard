@@ -161,6 +161,13 @@
         { name: 'serving_team', type: 'text', required: false },
         { name: 'status', type: 'select', required: false, values: ['not_started', 'in_progress', 'finished', 'paused'] },
         { name: 'match_type', type: 'select', required: false, values: ['classic', 'beach'] },
+        { name: 'matchmode', type: 'text', required: false },
+        { name: 'count_wins', type: 'number', required: false },
+        { name: 'score_wins', type: 'number', required: false },
+        { name: 'score_tie', type: 'number', required: false },
+        { name: 'balance', type: 'bool', required: false },
+        { name: 'score_change', type: 'number', required: false },
+        { name: 'count_timeouts', type: 'number', required: false },
         { name: 'lastEdited', type: 'date', required: false },
         { name: 'created', type: 'date', required: false }
       ]

@@ -11,13 +11,20 @@
   var timeoutTimerInterval = null;
   var timeoutRemainingSeconds = 0;
   var _localCustomMode = false;
+  var _customFieldsEditing = false;
+  var _recordExists = false;
+  var _localSettingsDirty = false;
+  var _localBeachMode = false;
+  var _localTwoWinsMode = false;
+  var _localInvertTablo = false;
+  var _localUnlimitedScore = false;
   var _localCustomSettings = {
-    custom_sets_to_win: 3,
-    custom_points_to_win: 25,
-    custom_tiebreak_points: 15,
-    custom_balance: false,
-    custom_side_switch_points: 7,
-    custom_max_timeouts: 2
+    count_wins: 3,
+    score_wins: 25,
+    score_tie: 15,
+    balance: false,
+    score_change: 7,
+    count_timeouts: 2
   };
 
   // ===== HELPERS =====
@@ -37,6 +44,67 @@
 
   function show(el) { el.style.display = ''; }
   function hide(el) { el.style.display = 'none'; }
+
+  function buildMatchmode() {
+    return (_localBeachMode ? 1 : 0) + '' + (_localTwoWinsMode ? 1 : 0) + '' +
+           (_localInvertTablo ? 1 : 0) + '' + (_localUnlimitedScore ? 1 : 0) + '' +
+           (_localCustomMode ? 1 : 0);
+  }
+
+  function applyMatchmode(code) {
+    if (!code || code.length !== 5) return;
+    _localBeachMode = code[0] === '1';
+    _localTwoWinsMode = code[1] === '1';
+    _localInvertTablo = code[2] === '1';
+    _localUnlimitedScore = code[3] === '1';
+    _localCustomMode = code[4] === '1';
+    document.getElementById('mobileBeachMode').checked = _localBeachMode;
+    document.getElementById('mobileTwoWinsMode').checked = _localTwoWinsMode;
+    document.getElementById('mobileInvertTablo').checked = _localInvertTablo;
+    document.getElementById('mobileUnlimitedScore').checked = _localUnlimitedScore;
+    document.getElementById('mobileCustomMode').checked = _localCustomMode;
+    document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
+    document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
+    document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
+    document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+  }
+
+  function loadCustomSettingsFromData(data) {
+    if (data['count_wins'] != null) _localCustomSettings.count_wins = ensureNumber(data['count_wins']);
+    if (data['score_wins'] != null) _localCustomSettings.score_wins = ensureNumber(data['score_wins']);
+    if (data['score_tie'] != null) _localCustomSettings.score_tie = ensureNumber(data['score_tie']);
+    if (data['balance'] != null) _localCustomSettings.balance = !!data['balance'];
+    if (data['score_change'] != null) _localCustomSettings.score_change = ensureNumber(data['score_change']);
+    if (data['count_timeouts'] != null) _localCustomSettings.count_timeouts = ensureNumber(data['count_timeouts']);
+    document.getElementById('customSetsToWin').value = _localCustomSettings.count_wins;
+    document.getElementById('customPointsToWin').value = _localCustomSettings.score_wins;
+    document.getElementById('customTiebreakPoints').value = _localCustomSettings.score_tie;
+    document.getElementById('customBalance').checked = _localCustomSettings.balance;
+    document.getElementById('customSideSwitchPoints').value = _localCustomSettings.score_change;
+    document.getElementById('customMaxTimeouts').value = _localCustomSettings.count_timeouts;
+  }
+
+  function buildSavePayload() {
+    var payload = {
+      matchmode: buildMatchmode(),
+      beach_mode: _localBeachMode,
+      two_wins_mode: _localTwoWinsMode,
+      invert_tablo: _localInvertTablo,
+      unlimited_score: _localUnlimitedScore,
+      custom_mode: _localCustomMode
+    };
+    if (_localCustomMode) {
+      syncCustomSettings();
+      payload.count_wins = _localCustomSettings.count_wins;
+      payload.score_wins = _localCustomSettings.score_wins;
+      payload.score_tie = _localCustomSettings.score_tie;
+      payload.balance = _localCustomSettings.balance;
+      payload.score_change = _localCustomSettings.score_change;
+      payload.count_timeouts = _localCustomSettings.count_timeouts;
+      payload.period_count = 9;
+    }
+    return payload;
+  }
 
   function showControlContent() {
     hide(document.getElementById('controlLoading'));
@@ -196,14 +264,17 @@
       if (data) {
         applyGameData(data);
       } else {
+        _recordExists = false;
         document.getElementById('controlLoading').textContent = 'Заполните данные команд';
       }
     }).catch(function() {
+      _recordExists = false;
       document.getElementById('controlLoading').textContent = 'Заполните данные команд';
     });
   }
 
   function applyGameData(data) {
+    _recordExists = true;
     Object.keys(data).forEach(function(key) {
       mobileScoreboardData[key] = data[key];
     });
@@ -243,6 +314,7 @@
       }
 
       // Merge instead of replace — PocketBase SSE may omit fields
+      _recordExists = true;
       Object.keys(data).forEach(function(key) {
         mobileScoreboardData[key] = data[key];
       });
@@ -274,37 +346,35 @@
   // ===== SETTINGS UI =====
 
   function updateSettingsUI(data) {
-    var beachMode = !!data['beach_mode'];
-    var twoWinsMode = !!data['two_wins_mode'];
-    var invertTablo = !!data['invert_tablo'];
-    var unlimitedScore = !!data['unlimited_score'];
-    var customMode = !!data['custom_mode'] || _localCustomMode;
+    if (!_localSettingsDirty) {
+      var matchmode = data['matchmode'];
+      if (matchmode) {
+        applyMatchmode(matchmode);
+      } else {
+        _localBeachMode = !!data['beach_mode'];
+        _localTwoWinsMode = !!data['two_wins_mode'];
+        _localInvertTablo = !!data['invert_tablo'];
+        _localUnlimitedScore = !!data['unlimited_score'];
+        _localCustomMode = !!data['custom_mode'];
+        document.getElementById('mobileBeachMode').checked = _localBeachMode;
+        document.getElementById('mobileTwoWinsMode').checked = _localTwoWinsMode;
+        document.getElementById('mobileInvertTablo').checked = _localInvertTablo;
+        document.getElementById('mobileUnlimitedScore').checked = _localUnlimitedScore;
+        document.getElementById('mobileCustomMode').checked = _localCustomMode;
+        document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
+        document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
+        document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
+        document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+      }
+    }
 
-    document.getElementById('mobileBeachMode').checked = beachMode;
-    document.getElementById('mobileTwoWinsMode').checked = twoWinsMode;
-    document.getElementById('mobileInvertTablo').checked = invertTablo;
-    document.getElementById('mobileUnlimitedScore').checked = unlimitedScore;
-    document.getElementById('mobileCustomMode').checked = customMode;
-
-    _localCustomMode = customMode;
-
-    document.getElementById('mobileTwoWinsMode').disabled = beachMode || customMode;
-    document.getElementById('mobileBeachMode').disabled = twoWinsMode || customMode;
-    document.getElementById('mobileUnlimitedScore').disabled = customMode;
-    document.getElementById('mobileCustomMode').disabled = beachMode || twoWinsMode;
-
-    // Custom settings card visibility
     var customCard = document.getElementById('customSettingsCard');
-    if (customMode) {
+    if (_localCustomMode) {
       customCard.style.display = '';
-      if (data['custom_sets_to_win'] != null) document.getElementById('customSetsToWin').value = ensureNumber(data['custom_sets_to_win']);
-      if (data['custom_points_to_win'] != null) document.getElementById('customPointsToWin').value = ensureNumber(data['custom_points_to_win']);
-      if (data['custom_tiebreak_points'] != null) document.getElementById('customTiebreakPoints').value = ensureNumber(data['custom_tiebreak_points']);
-      if (data['custom_balance'] != null) document.getElementById('customBalance').checked = !!data['custom_balance'];
-      if (data['custom_side_switch_points'] != null) document.getElementById('customSideSwitchPoints').value = ensureNumber(data['custom_side_switch_points']);
-      if (data['custom_max_timeouts'] != null) document.getElementById('customMaxTimeouts').value = ensureNumber(data['custom_max_timeouts']);
+      if (!_customFieldsEditing && !_localSettingsDirty) loadCustomSettingsFromData(data);
     } else {
       customCard.style.display = 'none';
+      _customFieldsEditing = false;
     }
   }
 
@@ -331,8 +401,8 @@
   // ===== CONTROL UI =====
 
   function updateControlUI(data) {
-    var beachMode = !!data['beach_mode'];
-    var unlimitedScore = !!data['unlimited_score'];
+    var beachMode = _localBeachMode;
+    var unlimitedScore = _localUnlimitedScore;
 
     document.getElementById('mHomeTeam').textContent = data['home_team'] || 'Home';
     document.getElementById('mAwayTeam').textContent = data['away_team'] || 'Away';
@@ -521,8 +591,8 @@
   }
 
   function saveMatchResult(setHistory, overallHome, overallAway) {
-    var isBeach = !!mobileScoreboardData['beach_mode'];
-    var twoWinsMode = !!mobileScoreboardData['two_wins_mode'];
+    var isBeach = _localBeachMode;
+    var twoWinsMode = _localTwoWinsMode;
     var userInfo = getCurrentUserInfo();
 
     if (typeof overallHome === 'undefined' || typeof overallAway === 'undefined') {
@@ -602,47 +672,47 @@
   var BEACH_SETS_TO_WIN = 2;
   var BEACH_MAX_SETS = 3;
 
-  function isBeachMode() { return !!mobileScoreboardData['beach_mode']; }
+  function isBeachMode() { return _localBeachMode; }
 
   function isCustomMode() { return _localCustomMode; }
 
   function syncCustomSettings() {
     if (!_localCustomMode) return;
-    _localCustomSettings.custom_sets_to_win = ensureNumber(document.getElementById('customSetsToWin').value) || 3;
-    _localCustomSettings.custom_points_to_win = ensureNumber(document.getElementById('customPointsToWin').value) || 25;
-    _localCustomSettings.custom_tiebreak_points = ensureNumber(document.getElementById('customTiebreakPoints').value) || 15;
-    _localCustomSettings.custom_balance = document.getElementById('customBalance').checked;
-    _localCustomSettings.custom_side_switch_points = ensureNumber(document.getElementById('customSideSwitchPoints').value) || 7;
+    _localCustomSettings.count_wins = ensureNumber(document.getElementById('customSetsToWin').value) || 3;
+    _localCustomSettings.score_wins = ensureNumber(document.getElementById('customPointsToWin').value) || 25;
+    _localCustomSettings.score_tie = ensureNumber(document.getElementById('customTiebreakPoints').value) || 15;
+    _localCustomSettings.balance = document.getElementById('customBalance').checked;
+    _localCustomSettings.score_change = ensureNumber(document.getElementById('customSideSwitchPoints').value) || 7;
     var maxT = document.getElementById('customMaxTimeouts').value;
-    _localCustomSettings.custom_max_timeouts = maxT === '' ? 2 : ensureNumber(maxT);
+    _localCustomSettings.count_timeouts = maxT === '' ? 2 : ensureNumber(maxT);
   }
 
   function getCustomPointsToWin() {
-    return _localCustomSettings.custom_points_to_win || CLASSIC_POINTS_TO_WIN;
+    return _localCustomSettings.score_wins || CLASSIC_POINTS_TO_WIN;
   }
 
   function getCustomTiebreakPoints() {
-    return _localCustomSettings.custom_tiebreak_points || 15;
+    return _localCustomSettings.score_tie || 15;
   }
 
   function getCustomSetsToWin() {
-    return _localCustomSettings.custom_sets_to_win || CLASSIC_SETS_TO_WIN;
+    return _localCustomSettings.count_wins || CLASSIC_SETS_TO_WIN;
   }
 
   function getCustomBalance() {
-    return _localCustomSettings.custom_balance;
+    return _localCustomSettings.balance;
   }
 
   function getCustomSideSwitch() {
-    return _localCustomSettings.custom_side_switch_points > 0;
+    return _localCustomSettings.score_change > 0;
   }
 
   function getCustomSideSwitchPoints() {
-    return ensureNumber(_localCustomSettings.custom_side_switch_points);
+    return ensureNumber(_localCustomSettings.score_change);
   }
 
   function getCustomMaxTimeouts() {
-    return _localCustomSettings.custom_max_timeouts;
+    return _localCustomSettings.count_timeouts;
   }
 
   function getBeachSetNumber() {
@@ -698,7 +768,7 @@
       return teamScore >= target;
     }
 
-    var twoWinsMode = !!mobileScoreboardData['two_wins_mode'];
+    var twoWinsMode = _localTwoWinsMode;
     var target2;
     if (twoWinsMode) {
       target2 = (period === 3) ? CLASSIC_TIEBREAK_POINTS_TO_WIN : CLASSIC_POINTS_TO_WIN;
@@ -756,7 +826,7 @@
         maxPeriod = ensureNumber(mobileScoreboardData['period_count']) || 9;
         nextPeriod = currentPeriod < maxPeriod ? currentPeriod + 1 : currentPeriod;
       } else {
-        var twoWinsMode = !!mobileScoreboardData['two_wins_mode'];
+        var twoWinsMode = _localTwoWinsMode;
         setsToWin = twoWinsMode ? CLASSIC_SETS_TO_WIN_TWO : CLASSIC_SETS_TO_WIN;
         matchFinished2 = homeFouls >= setsToWin || awayFouls >= setsToWin;
         currentPeriod = ensureNumber(mobileScoreboardData['current_period']) || 1;
@@ -771,7 +841,7 @@
         if (isCustomMode()) {
           classic_tiebreak_switch_done = true;
         } else {
-          var twoWinsMode = !!mobileScoreboardData['two_wins_mode'];
+          var twoWinsMode = _localTwoWinsMode;
           var tiebreakSet = twoWinsMode ? 3 : 5;
           classic_tiebreak_switch_done = nextPeriod === tiebreakSet ? false : true;
         }
@@ -861,7 +931,7 @@
     var homeAfter = team === 'home' ? newScore : ensureNumber(mobileScoreboardData['home_score']);
     var awayAfter = team === 'home' ? otherScore : newScore;
 
-    var twoWinsMode = !!mobileScoreboardData['two_wins_mode'];
+    var twoWinsMode = _localTwoWinsMode;
     var currentPeriod = ensureNumber(mobileScoreboardData['current_period']);
 
     var sideSwitchTriggered = false;
@@ -913,7 +983,7 @@
       highlightSideSwitch(true);
     }
 
-    var unlimitedScore = !!mobileScoreboardData['unlimited_score'];
+    var unlimitedScore = _localUnlimitedScore;
     if (delta > 0 && !unlimitedScore && classicSetWon(newScore, otherScore)) {
       applySetWin(team, newScore, otherScore, update);
       return;
@@ -971,109 +1041,128 @@
 
     document.getElementById('connectGameBtn').addEventListener('click', connectToGame);
 
-    // Mode toggles
+    // Mode toggles — local state only, no DB write
     document.getElementById('mobileBeachMode').addEventListener('change', function() {
-      var enabled = this.checked;
-      if (enabled) _localCustomMode = false;
-      var update = {
-        beach_mode: enabled, beach_match_finished: false, set_history: [], classic_match_finished: false,
-        classic_tiebreak_switch_done: true, home_timeouts: 0, away_timeouts: 0
-      };
-      if (enabled) {
-        update['home_sets'] = 0; update['away_sets'] = 0; update['home_score'] = 0; update['away_score'] = 0;
-        update['beach_current_set'] = 1; update['current_period'] = 1; update['beach_switch_message'] = '';
-        update['period_count'] = 3; update['classic_match_finished'] = false; update['two_wins_mode'] = false;
-        update['custom_mode'] = false;
-      } else {
-        update['beach_switch_message'] = ''; update['home_sets'] = 0; update['away_sets'] = 0;
-        update['beach_current_set'] = 1; update['period_count'] = 5; update['home_score'] = 0; update['away_score'] = 0;
-      }
-      update_db(update);
+      _localBeachMode = this.checked;
+      _localSettingsDirty = true;
+      if (_localBeachMode) { _localTwoWinsMode = false; _localCustomMode = false; }
+      document.getElementById('mobileTwoWinsMode').checked = _localTwoWinsMode;
+      document.getElementById('mobileCustomMode').checked = _localCustomMode;
+      document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
+      document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
+      document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
+      document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
     });
 
     document.getElementById('mobileTwoWinsMode').addEventListener('change', function() {
-      var enabled = this.checked;
-      if (enabled) _localCustomMode = false;
-      var update = {
-        two_wins_mode: enabled, classic_match_finished: false, set_history: [], beach_match_finished: false,
-        home_timeouts: 0, away_timeouts: 0
-      };
-      if (enabled) {
-        update['home_fouls'] = 0; update['away_fouls'] = 0; update['home_score'] = 0; update['away_score'] = 0;
-        update['current_period'] = 1; update['period_count'] = 3; update['classic_tiebreak_switch_done'] = true;
-        update['beach_mode'] = false; update['custom_mode'] = false;
-      } else {
-        update['home_fouls'] = 0; update['away_fouls'] = 0; update['home_score'] = 0; update['away_score'] = 0;
-        update['current_period'] = 1; update['period_count'] = 5;
-      }
-      update_db(update);
+      _localTwoWinsMode = this.checked;
+      _localSettingsDirty = true;
+      if (_localTwoWinsMode) { _localBeachMode = false; _localCustomMode = false; }
+      document.getElementById('mobileBeachMode').checked = _localBeachMode;
+      document.getElementById('mobileCustomMode').checked = _localCustomMode;
+      document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
+      document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
+      document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
+      document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
     });
 
     document.getElementById('mobileInvertTablo').addEventListener('change', function() {
-      update_db({ invert_tablo: this.checked });
+      _localInvertTablo = this.checked;
+      _localSettingsDirty = true;
     });
 
     document.getElementById('mobileUnlimitedScore').addEventListener('change', function() {
-      update_db({ unlimited_score: this.checked });
+      _localUnlimitedScore = this.checked;
+      _localSettingsDirty = true;
     });
 
-    // Custom mode toggle
+    // Custom mode toggle — local state only, load from DB if available
     document.getElementById('mobileCustomMode').addEventListener('change', function() {
-      var enabled = this.checked;
-      _localCustomMode = enabled;
-      if (enabled) syncCustomSettings();
-      var update = {
-        custom_mode: enabled, classic_match_finished: false, set_history: [], beach_match_finished: false,
-        home_timeouts: 0, away_timeouts: 0
-      };
-      if (enabled) {
-        update['home_fouls'] = 0; update['away_fouls'] = 0; update['home_score'] = 0; update['away_score'] = 0;
-        update['current_period'] = 1; update['classic_tiebreak_switch_done'] = true;
-        update['beach_mode'] = false; update['two_wins_mode'] = false; update['unlimited_score'] = false;
-        update['period_count'] = 9;
-        update['custom_sets_to_win'] = _localCustomSettings.custom_sets_to_win;
-        update['custom_points_to_win'] = _localCustomSettings.custom_points_to_win;
-        update['custom_tiebreak_points'] = _localCustomSettings.custom_tiebreak_points;
-        update['custom_balance'] = _localCustomSettings.custom_balance;
-        update['custom_side_switch_points'] = _localCustomSettings.custom_side_switch_points;
-        update['custom_max_timeouts'] = _localCustomSettings.custom_max_timeouts;
-      } else {
-        update['home_fouls'] = 0; update['away_fouls'] = 0; update['home_score'] = 0; update['away_score'] = 0;
-        update['current_period'] = 1; update['period_count'] = 5;
+      _localCustomMode = this.checked;
+      _localSettingsDirty = true;
+      if (_localCustomMode) {
+        _localBeachMode = false;
+        _localTwoWinsMode = false;
+        document.getElementById('mobileBeachMode').checked = false;
+        document.getElementById('mobileTwoWinsMode').checked = false;
       }
-      update_db(update);
+      document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
+      document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
+      document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
+      document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+
+      var customCard = document.getElementById('customSettingsCard');
+      if (_localCustomMode) {
+        customCard.style.display = '';
+        if (_recordExists) {
+          loadCustomSettingsFromData(mobileScoreboardData);
+        } else {
+          _localCustomSettings.count_wins = 3;
+          _localCustomSettings.score_wins = 25;
+          _localCustomSettings.score_tie = 15;
+          _localCustomSettings.balance = false;
+          _localCustomSettings.score_change = 7;
+          _localCustomSettings.count_timeouts = 2;
+          document.getElementById('customSetsToWin').value = 3;
+          document.getElementById('customPointsToWin').value = 25;
+          document.getElementById('customTiebreakPoints').value = 15;
+          document.getElementById('customBalance').checked = false;
+          document.getElementById('customSideSwitchPoints').value = 7;
+          document.getElementById('customMaxTimeouts').value = 2;
+        }
+      } else {
+        customCard.style.display = 'none';
+        _customFieldsEditing = false;
+      }
     });
 
-    // Save custom settings
+    // Save custom settings — save to DB (existing record only)
     document.getElementById('saveCustomSettings').addEventListener('click', function() {
       if (!mobileGameConnected) return;
+      _customFieldsEditing = false;
       syncCustomSettings();
-      update_db({
-        custom_sets_to_win: _localCustomSettings.custom_sets_to_win,
-        custom_points_to_win: _localCustomSettings.custom_points_to_win,
-        custom_tiebreak_points: _localCustomSettings.custom_tiebreak_points,
-        custom_balance: _localCustomSettings.custom_balance,
-        custom_side_switch_points: _localCustomSettings.custom_side_switch_points,
-        custom_max_timeouts: _localCustomSettings.custom_max_timeouts,
-        classic_match_finished: false, beach_match_finished: false, set_history: [],
-        home_fouls: 0, away_fouls: 0, home_score: 0, away_score: 0,
-        current_period: 1, classic_tiebreak_switch_done: true,
-        home_timeouts: 0, away_timeouts: 0, pending_new_set: DB.deleteField(),
-        next_period: DB.deleteField(), classic_switch_needed: DB.deleteField(),
-        classic_switch_shown: DB.deleteField(), classic_switch_message: DB.deleteField()
-      });
+      if (!_recordExists) return;
+      _localSettingsDirty = false;
+      var payload = buildSavePayload();
+      payload.classic_match_finished = false;
+      payload.beach_match_finished = false;
+      payload.set_history = [];
+      payload.home_fouls = 0;
+      payload.away_fouls = 0;
+      payload.home_score = 0;
+      payload.away_score = 0;
+      payload.current_period = 1;
+      payload.classic_tiebreak_switch_done = true;
+      payload.home_timeouts = 0;
+      payload.away_timeouts = 0;
+      payload.pending_new_set = DB.deleteField();
+      payload.next_period = DB.deleteField();
+      payload.classic_switch_needed = DB.deleteField();
+      payload.classic_switch_shown = DB.deleteField();
+      payload.classic_switch_message = DB.deleteField();
+      update_db(payload);
     });
+
+    // Track editing on custom form fields
+    ['customSetsToWin', 'customPointsToWin', 'customTiebreakPoints', 'customSideSwitchPoints', 'customMaxTimeouts'].forEach(function(id) {
+      document.getElementById(id).addEventListener('input', function() { _customFieldsEditing = true; });
+    });
+    document.getElementById('customBalance').addEventListener('change', function() { _customFieldsEditing = true; });
 
     // Teams save
     document.getElementById('saveTeamsBtn').addEventListener('click', function() {
-      update_db({
+      _localSettingsDirty = false;
+      var update = {
         away_team: document.getElementById('mobileAwayTeam').value,
         away_color: document.getElementById('mobileAwayColor').value,
         home_team: document.getElementById('mobileHomeTeam').value,
         home_color: document.getElementById('mobileHomeColor').value,
         tournament_name: document.getElementById('mobileTournament').value || 'НВЛ',
         venue: document.getElementById('mobileVenue').value || ''
-      });
+      };
+      var modePayload = buildSavePayload();
+      Object.keys(modePayload).forEach(function(k) { update[k] = modePayload[k]; });
+      update_db(update);
       showControlContent();
     });
 
@@ -1193,7 +1282,7 @@
         }
 
         if (delta > 0) {
-          var unlimitedScore = !!mobileScoreboardData['unlimited_score'];
+          var unlimitedScore = _localUnlimitedScore;
           var homeScore = ensureNumber(mobileScoreboardData['home_score']);
           var awayScore = ensureNumber(mobileScoreboardData['away_score']);
           var curPeriod = ensureNumber(mobileScoreboardData['current_period']);
@@ -1339,7 +1428,7 @@
       if (!confirm('Сбросить игру? Текущий счёт будет потерян.')) return;
 
       var beachEnabled = isBeachMode();
-      var invertTablo = !!mobileScoreboardData['invert_tablo'];
+      var invertTablo = _localInvertTablo;
       var userInfo = getCurrentUserInfo();
 
       var resetData = {
@@ -1356,7 +1445,8 @@
         beach_match_finished: false, period_count: beachEnabled ? 3 : 5, set_history: [],
         classic_match_finished: false, home_side: 'left', away_side: 'right',
         classic_tiebreak_switch_done: true, invert_tablo: invertTablo,
-        unlimited_score: false, two_wins_mode: false,
+        unlimited_score: false, two_wins_mode: false, custom_mode: _localCustomMode,
+        matchmode: buildMatchmode(),
         pending_new_set: DB.deleteField(), next_period: DB.deleteField(),
         next_beach_set: DB.deleteField(), pending_home_side: DB.deleteField(),
         pending_away_side: DB.deleteField(), pending_classic_tiebreak_switch_done: DB.deleteField(),
