@@ -189,30 +189,53 @@
     }
   }
 
+  function showError(msg) {
+    var errorEl = document.getElementById('loginError');
+    errorEl.textContent = msg;
+    errorEl.classList.add('visible');
+  }
+
+  function hideError() {
+    var errorEl = document.getElementById('loginError');
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
+  }
+
   function doLogin() {
     var username = document.getElementById('loginUsername').value.trim();
     var password = document.getElementById('loginPassword').value;
-    var errorEl = document.getElementById('loginError');
     var btn = document.getElementById('loginBtn');
 
     if (!username || !password) {
-      errorEl.textContent = 'Введите логин и пароль';
-      show(errorEl);
+      showError('Введите логин и пароль');
       return;
     }
 
     btn.disabled = true;
     btn.textContent = 'Вход...';
-    hide(errorEl);
+    hideError();
 
     DB.auth.login(username, password).then(function(userData) {
       btn.disabled = false;
       btn.textContent = 'Войти';
+      var role = userData.role || 'user';
+      showApp(userData.displayName || userData.username || username, role);
+
+      if (role === 'admin') {
+        document.querySelectorAll('.admin-tab').forEach(function(el) {
+          el.classList.remove('admin-hidden');
+        });
+      }
     }).catch(function(err) {
       btn.disabled = false;
       btn.textContent = 'Войти';
-      errorEl.textContent = err.message || 'Ошибка авторизации';
-      show(errorEl);
+      var msg = err.message || 'Ошибка авторизации';
+      if (msg.includes('не найден') || msg.includes('Неверный пароль')) {
+        msg = 'Неверный логин или пароль';
+      } else if (msg.includes('сеть') || msg.includes('fetch')) {
+        msg = 'Ошибка сети. Проверьте подключение к интернету.';
+      }
+      showError(msg);
     });
   }
 

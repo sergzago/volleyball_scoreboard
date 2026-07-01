@@ -720,10 +720,18 @@ html, body {
 
 .login-error {
   color: var(--danger);
+  background: rgba(225, 112, 85, 0.1);
+  border: 1px solid rgba(225, 112, 85, 0.3);
+  border-radius: var(--radius-sm);
   font-size: 13px;
+  padding: 8px 12px;
   margin-top: 8px;
   text-align: center;
   display: none;
+}
+
+.login-error.visible {
+  display: block;
 }
 
 /* ===== OFFLINE BANNER ===== */
