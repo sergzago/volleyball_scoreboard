@@ -19,12 +19,12 @@
   var _localInvertTablo = false;
   var _localUnlimitedScore = false;
   var _localCustomSettings = {
-    count_wins: 3,
-    score_wins: 25,
+    count_wins: 1,
+    score_wins: 21,
     score_tie: 15,
-    balance: false,
+    balance: true,
     score_change: 7,
-    count_timeouts: 2
+    count_timeouts: 1
   };
 
   // ===== HELPERS =====
@@ -1162,6 +1162,7 @@
       };
       var modePayload = buildSavePayload();
       Object.keys(modePayload).forEach(function(k) { update[k] = modePayload[k]; });
+      if (!_recordExists) update.show = 1;
       update_db(update);
       showControlContent();
     });
