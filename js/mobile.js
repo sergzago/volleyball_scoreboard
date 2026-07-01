@@ -113,9 +113,11 @@
 
   function getCurrentUserInfo() {
     if (DB.getProvider() === 'firebase') {
-      var user = firebase.auth().currentUser;
-      if (!user) return {};
-      return { username: user.email.split('@')[0], displayname: user.displayName || user.email.split('@')[0] };
+      try {
+        var stored = JSON.parse(localStorage.getItem('firebase_user'));
+        if (!stored) return {};
+        return { username: stored.username, displayname: stored.displayName || stored.username };
+      } catch (e) { return {}; }
     }
     if (DB.auth.getAuthInstance && DB.auth.getAuthInstance()) {
       var pb = typeof PocketBase !== 'undefined' ? new PocketBase(DB_CONFIG.pocketbase.url) : null;

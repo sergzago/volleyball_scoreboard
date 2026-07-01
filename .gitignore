@@ -2,3 +2,5 @@
 server/serviceAccountKey.json
 node_modules/*
 serviceAccountKey.json
+server/serviceAccountKey.json
+password.json

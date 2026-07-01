@@ -1,14 +1,31 @@
 /**
  * Маршруты для аутентификации
- * Поддерживает Firebase и PocketBase
+ * Поддерживает Firebase (через Firestore) и PocketBase
  *
  * Управление пользователями осуществляется через:
- * - Firebase Console (Firebase Auth)
+ * - Firebase: коллекция users в Firestore
  * - PocketBase Admin Dashboard (/_/)
  */
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
+
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_KEYLEN = 32;
+const PBKDF2_DIGEST = 'sha256';
+
+function verifyPasswordServer(password, stored) {
+  const parts = stored.split(':');
+  const salt = Buffer.from(parts[0], 'hex');
+  const hash = parts[1];
+  return new Promise(function(resolve, reject) {
+    crypto.pbkdf2(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST, function(err, derived) {
+      if (err) return reject(err);
+      resolve(derived.toString('hex') === hash);
+    });
+  });
+}
 
 // Загружаем credentials для Firebase API key
 let firebaseApiKey = null;
@@ -82,62 +99,48 @@ router.post('/login', async (req, res) => {
     const dbConfig = req.app.locals.db;
 
     if (dbConfig.provider === 'firebase') {
-      // Firebase: получаем ID token через Google Identity Toolkit API
-      const email = identity.includes('@') ? identity : `${identity.toLowerCase()}@volleyball.local`;
+      const username = identity.includes('@') ? identity.split('@')[0].toLowerCase() : identity.toLowerCase();
+      const usersCollection = process.env.FIREBASE_USERS_COLLECTION || 'users';
 
-      const response = await fetch(
-        'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            password,
-            returnSecureToken: true
-          })
-        }
-      );
+      const userDoc = await dbConfig.db
+        .collection(usersCollection)
+        .doc(username)
+        .get();
 
-      if (!response.ok) {
-        const error = await response.json();
-        let message = 'Неверные учётные данные';
-        if (error.error?.message === 'INVALID_LOGIN_CREDENTIALS') {
-          message = 'Пользователь не найден или неверный пароль';
-        } else if (error.error?.message === 'USER_DISABLED') {
-          message = 'Учётная запись заблокирована';
-        } else if (error.error?.message === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
-          message = 'Слишком много попыток входа. Попробуйте позже';
-        }
-        return res.status(401).json({ error: 'Unauthorized', message });
+      if (!userDoc.exists || !userDoc.data().password) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Пользователь не найден или неверный пароль' });
       }
 
-      const data = await response.json();
+      const userData = userDoc.data();
+      const valid = await verifyPasswordServer(password, userData.password);
 
-      // Получаем роль пользователя из Firestore
-      let role = 'user';
-      const username = email.split('@')[0];
-      try {
-        const userDoc = await dbConfig.db
-          .collection(process.env.FIREBASE_USERS_COLLECTION || 'users')
-          .doc(username)
-          .get();
-        if (userDoc.exists && userDoc.data().role) {
-          role = userDoc.data().role;
-        }
-      } catch {
-        // Роль по умолчанию — 'user'
+      if (!valid) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Пользователь не найден или неверный пароль' });
       }
+
+      const { v4: uuidv4 } = require('uuid');
+      const token = uuidv4();
+      const sessionsCollection = process.env.FIREBASE_SESSIONS_COLLECTION || 'sessions';
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await dbConfig.db.collection(sessionsCollection).doc(token).set({
+        uid: userDoc.id,
+        email: userData.email,
+        role: userData.role || 'user',
+        expiresAt: expiresAt,
+        createdAt: new Date()
+      });
 
       res.json({
-        token: data.idToken,
-        refreshToken: data.refreshToken,
-        expiresIn: parseInt(data.expiresIn, 10),
+        token: token,
+        refreshToken: token,
+        expiresIn: 604800,
         user: {
-          uid: data.localId,
-          email: data.email,
-          username,
-          role,
-          displayName: data.displayName || username
+          uid: userDoc.id,
+          email: userData.email,
+          username: username,
+          role: userData.role || 'user',
+          displayName: userData.displayName || username
         }
       });
 
@@ -261,6 +264,55 @@ router.post('/token', requireAuth, async (req, res) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/update-password
+ * Смена пароля пользователя (Firebase — через Firestore)
+ */
+router.post('/update-password', requireAuth, async (req, res) => {
+  try {
+    const { uid, password } = req.body;
+
+    if (!uid || !password) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Требуется uid и password'
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Пароль должен быть минимум 8 символов'
+      });
+    }
+
+    const dbConfig = req.app.locals.db;
+
+    if (dbConfig.provider !== 'firebase') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Смена пароля через API доступна только для Firebase'
+      });
+    }
+
+    const crypto = require('crypto');
+    const salt = crypto.randomBytes(16);
+    const derived = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+    const hashedPassword = salt.toString('hex') + ':' + derived.toString('hex');
+
+    const usersCollection = process.env.FIREBASE_USERS_COLLECTION || 'users';
+    await dbConfig.db.collection(usersCollection).doc(uid).update({ password: hashedPassword });
+
+    res.json({ message: 'Пароль успешно обновлён' });
+  } catch (error) {
+    console.error('Update password error:', error.message);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Не удалось обновить пароль: ' + error.message
     });
   }
 });

@@ -1019,13 +1019,12 @@
                         role: role
                     });
 
-                    if (password) {
-                        showAlert(
-                            `Данные обновлены в Firestore.\n\n` +
-                            `⚠️ Для смены пароля используйте Firebase Console:\n` +
-                            `Authentication → Users → Найдите ${email} → Reset password`,
-                            'success'
-                        );
+                    if (password && password.length >= 8) {
+                        await DB.users.updatePassword(uid, password);
+                        showAlert('Пользователь и пароль успешно обновлены', 'success');
+                    } else if (password && password.length > 0 && password.length < 8) {
+                        showAlert('Пароль должен быть минимум 8 символов', 'error');
+                        return;
                     } else {
                         showAlert('Пользователь успешно обновлен', 'success');
                     }

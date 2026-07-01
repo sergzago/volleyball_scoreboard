@@ -47,6 +47,54 @@
   }
 
   // ============================================================================
+  // PASSWORD HASHING (Web Crypto API — PBKDF2 + SHA-256)
+  // ============================================================================
+
+  var SALT_LENGTH = 16;
+  var ITERATIONS = 100000;
+
+  function arrayBufferToHex(buffer) {
+    return Array.from(new Uint8Array(buffer))
+      .map(function(b) { return b.toString(16).padStart(2, '0'); })
+      .join('');
+  }
+
+  function hexToArrayBuffer(hex) {
+    var bytes = new Uint8Array(hex.length / 2);
+    for (var i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    }
+    return bytes.buffer;
+  }
+
+  function generateSalt() {
+    return crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  }
+
+  function hashPassword(password, salt) {
+    var encoder = new TextEncoder();
+    var keyMaterial = crypto.subtle.importKey(
+      'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    return keyMaterial.then(function(key) {
+      return crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt: salt, iterations: ITERATIONS, hash: 'SHA-256' },
+        key, 256
+      );
+    }).then(function(hash) {
+      return arrayBufferToHex(salt.buffer) + ':' + arrayBufferToHex(hash);
+    });
+  }
+
+  function verifyPassword(password, stored) {
+    var parts = stored.split(':');
+    var salt = new Uint8Array(hexToArrayBuffer(parts[0]));
+    return hashPassword(password, salt).then(function(computed) {
+      return computed === stored;
+    });
+  }
+
+  // ============================================================================
   // POCKETBASE CLIENT LAZY-LOAD
   // ============================================================================
 
@@ -410,23 +458,41 @@
       // Сначала убедимся что DB инициализирован
       return init().then(function() {
         if (provider === 'firebase') {
-          var email = username.toLowerCase() + '@volleyball.local';
-          return firebase.auth().signInWithEmailAndPassword(email, password)
-            .then(function(cred) {
-              return firebase.firestore().collection(DB_CONFIG.collections.USERS).doc(username.toLowerCase()).get()
-                .then(function(doc) {
-                  var role = 'user';
-                  if (doc.exists && doc.data().role) {
-                    role = doc.data().role;
-                  }
-                  return {
-                    username: username.toLowerCase(),
-                    role: role,
-                    email: cred.user.email,
-                    uid: cred.user.uid,
-                    displayName: cred.user.displayName || username
-                  };
+          var usersCollection = DB_CONFIG.collections.USERS;
+          return firebase.firestore().collection(usersCollection).doc(username.toLowerCase()).get()
+            .then(function(doc) {
+              if (!doc.exists || !doc.data().password) {
+                throw new Error('Пользователь не найден');
+              }
+              var userData = doc.data();
+              return verifyPassword(password, userData.password).then(function(valid) {
+                if (!valid) {
+                  throw new Error('Неверный пароль');
+                }
+                var token = crypto.getRandomValues(new Uint8Array(32)).reduce(function(a, b) {
+                  return a + b.toString(16).padStart(2, '0');
+                }, '');
+                var expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                var sessionsCollection = 'sessions';
+                var userInfo = {
+                  username: username.toLowerCase(),
+                  role: userData.role || 'user',
+                  email: userData.email,
+                  uid: doc.id,
+                  displayName: userData.displayName || username
+                };
+                return firebase.firestore().collection(sessionsCollection).doc(token).set({
+                  uid: doc.id,
+                  email: userData.email,
+                  role: userData.role || 'user',
+                  expiresAt: expiresAt,
+                  createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(function() {
+                  localStorage.setItem('firebase_token', token);
+                  localStorage.setItem('firebase_user', JSON.stringify(userInfo));
+                  return userInfo;
                 });
+              });
             });
         }
 
@@ -479,7 +545,15 @@
      */
     logout: function() {
       if (provider === 'firebase') {
-        return firebase.auth().signOut();
+        var token = localStorage.getItem('firebase_token');
+        localStorage.removeItem('firebase_token');
+        localStorage.removeItem('firebase_user');
+        if (token) {
+          var sessionsCollection = 'sessions';
+          return firebase.firestore().collection(sessionsCollection).doc(token).delete()
+            .catch(function() {});
+        }
+        return Promise.resolve();
       }
       var pb = getPocketBaseClient();
       pb.authStore.clear();
@@ -492,22 +566,11 @@
      */
     onAuthStateChanged: function(callback) {
       if (provider === 'firebase') {
-        firebase.auth().onAuthStateChanged(function(user) {
-          if (!user) { callback(null); return; }
-          firebase.firestore().collection(DB_CONFIG.collections.USERS).doc(user.email.split('@')[0]).get()
-            .then(function(doc) {
-              var role = 'user';
-              if (doc.exists && doc.data().role) role = doc.data().role;
-              callback({
-                username: user.email.split('@')[0],
-                email: user.email,
-                uid: user.uid,
-                role: role,
-                displayName: user.displayName
-              });
-            })
-            .catch(function() { callback(null); });
-        });
+        var storedUser = null;
+        try {
+          storedUser = JSON.parse(localStorage.getItem('firebase_user'));
+        } catch (e) {}
+        callback(storedUser);
         return;
       }
 
@@ -552,26 +615,19 @@
       var email = username.toLowerCase() + '@volleyball.local';
 
       if (provider === 'firebase') {
-        return firebase.auth().createUserWithEmailAndPassword(email, password)
-          .then(function(cred) {
-            return cred.user.updateProfile({ displayName: displayName })
-              .then(function() {
-                return firebase.firestore().collection(DB_CONFIG.collections.USERS).doc(username.toLowerCase()).set({
-                  uid: cred.user.uid,
-                  email: email,
-                  username: username.toLowerCase(),
-                  displayName: displayName,
-                  role: role || 'user',
-                  createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-              })
-              .then(function() {
-                return firebase.auth().signOut();
-              })
-              .then(function() {
-                return { username: username.toLowerCase(), role: role || 'user' };
-              });
+        var salt = generateSalt();
+        return hashPassword(password, salt).then(function(hashedPassword) {
+          return firebase.firestore().collection(DB_CONFIG.collections.USERS).doc(username.toLowerCase()).set({
+            email: email,
+            username: username.toLowerCase(),
+            password: hashedPassword,
+            displayName: displayName,
+            role: role || 'user',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
+        }).then(function() {
+          return { username: username.toLowerCase(), role: role || 'user' };
+        });
       }
 
       // PocketBase — создаём пользователя в настраиваемой коллекции
@@ -599,9 +655,8 @@
      */
     deleteUser: function(username) {
       if (provider === 'firebase') {
-        // Firebase не позволяет удалять чужих пользователей из клиента
-        // Нужен Cloud Function или Admin SDK
-        return Promise.reject(new Error('Удаление пользователей доступно только через Admin SDK'));
+        var usersCollection = DB_CONFIG.collections.USERS;
+        return firebase.firestore().collection(usersCollection).doc(username.toLowerCase()).delete();
       }
 
       // PocketBase — удаляем пользователя из настраиваемой коллекции
@@ -652,10 +707,15 @@
     },
 
     /**
-     * Firebase auth object (для обратной совместимости)
+     * Auth object (для обратной совместимости)
      */
     getAuthInstance: function() {
-      if (provider === 'firebase') return firebase.auth();
+      if (provider === 'firebase') {
+        try {
+          var stored = JSON.parse(localStorage.getItem('firebase_user'));
+          return stored ? { currentUser: { email: stored.email } } : null;
+        } catch (e) { return null; }
+      }
       return null;
     }
   };
@@ -1114,6 +1174,30 @@
         .then(function(record) {
           return pb.collection(usersCollection).update(record.id, data);
         });
+    },
+
+    /**
+     * Сменить пароль пользователя
+     * Для Firebase — хешируем и обновляем в Firestore
+     * Для PocketBase — напрямую через SDK (обновление с password + passwordConfirm)
+     */
+    updatePassword: function(uid, newPassword) {
+      if (provider === 'firebase') {
+        var usersCollection = DB_CONFIG.collections.USERS;
+        var salt = generateSalt();
+        return hashPassword(newPassword, salt).then(function(hashedPassword) {
+          return firebase.firestore().collection(usersCollection).doc(uid).update({
+            password: hashedPassword
+          });
+        });
+      }
+
+      var pb = getPocketBaseClient();
+      var usersCollection = DB_CONFIG.collections.USERS;
+      return pb.collection(usersCollection).update(uid, {
+        password: newPassword,
+        passwordConfirm: newPassword
+      });
     },
 
     /**

@@ -49,14 +49,27 @@ async function requireAuth(req, res, next) {
 
   try {
     if (dbConfig.provider === 'firebase') {
-      const { admin } = dbConfig;
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const sessionsCollection = process.env.FIREBASE_SESSIONS_COLLECTION || 'sessions';
+      const sessionDoc = await dbConfig.db
+        .collection(sessionsCollection)
+        .doc(token)
+        .get();
+
+      if (!sessionDoc.exists) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Неверный или истекший токен.' });
+      }
+
+      const session = sessionDoc.data();
+      if (session.expiresAt && session.expiresAt.toMillis() < Date.now()) {
+        await dbConfig.db.collection(sessionsCollection).doc(token).delete();
+        return res.status(401).json({ error: 'Unauthorized', message: 'Токен авторизации истёк.' });
+      }
 
       req.user = {
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        role: decodedToken.role || 'user',
-        claims: decodedToken.claims || {}
+        uid: session.uid,
+        email: session.email,
+        role: session.role || 'user',
+        claims: { role: session.role || 'user', admin: session.role === 'admin' }
       };
     } else if (dbConfig.provider === 'pocketbase') {
       const payload = decodeAndValidateJwt(token);

@@ -25,6 +25,11 @@ var DB_CONFIG = {
   provider: 'firebase',
 
   // ============================================================================
+  // КОНФИГУРАЦИЯ СЕРВЕРА (Node.js API, используется для Firebase Admin операций)
+  // ============================================================================
+  server: CREDENTIALS.server || {},
+
+  // ============================================================================
   // FIREBASE КОНФИГУРАЦИЯ (из credentials.js)
   // ============================================================================
   firebase: CREDENTIALS.firebase || {},
@@ -41,6 +46,7 @@ var DB_CONFIG = {
     VOLLEYBALL: 'volleyball',
     MATCHES: 'matches',
     USERS: 'users',
+    SESSIONS: 'sessions',
     AUTH_LOG: 'auth_log'
   },
   pocketbaseCollections: {
