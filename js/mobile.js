@@ -2,6 +2,7 @@
   'use strict';
 
   var BASE_URL = window.location.href.replace(/\/[^\/]*$/, '/');
+  var DEMO_MODE = false;
   var mobileScoreboardData = {};
   var mobileGameConnected = false;
   var pendingMatchFinish = null;
@@ -25,6 +26,42 @@
     balance: true,
     score_change: 7,
     count_timeouts: 1
+  };
+
+  var DEMO_DEFAULT_DATA = {
+    home_team: 'Команда А',
+    away_team: 'Команда Б',
+    home_color: '#ff0000',
+    away_color: '#0000ff',
+    tournament_name: 'Демо-турнир',
+    venue: 'Демо-зал',
+    home_score: 0,
+    away_score: 0,
+    home_sets: 0,
+    away_sets: 0,
+    home_fouls: 0,
+    away_fouls: 0,
+    current_period: 1,
+    period_count: 5,
+    set_history: [],
+    matchmode: '00000',
+    beach_mode: false,
+    two_wins_mode: false,
+    invert_tablo: false,
+    unlimited_score: false,
+    custom_mode: false,
+    show: 1,
+    custom_label: '',
+    home_side: 'left',
+    away_side: 'right',
+    home_timeouts: 0,
+    away_timeouts: 0,
+    classic_match_finished: false,
+    beach_match_finished: false,
+    beach_current_set: 1,
+    beach_switch_message: '',
+    classic_tiebreak_switch_done: true,
+    pending_new_set: false
   };
 
   // ===== HELPERS =====
@@ -130,6 +167,17 @@
   }
 
   function update_db(data) {
+    if (DEMO_MODE) {
+      Object.keys(data).forEach(function(key) {
+        if (data[key] === DB.deleteField() || data[key] === '__PB_DELETE_FIELD__') {
+          delete mobileScoreboardData[key];
+        } else {
+          mobileScoreboardData[key] = data[key];
+        }
+      });
+      updateControlUI(mobileScoreboardData);
+      return;
+    }
     var userInfo = getCurrentUserInfo();
     if (userInfo.username) {
       data.username = userInfo.username;
@@ -185,7 +233,12 @@
     hide(document.getElementById('loginPage'));
     show(document.getElementById('appContainer'));
     if (userInfo) {
-      document.getElementById('mobileUserInfo').textContent = userInfo + (role === 'admin' ? ' (Админ)' : '');
+      var infoText = userInfo + (role === 'admin' ? ' (Админ)' : '');
+      if (DEMO_MODE) {
+        document.getElementById('mobileUserInfo').innerHTML = infoText + ' <span class="demo-badge">ДЕМО</span>';
+      } else {
+        document.getElementById('mobileUserInfo').textContent = infoText;
+      }
     }
   }
 
@@ -215,6 +268,15 @@
     btn.textContent = 'Вход...';
     hideError();
 
+    if (username === 'test' && password === 'testpassw') {
+      DEMO_MODE = true;
+      btn.disabled = false;
+      btn.textContent = 'Войти';
+      showApp('test', 'user');
+      setupMockDB();
+      return;
+    }
+
     DB.auth.login(username, password).then(function(userData) {
       btn.disabled = false;
       btn.textContent = 'Войти';
@@ -240,10 +302,71 @@
   }
 
   function doLogout() {
+    if (DEMO_MODE) {
+      DEMO_MODE = false;
+      mobileGameConnected = false;
+      mobileScoreboardData = {};
+      stopPolling();
+      showLogin();
+      return;
+    }
     AuthModule.logout().then(function() {
       mobileGameConnected = false;
       showLogin();
     });
+  }
+
+  function setupMockDB() {
+    var _mockData = {};
+    window.scoreboard_query = {
+      update: function(data) {
+        Object.keys(data).forEach(function(k) {
+          _mockData[k] = data[k];
+        });
+      }
+    };
+    window.DB = {
+      init: function() { return Promise.resolve(); },
+      serverTimestamp: function() { return new Date().toISOString(); },
+      deleteField: function() { return null; },
+      getProvider: function() { return 'mock'; },
+      isInitialized: function() { return true; },
+      auth: {
+        login: function() { return Promise.reject(new Error('Demo mode')); },
+        logout: function() { return Promise.resolve(); },
+        onAuthStateChanged: function(cb) { cb(null); },
+        getAuthInstance: function() { return null; },
+        createUser: function() { return Promise.reject(new Error('Demo mode')); },
+        deleteUser: function() { return Promise.reject(new Error('Demo mode')); },
+        getUserRole: function() { return Promise.resolve('user'); },
+        logAuthEvent: function() { return Promise.resolve(); }
+      },
+      scoreboard: {
+        get: function(gameId) { return Promise.resolve(_mockData); },
+        subscribe: function() { return function() {}; },
+        update: function(gameId, data) {
+          Object.keys(data).forEach(function(k) {
+            _mockData[k] = data[k];
+          });
+          return Promise.resolve();
+        },
+        create: function() { return Promise.resolve(); },
+        delete: function() { return Promise.resolve(); }
+      },
+      matches: {
+        add: function() { return Promise.resolve({ id: 'demo-' + Date.now() }); },
+        query: function() { return Promise.resolve([]); },
+        softDelete: function() { return Promise.resolve(); },
+        delete: function() { return Promise.resolve(); }
+      },
+      users: {
+        get: function() { return Promise.resolve({ role: 'user' }); },
+        update: function() { return Promise.resolve(); },
+        updatePassword: function() { return Promise.resolve(); },
+        delete: function() { return Promise.resolve(); }
+      },
+      ensureCollections: function() { return Promise.resolve(); }
+    };
   }
 
   // ===== TABS =====
@@ -283,6 +406,19 @@
     hide(document.getElementById('controlContent'));
 
     updateLinks();
+
+    if (DEMO_MODE) {
+      Object.keys(DEMO_DEFAULT_DATA).forEach(function(key) {
+        mobileScoreboardData[key] = DEMO_DEFAULT_DATA[key];
+      });
+      _recordExists = true;
+      updateSettingsUI(mobileScoreboardData);
+      updateTeamsUI(mobileScoreboardData);
+      updateControlUI(mobileScoreboardData);
+      showControlContent();
+      return;
+    }
+
     subscribeToGame();
 
     DB.scoreboard.get(game_id).then(function(data) {
@@ -616,6 +752,8 @@
   }
 
   function saveMatchResult(setHistory, overallHome, overallAway) {
+    if (DEMO_MODE) return;
+
     var isBeach = _localBeachMode;
     var twoWinsMode = _localTwoWinsMode;
     var userInfo = getCurrentUserInfo();
@@ -1406,7 +1544,11 @@
       delete mobileScoreboardData['beach_switch_message'];
       delete mobileScoreboardData['classic_switch_shown'];
       highlightSideSwitch(false);
-      scoreboard_query.update(update);
+      if (DEMO_MODE) {
+        update_db(update);
+      } else {
+        scoreboard_query.update(update);
+      }
     });
 
     // New set
@@ -1482,9 +1624,7 @@
       };
 
       matchWasAlreadyFinished = false;
-      DB.scoreboard.update(game_id, resetData).catch(function(err) {
-        alert('Ошибка при сбросе: ' + err.message);
-      });
+      update_db(resetData);
     });
 
     // Match finish modal

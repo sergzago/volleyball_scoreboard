@@ -88,6 +88,18 @@ html, body {
   color: var(--text-secondary);
 }
 
+.demo-badge {
+  background: #fdcb6e;
+  color: #1a1a2e;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+  display: inline-block;
+  line-height: 1.4;
+}
+
 .app-header .logout-btn {
   background: none;
   border: 1px solid var(--danger);
