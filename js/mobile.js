@@ -196,7 +196,13 @@
       return;
     }
 
+    // Always show login form as fallback (ensures demo mode works without any DB)
+    var loginFallback = setTimeout(function() {
+      showLogin();
+    }, 3000);
+
     DB.init().then(function() {
+      clearTimeout(loginFallback);
       DB.auth.onAuthStateChanged(function(user) {
         if (!user) {
           showLogin();
@@ -219,8 +225,9 @@
         });
       });
     }).catch(function(e) {
+      clearTimeout(loginFallback);
       console.error('DB init failed:', e);
-      showApp('Гость (ошибка БД)', 'user');
+      showLogin();
     });
   }
 
