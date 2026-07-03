@@ -281,9 +281,6 @@
       btn.textContent = 'Войти';
       showApp('test', 'user');
       setupMockDB();
-      document.querySelectorAll('.admin-tab').forEach(function(el) {
-        el.classList.remove('admin-hidden');
-      });
       return;
     }
 
