@@ -472,7 +472,7 @@
                 var token = crypto.getRandomValues(new Uint8Array(32)).reduce(function(a, b) {
                   return a + b.toString(16).padStart(2, '0');
                 }, '');
-                var expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                var expiresAt = new Date(Date.now() + DB_CONFIG.SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
                 var sessionsCollection = 'sessions';
                 var userInfo = {
                   username: username.toLowerCase(),
