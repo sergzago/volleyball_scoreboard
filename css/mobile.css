@@ -611,6 +611,40 @@ html, body {
   font-size: 18px;
 }
 
+.link-item-wrap {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 8px;
+}
+
+.link-item-wrap .link-item {
+  flex: 1;
+  margin-bottom: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+  border-right: none;
+}
+
+.link-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.link-copy-btn:active {
+  background: var(--btn-primary);
+  color: white;
+}
+
 /* ===== ADMIN PAGE ===== */
 .admin-card {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);

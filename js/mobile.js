@@ -1645,6 +1645,33 @@
     window.addEventListener('offline', function() {
       document.getElementById('offlineBanner').classList.add('visible');
     });
+
+    // Link copy buttons
+    document.querySelectorAll('.link-copy-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var targetId = this.getAttribute('data-target');
+        var link = document.getElementById(targetId);
+        if (!link) return;
+        var url = link.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(function() {
+            btn.textContent = '✅';
+            setTimeout(function() { btn.textContent = '📋'; }, 1500);
+          });
+        } else {
+          var textarea = document.createElement('textarea');
+          textarea.value = url;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          btn.textContent = '✅';
+          setTimeout(function() { btn.textContent = '📋'; }, 1500);
+        }
+      });
+    });
   }
 
   // ===== THEME =====
