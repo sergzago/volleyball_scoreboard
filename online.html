@@ -298,6 +298,14 @@
             object-fit: contain;
         }
 
+        .db-provider-label {
+            color: #999;
+            font-size: 11px;
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
         @media (max-width: 768px) {
             .page-header {
                 flex-direction: column;
@@ -316,6 +324,7 @@
     <div class="container">
         <div class="page-header">
             <h1>Онлайн результаты матчей</h1>
+            <span class="db-provider-label" id="dbProviderLabel"></span>
             <img class="logo-img" src="" alt="Logo">
         </div>
 
@@ -348,6 +357,14 @@
         // Initialize
         function init() {
             DB.init().then(function() {
+                // Провайдер БД
+                var el = document.getElementById('dbProviderLabel');
+                if (el) {
+                    var p = 'firebase';
+                    try { p = DB_CONFIG.provider || 'firebase'; } catch (e) {}
+                    var labels = { firebase: 'Firebase', pocketbase: 'PocketBase' };
+                    el.textContent = labels[p] || p;
+                }
                 // Создаём обёртку scoreboard_collection
                 scoreboard_collection = createVolleyballCollection();
                 matches_collection = createMatchesCollection();

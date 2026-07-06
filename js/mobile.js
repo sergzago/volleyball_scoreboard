@@ -1690,10 +1690,20 @@
     localStorage.setItem('mobile_theme', isLight ? 'light' : 'dark');
   }
 
+  function initProviderBadge() {
+    var badge = document.getElementById('dbProviderBadge');
+    if (!badge) return;
+    var provider = 'firebase';
+    try { provider = DB_CONFIG.provider || 'firebase'; } catch (e) {}
+    var labels = { firebase: 'Firebase', pocketbase: 'PocketBase' };
+    badge.textContent = labels[provider] || provider;
+  }
+
   // ===== INIT =====
 
   function init() {
     initTheme();
+    initProviderBadge();
     initTabs();
     initEventHandlers();
     initAuth();
