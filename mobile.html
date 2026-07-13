@@ -24,7 +24,7 @@
 
   <!-- LOGIN PAGE -->
   <div id="loginPage" class="login-page" style="display:none;">
-    <div class="login-logo">🏐</div>
+    <img class="login-logo" id="loginLogo" src="logo_nvl.png" alt="Logo">
     <div class="login-title">Volleyball Scoreboard</div>
     <div class="login-subtitle">Войдите для управления табло</div>
     <div class="login-card">
@@ -46,12 +46,16 @@
 
     <!-- HEADER -->
     <div class="app-header">
-      <span class="title">🏐 Scoreboard</span>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button class="theme-toggle" id="themeToggle" title="Дневной/ночной режим">🌙</button>
+      <div class="header-row-top">
+        <span class="title"><img class="header-logo" id="headerLogo" src="logo_nvl.png" alt="Logo"> Scoreboard</span>
         <span class="db-provider-badge" id="dbProviderBadge"></span>
+      </div>
+      <div class="header-row-bottom">
         <span class="user-info" id="mobileUserInfo"></span>
-        <button class="logout-btn" id="logoutBtn">Выйти</button>
+        <div class="header-actions">
+          <button class="theme-toggle" id="themeToggle" title="Дневной/ночной режим">🌙</button>
+          <button class="logout-btn" id="logoutBtn">Выйти</button>
+        </div>
       </div>
     </div>
 

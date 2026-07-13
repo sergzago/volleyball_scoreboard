@@ -1817,11 +1817,25 @@
     badge.textContent = labels[provider] || provider;
   }
 
+  function initLogo() {
+    var logoIds = ['loginLogo', 'headerLogo'];
+    if (typeof loadLogo === 'function') {
+      loadLogo(function(base64) {
+        if (!base64) return;
+        logoIds.forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.src = base64;
+        });
+      });
+    }
+  }
+
   // ===== INIT =====
 
   function init() {
     initTheme();
     initProviderBadge();
+    initLogo();
     initTabs();
     initEventHandlers();
     initAuth();
