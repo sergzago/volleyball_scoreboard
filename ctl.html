@@ -370,6 +370,24 @@
       </div>
     </div>
 
+    <!-- Модальное окно подтверждения таймаута -->
+    <div id="timeoutConfirmModal" class="modal-overlay dialog-hidden">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>⏸️ Таймаут</h3>
+          </div>
+          <div class="modal-body" style="text-align:center;">
+            <p id="timeoutConfirmText" style="font-size:18px;">Начать таймаут?</p>
+          </div>
+          <div class="modal-footer">
+            <button id="timeoutConfirmNo" class="btn btn-secondary" type="button">Нет</button>
+            <button id="timeoutConfirmYes" class="btn btn-warning" type="button">Да</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
         // Проверка авторизации при загрузке страницы через AuthModule
         window.addEventListener('DOMContentLoaded', async () => {

@@ -763,8 +763,12 @@
 
         // Фильтрация матчей (теперь используется серверная фильтрация)
         function filterMatches() {
-            // Применяем фильтр по команде ко ВСЕМ матчам (из обоих Complete массивов)
             var filtered = [];
+            var activeGameIds = {};
+            
+            activeVolleyballGamesComplete.forEach(function(match) {
+                activeGameIds[match.id] = true;
+            });
             
             // Фильтруем активные матчи volleyball
             activeVolleyballGamesComplete.forEach(function(match) {
@@ -781,8 +785,9 @@
                 }
             });
             
-            // Фильтруем архивные матчи matches
+            // Фильтруем архивные матчи matches, исключая дубли с активными
             allMatchesComplete.forEach(function(match) {
+                if (activeGameIds[match.data.game_id] || activeGameIds[match.id]) return;
                 if (teamFilter) {
                     var homeTeam = (match.data.home_team || '').toLowerCase();
                     var awayTeam = (match.data.away_team || '').toLowerCase();

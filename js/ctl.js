@@ -20,6 +20,7 @@ var _subscribeCallCount = 0;
 var timeoutTimerInterval = null;
 var timeoutRemainingSeconds = 0;
 var timeoutTeam = null; // команда, взявшая таймаут ('home' или 'away')
+var pendingTimeout = null;
 
 // scoreboard_data определена в common.js
 
@@ -1085,67 +1086,50 @@ $(document).ready(function(){
     var homeTimeouts = parseInt(scoreboard_data['home_timeouts'], 10) || 0;
     var awayTimeouts = parseInt(scoreboard_data['away_timeouts'], 10) || 0;
 
-    var update;
-    // Если уже режим show=6 (верх надпись+низ), переключаем на show=1 (только низ)
     if(currentShow === 6){
-      // Проверяем, это таймаут той же команды?
       var currentLabel = scoreboard_data['custom_label'] || '';
       var homeTeam = scoreboard_data['home_team'] || '';
       var awayTeam = scoreboard_data['away_team'] || '';
       var isHomeTimeoutActive = currentLabel === 'Таймаут ' + homeTeam;
       var isAwayTimeoutActive = currentLabel === 'Таймаут ' + awayTeam;
 
-      if(team === 'home'){
-        if(isHomeTimeoutActive){
-          // Та же команда — выключаем таймаут, счетчик НЕ уменьшаем
-          update = {
-            show: 1,
-            custom_label: scoreboard_data['custom_label']
-          };
-        } else {
-          // Другая команда была активна — блокируем переключение, ничего не делаем
-          return;
-        }
-      } else {
-        // away team
-        if(isAwayTimeoutActive){
-          // Та же команда — выключаем таймаут, счетчик НЕ уменьшаем
-          update = {
-            show: 1,
-            custom_label: scoreboard_data['custom_label']
-          };
-        } else {
-          // Другая команда была активна — блокируем переключение, ничего не делаем
-          return;
-        }
+      if((team === 'home' && isHomeTimeoutActive) || (team === 'away' && isAwayTimeoutActive)){
+        var update = { show: 1, custom_label: scoreboard_data['custom_label'] };
+        update_db(update);
+        hideTimeoutModal();
       }
-    } else {
-      // Нет активного таймаута — проверяем лимит
-      var timeoutKey = team === 'home' ? 'home_timeouts' : 'away_timeouts';
-      var currentTimeouts = team === 'home' ? homeTimeouts : awayTimeouts;
-
-      if(currentTimeouts >= maxTimeouts){
-        // Лимит исчерпан — ничего не делаем
-        return;
-      }
-
-      update = {
-        show: 6,
-        custom_label: timeoutLabel,
-        [timeoutKey]: currentTimeouts + 1
-      };
+      return;
     }
-    console.log('Timeout button clicked:', update);
+
+    var timeoutKey = team === 'home' ? 'home_timeouts' : 'away_timeouts';
+    var currentTimeouts = team === 'home' ? homeTimeouts : awayTimeouts;
+    if(currentTimeouts >= maxTimeouts) return;
+
+    pendingTimeout = {
+      team: team,
+      teamName: teamName,
+      timeoutLabel: timeoutLabel,
+      timeoutKey: timeoutKey,
+      currentTimeouts: currentTimeouts
+    };
+    $('#timeoutConfirmText').text('Начать таймаут (' + teamName + ')?');
+    $('#timeoutConfirmModal').removeClass('dialog-hidden');
+  });
+
+  $('#timeoutConfirmYes').click(function(){
+    $('#timeoutConfirmModal').addClass('dialog-hidden');
+    if (!pendingTimeout) return;
+    var pt = pendingTimeout;
+    pendingTimeout = null;
+    var update = { show: 6, custom_label: pt.timeoutLabel };
+    update[pt.timeoutKey] = pt.currentTimeouts + 1;
     update_db(update);
+    showTimeoutModal(pt.teamName);
+  });
 
-    // Управление модальным окном таймаута
-    if (currentShow === 6) {
-      // Таймаут выключается — скрываем модальное окно
-      hideTimeoutModal();
-    } else {
-      // Таймаут включается — показываем модальное окно с таймером
-      showTimeoutModal(teamName);
-    }
+  $('#timeoutConfirmNo').click(function(){
+    $('#timeoutConfirmModal').addClass('dialog-hidden');
+    pendingTimeout = null;
   });
 
   // Кнопка закрытия таймаута в модальном окне

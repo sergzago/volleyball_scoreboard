@@ -1237,7 +1237,27 @@
     // Проверка инициализации
     isInitialized: function() { return initialized; },
     // Проверка и создание коллекций PocketBase (публичный API)
-    ensureCollections: ensurePocketBaseCollections
+    ensureCollections: ensurePocketBaseCollections,
+    // Получение данных текущего пользователя
+    getCurrentUser: function() {
+      if (provider === 'firebase') {
+        try {
+          var stored = JSON.parse(localStorage.getItem('firebase_user'));
+          if (!stored) return null;
+          return { username: stored.username, displayname: stored.displayName || stored.username };
+        } catch (e) { return null; }
+      }
+      if (provider === 'pocketbase') {
+        try {
+          var pb = getPocketBaseClient();
+          if (pb.authStore.isValid && pb.authStore.model) {
+            var record = pb.authStore.model;
+            return { username: record.username || record.email.split('@')[0], displayname: record.name || record.username || record.email.split('@')[0] };
+          }
+        } catch (e) {}
+      }
+      return null;
+    }
   };
 
 })(typeof window !== 'undefined' ? window : global);

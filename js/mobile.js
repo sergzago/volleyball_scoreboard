@@ -11,6 +11,9 @@
   var _initialDataLoaded = false;
   var timeoutTimerInterval = null;
   var timeoutRemainingSeconds = 0;
+  var pendingTimeout = null;
+  var pendingGameSelect = null;
+  var _currentUserInfo = null;
   var _localCustomMode = false;
   var _customFieldsEditing = false;
   var _recordExists = false;
@@ -149,24 +152,26 @@
   }
 
   function getCurrentUserInfo() {
-    if (DB.getProvider() === 'firebase') {
-      try {
-        var stored = JSON.parse(localStorage.getItem('firebase_user'));
-        if (!stored) return {};
-        return { username: stored.username, displayname: stored.displayName || stored.username };
-      } catch (e) { return {}; }
+    if (DEMO_MODE) {
+      return { username: 'test', displayname: 'test' };
     }
-    if (DB.auth.getAuthInstance && DB.auth.getAuthInstance()) {
-      var pb = typeof PocketBase !== 'undefined' ? new PocketBase(DB_CONFIG.pocketbase.url) : null;
-      if (pb && pb.authStore.isValid && pb.authStore.model) {
-        var record = pb.authStore.model;
-        return { username: record.username || record.email.split('@')[0], displayname: record.displayName || record.username || record.email.split('@')[0] };
-      }
+    if (_currentUserInfo) return _currentUserInfo;
+    var user = DB.getCurrentUser();
+    if (user && user.username) {
+      _currentUserInfo = user;
+      return _currentUserInfo;
     }
     return {};
   }
 
   function update_db(data) {
+    var userInfo = getCurrentUserInfo();
+    if (userInfo.username) {
+      data.username = userInfo.username;
+      data.displayname = userInfo.displayname;
+    }
+    data.lastEdited = DB.serverTimestamp();
+
     if (DEMO_MODE) {
       Object.keys(data).forEach(function(key) {
         if (data[key] === DB.deleteField() || data[key] === '__PB_DELETE_FIELD__') {
@@ -178,12 +183,6 @@
       updateControlUI(mobileScoreboardData);
       return;
     }
-    var userInfo = getCurrentUserInfo();
-    if (userInfo.username) {
-      data.username = userInfo.username;
-      data.displayname = userInfo.displayname;
-    }
-    data.lastEdited = DB.serverTimestamp();
     scoreboard_query.update(data);
   }
 
@@ -210,9 +209,11 @@
         }
 
         var username = user.email ? user.email.split('@')[0] : user.username || '';
+        _currentUserInfo = { username: username, displayname: user.displayName || user.name || username };
         DB.users.get(username).then(function(userData) {
           var role = 'user';
           if (userData && userData.role) role = userData.role;
+          _currentUserInfo = { username: username, displayname: userData.displayName || userData.name || username };
           showApp(user.email || username, role);
 
           if (role === 'admin') {
@@ -288,6 +289,7 @@
       btn.disabled = false;
       btn.textContent = 'Войти';
       var role = userData.role || 'user';
+      _currentUserInfo = { username: userData.username || username, displayname: userData.displayName || userData.username || username };
       showApp(userData.displayName || userData.username || username, role);
 
       if (role === 'admin') {
@@ -309,6 +311,7 @@
   }
 
   function doLogout() {
+    _currentUserInfo = null;
     if (DEMO_MODE) {
       DEMO_MODE = false;
       mobileGameConnected = false;
@@ -387,8 +390,96 @@
         this.classList.add('active');
         document.querySelectorAll('.tab-page').forEach(function(p) { p.classList.remove('active'); });
         document.getElementById(target).classList.add('active');
+        if (target === 'pageGames') loadGamesList();
       });
     });
+  }
+
+  // ===== GAMES LIST =====
+
+  var _gamesListData = {};
+
+  function loadGamesList() {
+    var container = document.getElementById('gamesListContainer');
+    container.innerHTML = '<div class="loading"><div class="spinner"></div> Загрузка...</div>';
+    _gamesListData = {};
+
+    DB.scoreboard.queryActive().then(function(results) {
+      if (!results || results.length === 0) {
+        container.innerHTML = '<div class="games-empty">Нет активных игр</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < results.length; i++) {
+        var g = results[i];
+        var home = g.home_team || 'Home';
+        var away = g.away_team || 'Away';
+        var hs = ensureNumber(g.home_score);
+        var as = ensureNumber(g.away_score);
+        var period = g.current_period || 1;
+        var finished = !!g.classic_match_finished || !!g.beach_match_finished;
+        var status = finished ? 'Завершена' : 'Сет ' + period;
+        var gid = g.id || '';
+        _gamesListData[gid] = g;
+
+        html += '<div class="game-item" data-game-id="' + gid + '">' +
+          '<div class="game-item-title">' + home + ' — ' + away + '</div>' +
+          '<div class="game-item-sub">' + (g.tournament_name || '') + (g.venue ? ' · ' + g.venue : '') + ' · ID: ' + gid + (finished ? ' · Завершена' : '') + '</div>' +
+          '<div class="game-item-score">' + hs + ' : ' + as + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(' + status + ')</span></div>' +
+          '</div>';
+      }
+      container.innerHTML = html;
+
+      container.querySelectorAll('.game-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          var gid = this.getAttribute('data-game-id');
+          if (!gid) return;
+          var g = _gamesListData[gid];
+          if (!g) return;
+
+          var home = g.home_team || 'Home';
+          var away = g.away_team || 'Away';
+          var tournament = g.tournament_name || '';
+          var venue = g.venue || '';
+          var user = g.displayname || g.username || '—';
+          var finished = !!g.classic_match_finished || !!g.beach_match_finished;
+
+          var info = '<div style="text-align:center;">' +
+            '<div style="font-size:18px;font-weight:600;margin-bottom:8px;">' + home + ' — ' + away + '</div>' +
+            '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:4px;">' + tournament + (venue ? ' · ' + venue : '') + '</div>' +
+            '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Судья: ' + user + (finished ? ' · Завершена' : '') + '</div>' +
+            '<div style="font-size:14px;">Вы уверены, что хотите загрузить игру<br><b>' + gid + '</b>?</div>' +
+            '</div>';
+
+          pendingGameSelect = gid;
+          document.getElementById('mobileGameSelectInfo').innerHTML = info;
+          document.getElementById('mobileGameSelectModal').classList.remove('hidden');
+        });
+      });
+    }).catch(function(err) {
+      console.error('Failed to load games:', err);
+      container.innerHTML = '<div class="games-empty">Ошибка загрузки</div>';
+    });
+  }
+
+  function confirmGameSelect() {
+    document.getElementById('mobileGameSelectModal').classList.add('hidden');
+    if (!pendingGameSelect) return;
+    var gid = pendingGameSelect;
+    pendingGameSelect = null;
+    document.getElementById('mobileGameId').value = gid;
+    connectToGame();
+    var tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.tab-page').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelector('.tab-btn[data-tab="pageSettings"]').classList.add('active');
+    document.getElementById('pageSettings').classList.add('active');
+  }
+
+  function cancelGameSelect() {
+    document.getElementById('mobileGameSelectModal').classList.add('hidden');
+    pendingGameSelect = null;
   }
 
   // ===== GAME CONNECTION =====
@@ -419,6 +510,7 @@
         mobileScoreboardData[key] = DEMO_DEFAULT_DATA[key];
       });
       _recordExists = true;
+      update_db({});
       updateSettingsUI(mobileScoreboardData);
       updateTeamsUI(mobileScoreboardData);
       updateControlUI(mobileScoreboardData);
@@ -592,6 +684,12 @@
     var awayBlock = scoreCard.querySelector('.team-score-block:last-child');
     if (homeBlock) homeBlock.style.order = homeOrder;
     if (awayBlock) awayBlock.style.order = awayOrder;
+
+    var setsCard = document.getElementById('controlSetsCard');
+    var homeFoulsBlock = setsCard.querySelector('.team-score-block:first-child');
+    var awayFoulsBlock = setsCard.querySelector('.team-score-block:last-child');
+    if (homeFoulsBlock) homeFoulsBlock.style.order = homeOrder;
+    if (awayFoulsBlock) awayFoulsBlock.style.order = awayOrder;
 
     var beachFinished = beachMode && data['beach_match_finished'];
     var classicFinished = (!beachMode) && data['classic_match_finished'];
@@ -1210,6 +1308,9 @@
     });
 
     document.getElementById('connectGameBtn').addEventListener('click', connectToGame);
+    document.getElementById('refreshGamesBtn').addEventListener('click', loadGamesList);
+    document.getElementById('mobileGameSelectYes').addEventListener('click', confirmGameSelect);
+    document.getElementById('mobileGameSelectNo').addEventListener('click', cancelGameSelect);
 
     // Mode toggles — local state only, no DB write
     document.getElementById('mobileBeachMode').addEventListener('change', function() {
@@ -1501,7 +1602,6 @@
         var timeoutKey = team + '_timeouts';
         var currentTimeouts = ensureNumber(mobileScoreboardData[timeoutKey]);
 
-        var update;
         if (currentShow === 6) {
           var currentLabel = mobileScoreboardData['custom_label'] || '';
           var homeTeam = mobileScoreboardData['home_team'] || '';
@@ -1510,23 +1610,41 @@
           var isAwayTimeout = currentLabel === 'Таймаут ' + awayTeam;
 
           if ((team === 'home' && isHomeTimeout) || (team === 'away' && isAwayTimeout)) {
-            update = { show: 1, custom_label: mobileScoreboardData['custom_label'] };
-          } else {
-            return;
+            var update = { show: 1, custom_label: mobileScoreboardData['custom_label'] };
+            update_db(update);
+            hideTimeoutModal();
           }
-        } else {
-          if (currentTimeouts >= maxTimeouts) return;
-          update = { show: 6, custom_label: timeoutLabel };
-          update[timeoutKey] = currentTimeouts + 1;
+          return;
         }
 
-        update_db(update);
-        if (currentShow === 6) {
-          hideTimeoutModal();
-        } else {
-          showTimeoutModal(teamName);
-        }
+        if (currentTimeouts >= maxTimeouts) return;
+
+        pendingTimeout = {
+          team: team,
+          teamName: teamName,
+          timeoutLabel: timeoutLabel,
+          timeoutKey: timeoutKey,
+          currentTimeouts: currentTimeouts
+        };
+        document.getElementById('mobileTimeoutConfirmText').textContent = 'Начать таймаут (' + teamName + ')?';
+        document.getElementById('mobileTimeoutConfirmModal').classList.remove('hidden');
       });
+    });
+
+    document.getElementById('mobileTimeoutConfirmYes').addEventListener('click', function() {
+      document.getElementById('mobileTimeoutConfirmModal').classList.add('hidden');
+      if (!pendingTimeout) return;
+      var pt = pendingTimeout;
+      pendingTimeout = null;
+      var update = { show: 6, custom_label: pt.timeoutLabel };
+      update[pt.timeoutKey] = pt.currentTimeouts + 1;
+      update_db(update);
+      showTimeoutModal(pt.teamName);
+    });
+
+    document.getElementById('mobileTimeoutConfirmNo').addEventListener('click', function() {
+      document.getElementById('mobileTimeoutConfirmModal').classList.add('hidden');
+      pendingTimeout = null;
     });
 
     document.getElementById('mobileTimeoutClose').addEventListener('click', function() {
