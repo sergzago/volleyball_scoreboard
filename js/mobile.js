@@ -413,21 +413,26 @@
       var html = '';
       for (var i = 0; i < results.length; i++) {
         var g = results[i];
+        var finished = !!g.classic_match_finished || !!g.beach_match_finished;
+        if (finished) continue;
+
         var home = g.home_team || 'Home';
         var away = g.away_team || 'Away';
         var hs = ensureNumber(g.home_score);
         var as = ensureNumber(g.away_score);
         var period = g.current_period || 1;
-        var finished = !!g.classic_match_finished || !!g.beach_match_finished;
-        var status = finished ? 'Завершена' : 'Сет ' + period;
         var gid = g.id || '';
         _gamesListData[gid] = g;
 
         html += '<div class="game-item" data-game-id="' + gid + '">' +
           '<div class="game-item-title">' + home + ' — ' + away + '</div>' +
-          '<div class="game-item-sub">' + (g.tournament_name || '') + (g.venue ? ' · ' + g.venue : '') + ' · ID: ' + gid + (finished ? ' · Завершена' : '') + '</div>' +
-          '<div class="game-item-score">' + hs + ' : ' + as + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(' + status + ')</span></div>' +
+          '<div class="game-item-sub">' + (g.tournament_name || '') + (g.venue ? ' · ' + g.venue : '') + ' · ID: ' + gid + '</div>' +
+          '<div class="game-item-score">' + hs + ' : ' + as + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(Сет ' + period + ')</span></div>' +
           '</div>';
+      }
+      if (!html) {
+        container.innerHTML = '<div class="games-empty">Нет активных игр</div>';
+        return;
       }
       container.innerHTML = html;
 
