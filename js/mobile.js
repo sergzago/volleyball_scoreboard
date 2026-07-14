@@ -14,6 +14,7 @@
   var pendingTimeout = null;
   var pendingGameSelect = null;
   var _currentUserInfo = null;
+  var _userRole = 'user';
   var _localCustomMode = false;
   var _customFieldsEditing = false;
   var _recordExists = false;
@@ -213,6 +214,7 @@
         DB.users.get(username).then(function(userData) {
           var role = 'user';
           if (userData && userData.role) role = userData.role;
+          _userRole = role;
           _currentUserInfo = { username: username, displayname: userData.displayName || userData.name || username };
           showApp(user.email || username, role);
 
@@ -221,8 +223,10 @@
               el.classList.remove('admin-hidden');
             });
           }
+          loadGamesList();
         }).catch(function() {
           showApp(user.email || username, 'user');
+          loadGamesList();
         });
       });
     }).catch(function(e) {
@@ -282,6 +286,7 @@
       btn.textContent = 'Войти';
       showApp('test', 'user');
       setupMockDB();
+      loadGamesList();
       return;
     }
 
@@ -289,6 +294,7 @@
       btn.disabled = false;
       btn.textContent = 'Войти';
       var role = userData.role || 'user';
+      _userRole = role;
       _currentUserInfo = { username: userData.username || username, displayname: userData.displayName || userData.username || username };
       showApp(userData.displayName || userData.username || username, role);
 
@@ -297,6 +303,7 @@
           el.classList.remove('admin-hidden');
         });
       }
+      loadGamesList();
     }).catch(function(err) {
       btn.disabled = false;
       btn.textContent = 'Войти';
@@ -312,6 +319,7 @@
 
   function doLogout() {
     _currentUserInfo = null;
+    _userRole = 'user';
     if (DEMO_MODE) {
       DEMO_MODE = false;
       mobileGameConnected = false;
@@ -404,9 +412,9 @@
     container.innerHTML = '<div class="loading"><div class="spinner"></div> Загрузка...</div>';
     _gamesListData = {};
 
-    DB.scoreboard.queryActive().then(function(results) {
+    DB.scoreboard.queryAll().then(function(results) {
       if (!results || results.length === 0) {
-        container.innerHTML = '<div class="games-empty">Нет активных игр</div>';
+        container.innerHTML = '<div class="games-empty">Нет игр</div>';
         return;
       }
 
@@ -414,8 +422,6 @@
       for (var i = 0; i < results.length; i++) {
         var g = results[i];
         var finished = !!g.classic_match_finished || !!g.beach_match_finished;
-        if (finished) continue;
-
         var home = g.home_team || 'Home';
         var away = g.away_team || 'Away';
         var hs = ensureNumber(g.home_score);
@@ -424,15 +430,11 @@
         var gid = g.id || '';
         _gamesListData[gid] = g;
 
-        html += '<div class="game-item" data-game-id="' + gid + '">' +
-          '<div class="game-item-title">' + home + ' — ' + away + '</div>' +
+        html += '<div class="game-item' + (finished ? ' game-item-finished' : '') + '" data-game-id="' + gid + '">' +
+          '<div class="game-item-title">' + home + ' — ' + away + (finished ? ' <span style="color:var(--text-muted);font-weight:400;font-size:12px;">(завершена)</span>' : '') + '</div>' +
           '<div class="game-item-sub">' + (g.tournament_name || '') + (g.venue ? ' · ' + g.venue : '') + ' · ID: ' + gid + '</div>' +
           '<div class="game-item-score">' + hs + ' : ' + as + ' <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(Сет ' + period + ')</span></div>' +
           '</div>';
-      }
-      if (!html) {
-        container.innerHTML = '<div class="games-empty">Нет активных игр</div>';
-        return;
       }
       container.innerHTML = html;
 
@@ -459,6 +461,7 @@
 
           pendingGameSelect = gid;
           document.getElementById('mobileGameSelectInfo').innerHTML = info;
+          document.getElementById('mobileGameSelectDelete').style.display = _userRole === 'admin' ? '' : 'none';
           document.getElementById('mobileGameSelectModal').classList.remove('hidden');
         });
       });
@@ -1316,6 +1319,25 @@
     document.getElementById('refreshGamesBtn').addEventListener('click', loadGamesList);
     document.getElementById('mobileGameSelectYes').addEventListener('click', confirmGameSelect);
     document.getElementById('mobileGameSelectNo').addEventListener('click', cancelGameSelect);
+    document.getElementById('mobileGameSelectDelete').addEventListener('click', function() {
+      document.getElementById('mobileGameSelectModal').classList.add('hidden');
+      document.getElementById('mobileDeleteConfirmModal').classList.remove('hidden');
+    });
+    document.getElementById('mobileDeleteConfirmYes').addEventListener('click', function() {
+      document.getElementById('mobileDeleteConfirmModal').classList.add('hidden');
+      if (!pendingGameSelect) return;
+      var gid = pendingGameSelect;
+      pendingGameSelect = null;
+      DB.scoreboard.delete(gid).then(function() {
+        loadGamesList();
+      }).catch(function(err) {
+        console.error('Delete failed:', err);
+        alert('Ошибка удаления');
+      });
+    });
+    document.getElementById('mobileDeleteConfirmNo').addEventListener('click', function() {
+      document.getElementById('mobileDeleteConfirmModal').classList.add('hidden');
+    });
 
     // Mode toggles — local state only, no DB write
     document.getElementById('mobileBeachMode').addEventListener('change', function() {

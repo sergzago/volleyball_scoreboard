@@ -63,7 +63,7 @@
     <div class="tab-content">
 
       <!-- ===== TAB: GAMES ===== -->
-      <div class="tab-page" id="pageGames">
+      <div class="tab-page active" id="pageGames">
         <div class="section-header">
           <h2>Текущие игры</h2>
           <button class="btn btn-sm btn-secondary" id="refreshGamesBtn">🔄</button>
@@ -74,7 +74,7 @@
       </div>
 
       <!-- ===== TAB: SETTINGS ===== -->
-      <div class="tab-page active" id="pageSettings">
+      <div class="tab-page" id="pageSettings">
         <div class="section-header">
           <h2>Настройки</h2>
         </div>
@@ -458,11 +458,11 @@
 
     <!-- BOTTOM TABS -->
     <nav class="bottom-tabs" id="bottomTabs">
-      <button class="tab-btn" data-tab="pageGames">
+      <button class="tab-btn active" data-tab="pageGames">
         <span class="tab-icon">📋</span>
         <span>Игры</span>
       </button>
-      <button class="tab-btn active" data-tab="pageSettings">
+      <button class="tab-btn" data-tab="pageSettings">
         <span class="tab-icon">⚙️</span>
         <span>Настройки</span>
       </button>
@@ -529,8 +529,21 @@
       <div class="modal-header"><h3>📋 Загрузка игры</h3></div>
       <div class="modal-body" id="mobileGameSelectInfo"></div>
       <div class="modal-footer">
+        <button class="btn btn-danger" id="mobileGameSelectDelete" style="display:none;margin-right:auto;">Удалить</button>
         <button class="btn btn-secondary" id="mobileGameSelectNo">Отмена</button>
         <button class="btn btn-primary" id="mobileGameSelectYes">Загрузить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Delete Confirm -->
+  <div id="mobileDeleteConfirmModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header"><h3>🗑️ Удаление игры</h3></div>
+      <div class="modal-body" style="text-align:center;">Вы уверены, что хотите удалить игру?</div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="mobileDeleteConfirmNo">Нет</button>
+        <button class="btn btn-danger" id="mobileDeleteConfirmYes">Да, удалить</button>
       </div>
     </div>
   </div>

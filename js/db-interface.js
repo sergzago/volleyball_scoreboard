@@ -942,6 +942,29 @@
     },
 
     /**
+     * Получить все записи из коллекции volleyball (без фильтров)
+     */
+    queryAll: function() {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection(DB_CONFIG.collections.VOLLEYBALL)
+          .get()
+          .then(function(snapshot) {
+            var results = [];
+            snapshot.forEach(function(doc) {
+              results.push({ id: doc.id, ...doc.data() });
+            });
+            return results;
+          });
+      }
+
+      var pb = getPocketBaseClient();
+      return pb.collection(DB_CONFIG.collections.VOLLEYBALL).getFullList({
+        sort: '-lastEdited'
+      });
+    },
+
+    /**
      * Подписка на все активные игры (для online.html)
      */
     subscribeActive: function(onUpdate, onError) {

@@ -907,6 +907,10 @@ html, body {
   border-color: var(--btn-primary);
 }
 
+.game-item-finished {
+  opacity: 0.6;
+}
+
 .game-item-title {
   font-size: 15px;
   font-weight: 600;
