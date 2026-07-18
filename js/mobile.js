@@ -584,8 +584,13 @@
       // Merge instead of replace — PocketBase SSE may omit fields
       _recordExists = true;
       Object.keys(data).forEach(function(key) {
-        mobileScoreboardData[key] = data[key];
+        if (key !== 'id') mobileScoreboardData[key] = data[key];
       });
+      // PocketBase system id shadows custom id field — use get('id') for custom game ID
+      if (typeof data.get === 'function') {
+        var customId = data.get('id');
+        if (customId) mobileScoreboardData['id'] = customId;
+      }
       // Keep fields that PocketBase SSE might have dropped
       var merged = mobileScoreboardData;
 

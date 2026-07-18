@@ -733,7 +733,7 @@
       .getFullList()
       .then(function(records) {
         for (var i = 0; i < records.length; i++) {
-          if (records[i].id === gameId) return records[i];
+          if (records[i].get('id') === gameId) return records[i];
         }
         return null;
       });
@@ -795,15 +795,15 @@
           if (onError) onError(err);
         });
 
-      // Подписываемся на все изменения коллекции, фильтруем по полю id
+      // Подписываемся на все изменения коллекции, фильтруем по кастомному полю id
       pb.collection(DB_CONFIG.collections.VOLLEYBALL)
         .subscribe('*', function(e) {
           if (e.action === 'update' || e.action === 'create') {
-            if (e.record && e.record.id === gameId) {
+            var recordGameId = e.record ? e.record.get('id') : null;
+            if (recordGameId && recordGameId === gameId) {
               onUpdate(e.record);
             }
           }
-          // delete events ignored — can't verify which record was deleted
         })
         .catch(function(err) {
           if (onError) onError(err);
