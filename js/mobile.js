@@ -682,6 +682,9 @@
     document.getElementById('mHomeTeamFouls').textContent = data['home_team'] || 'Home';
     document.getElementById('mAwayTeamFouls').textContent = data['away_team'] || 'Away';
 
+    var venueEl = document.getElementById('controlVenue');
+    if (venueEl) venueEl.textContent = data['venue'] || '';
+
     document.getElementById('mHomeScore').textContent = ensureNumber(data['home_score']);
     document.getElementById('mAwayScore').textContent = ensureNumber(data['away_score']);
     document.getElementById('mHomeFouls').textContent = beachMode ? ensureNumber(data['home_sets']) : data['home_fouls'];
