@@ -156,13 +156,7 @@
     if (DEMO_MODE) {
       return { username: 'test', displayname: 'test' };
     }
-    if (_currentUserInfo) return _currentUserInfo;
-    var user = DB.getCurrentUser();
-    if (user && user.username) {
-      _currentUserInfo = user;
-      return _currentUserInfo;
-    }
-    return {};
+    return _currentUserInfo || {};
   }
 
   function update_db(data) {
@@ -184,7 +178,15 @@
       updateControlUI(mobileScoreboardData);
       return;
     }
-    scoreboard_query.update(data);
+    // Напрямую используем DB.scoreboard.update, чтобы получить Promise с обновленными данными
+    DB.scoreboard.update(game_id, data)
+      .then(function(updatedDoc) {
+        if (updatedDoc) {
+          mobileScoreboardData = DB.utils.getPlainObject(updatedDoc);
+        }
+      }).catch(function(err) {
+        console.error("Mobile update failed:", err);
+      });
   }
 
   // ===== AUTH =====

@@ -39,6 +39,31 @@
     return '__PB_DELETE_FIELD__';
   }
 
+  // ============================================================================
+  // UTILS
+  // ============================================================================
+
+  var utils = {
+    /**
+     * Преобразует данные от любого провайдера в простой JS-объект.
+     * @param {Object|Record} data - Данные от Firebase (объект) или PocketBase (Record).
+     * @returns {Object}
+     */
+    getPlainObject: function(data) {
+      if (!data) return {};
+      // PocketBase `data` is a Record object with a get() method.
+      if (typeof data.get === 'function') {
+        var plainData = data.get();
+        // PocketBase system id shadows custom id field — use get('id') for custom game ID
+        var customId = data.get('id');
+        if (customId) plainData['id'] = customId;
+        return plainData;
+      }
+      // Firebase data is already a plain object.
+      return data;
+    }
+  };
+
   /**
    * Конвертирует Date в строку формата PocketBase (с пробелом вместо T)
    */
@@ -822,39 +847,23 @@
      */
     update: function(gameId, data) {
       if (provider === 'firebase') {
-        // Обрабатываем маркеры удаления полей для Firebase
-        var setData = {};
-        Object.keys(data).forEach(function(key) {
-          if (data[key] !== '__PB_DELETE_FIELD__') {
-            setData[key] = data[key];
-          }
-        });
-
+        // Используем set с merge:true для upsert-поведения.
+        // Это создает документ, если он не существует, и обновляет, если существует.
+        // FieldValue.delete() поддерживается в этом режиме.
         return firebase.firestore()
           .collection(DB_CONFIG.collections.VOLLEYBALL)
           .doc(gameId)
-          .update(data)
+          .set(data, { merge: true })
           .then(function() {
+            // Возвращаем обновленный документ, так как некоторый код (ctl.js)
+            // ожидает получить обновленные данные в .then()
             return firebase.firestore()
               .collection(DB_CONFIG.collections.VOLLEYBALL)
               .doc(gameId)
               .get()
               .then(function(snapshot) {
-                return snapshot.exists ? Object.assign({ id: snapshot.id }, snapshot.data()) : null;
+                return snapshot.exists ? utils.getPlainObject(snapshot.data()) : null;
               });
-          })
-          .catch(function(err) {
-            // Документ не существует — создаём через set
-            if (err.code === 'not-found') {
-              return firebase.firestore()
-                .collection(DB_CONFIG.collections.VOLLEYBALL)
-                .doc(gameId)
-                .set(setData, { merge: true })
-                .then(function() {
-                  return Object.assign({ id: gameId }, setData);
-                });
-            }
-            throw err;
           });
       }
 
@@ -909,6 +918,63 @@
       return pb.collection(DB_CONFIG.collections.VOLLEYBALL).create(
         Object.assign({ id: gameId }, initialData)
       );
+    },
+
+    /**
+     * Сброс игры к начальному состоянию.
+     * @param {string} gameId
+     * @param {Object} initialData - Начальные данные (названия команд и т.д.).
+     * @param {Object} userInfo - Информация о пользователе.
+     */
+    reset: function(gameId, initialData, userInfo) {
+      var resetData = Object.assign({}, initialData, {
+        show: 1,
+        home_score: 0,
+        home_fouls: 0,
+        away_score: 0,
+        away_fouls: 0,
+        current_period: 1,
+        custom_label: "Таймаут",
+        home_sets: 0,
+        away_sets: 0,
+        home_timeouts: 0,
+        away_timeouts: 0,
+        beach_mode: false,
+        beach_current_set: 1,
+        beach_switch_message: '',
+        beach_match_finished: false,
+        period_count: 5,
+        set_history: [],
+        classic_match_finished: false,
+        home_side: 'left',
+        away_side: 'right',
+        classic_tiebreak_switch_done: true,
+        invert_tablo: false,
+        unlimited_score: false,
+        two_wins_mode: false,
+        custom_mode: false,
+        matchmode: '00000',
+        pending_new_set: deleteField(),
+        next_period: deleteField(),
+        next_beach_set: deleteField(),
+        pending_home_side: deleteField(),
+        pending_away_side: deleteField(),
+        pending_classic_tiebreak_switch_done: deleteField(),
+        classic_switch_needed: deleteField(),
+        classic_switch_shown: deleteField(),
+        classic_switch_message: deleteField(),
+        lastEdited: serverTimestamp(),
+        username: userInfo.username || '',
+        displayname: userInfo.displayname || ''
+      });
+
+      // Для Firebase используем set с merge:true, который работает как upsert
+      // и корректно обрабатывает FieldValue.delete().
+      if (provider === 'firebase') {
+        return this.update(gameId, resetData);
+      }
+      // Для PocketBase используем update, который работает как upsert.
+      return this.update(gameId, resetData);
     },
 
     /**
@@ -1251,6 +1317,7 @@
     init: init,
     serverTimestamp: serverTimestamp,
     deleteField: deleteField,
+    utils: utils,
     auth: auth,
     scoreboard: scoreboard,
     matches: matches,

@@ -10,20 +10,20 @@ function getParameterByName(name, url) {
 
 var scoreboard_data={};
 
-// Инициализация DB и получение game_id
-var game_id=getParameterByName('game');
-if(!game_id) game_id='test1';
-console.log('game_id:', game_id);
-console.log('DB provider:', DB.getProvider());
-
 // Глобальные алиасы для обратной совместимости (старый код использует scoreboard_query.update())
+// Теперь они не зависят от глобального game_id
 scoreboard_query = {
-    update: function(data) {
+    update: function(data, gameId) {
+        if (!gameId) {
+            console.error('scoreboard_query.update: gameId is not provided!');
+            return Promise.reject('gameId is not provided');
+        }
         console.log('scoreboard_query.update called with:', data);
-        return DB.scoreboard.update(game_id, data);
+        return DB.scoreboard.update(gameId, data);
     },
-    get: function() {
-        return DB.scoreboard.get(game_id);
+    get: function(gameId) {
+        if (!gameId) return Promise.reject('gameId is not provided');
+        return DB.scoreboard.get(gameId);
     }
 };
 
@@ -37,14 +37,16 @@ scoreboard_collection = {
     doc: function(id) {
         return {
             update: function(data) {
-                return DB.scoreboard.update(id, data);
+                return scoreboard_query.update(data, id); // Передаем id в update
             },
             set: function(data, options) {
-                // Для PocketBase update работает как upsert (создаёт если нет)
-                return DB.scoreboard.update(id, data);
+                // В ctl.js .set() используется для сброса игры.
+                // Наш DB.scoreboard.reset() делает то же самое, но более явно.
+                // Перенаправляем вызов на него для консистентности.
+                return scoreboard_query.update(data, id);
             },
             get: function() {
-                return DB.scoreboard.get(id);
+                return scoreboard_query.get(id);
             }
         };
     }

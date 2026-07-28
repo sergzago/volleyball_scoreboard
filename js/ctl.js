@@ -16,40 +16,25 @@ var matchWasAlreadyFinished = false;
 // Счётчик обновлений подписки — для определения первой загрузки
 var _subscribeCallCount = 0;
 
-// Таймер таймаута 30 секунд
 var timeoutTimerInterval = null;
 var timeoutRemainingSeconds = 0;
 var timeoutTeam = null; // команда, взявшая таймаут ('home' или 'away')
 var pendingTimeout = null;
 
-// scoreboard_data определена в common.js
+// Локальный game_id для этой сессии, чтобы избежать конфликтов между вкладками
+var local_game_id = null;
+
+var _currentUserInfo = null;
 
 // Получение информации о текущем пользователе
 function getCurrentUserInfo() {
-  // Через DB интерфейс (работает для обоих провайдеров)
-  if (DB.getProvider() === 'firebase') {
-    try {
-      const stored = JSON.parse(localStorage.getItem('firebase_user'));
-      if (!stored) return {};
-      return {
-        username: stored.username,
-        displayname: stored.displayName || stored.username
-      };
-    } catch (e) { return {}; }
+  if (_currentUserInfo) {
+    return _currentUserInfo;
   }
-
-  // PocketBase
-  if (DB.auth.getAuthInstance && DB.auth.getAuthInstance()) {
-    const pb = typeof PocketBase !== 'undefined' ? new PocketBase(DB_CONFIG.pocketbase.url) : null;
-    if (pb && pb.authStore.isValid && pb.authStore.model) {
-      const record = pb.authStore.model;
-      return {
-        username: record.username || record.email.split('@')[0],
-        displayname: record.displayName || record.username || record.email.split('@')[0]
-      };
-    }
-  }
-  return {};
+  // Fallback to DB interface if not initialized
+  var user = DB.getCurrentUser();
+  if (user) _currentUserInfo = user;
+  return _currentUserInfo || {};
 }
 
 /**
@@ -140,10 +125,18 @@ function cancelMatchFinish() {
 // Подписка на изменения после загрузки DOM
 $(document).ready(function() {
   // Инициализируем DB
+  local_game_id = getParameterByName('game');
+  if (!local_game_id) local_game_id = 'test1';
+
+  AuthModule.checkAuth('user', 'login.html').then(function(isAuth) {
+    if (isAuth) {
+      _currentUserInfo = AuthModule.getCurrentUser();
+    }
+  });
   DB.init().then(function() {
-    // Подписка на изменения через DB интерфейс
+    // Подписка на изменения через DB интерфейс, используя локальный game_id
     DB.scoreboard.subscribe(
-      game_id,
+      local_game_id,
       function(data) {
         if (!data) {
           console.warn('Document does not exist:', game_id);
@@ -334,8 +327,17 @@ function update_db(data){
     data.username = userInfo.username;
     data.displayname = userInfo.displayname;
   }
-  data.lastEdited = DB.serverTimestamp();
-  scoreboard_query.update(data);
+  data.lastEdited = DB.serverTimestamp();  
+  // Напрямую используем DB.scoreboard.update, чтобы получить Promise с обновленными данными
+  DB.scoreboard.update(local_game_id, data)
+    .then(function(updatedDoc) {
+      if (updatedDoc) {
+        // Обновляем локальные данные для консистентности
+        scoreboard_data = updatedDoc;
+      }
+    }).catch(function(err) {
+      console.error("Update failed:", err);
+    });
 }
 
 function saveMatchResult(setHistory, overallHome, overallAway){
@@ -362,8 +364,8 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
-    two_wins_mode: twoWinsMode, // Режим до двух побед
-    game_id: game_id,
+    two_wins_mode: twoWinsMode,
+    game_id: local_game_id,
     username: userInfo.username || '',
     displayname: userInfo.displayname || '',
     is_deleted: false // Флаг удаления (для возможности отмены)
@@ -372,7 +374,7 @@ function saveMatchResult(setHistory, overallHome, overallAway){
   matches_collection.add(matchData).then(function(docRef) {
     console.log('Match result saved with ID: ', docRef.id);
     // Сохраняем ID последнего матча в scoreboard для возможности удаления при сбросе
-    scoreboard_collection.doc(game_id).update({
+    scoreboard_collection.doc(local_game_id).update({
       last_match_id: docRef.id
     }).catch(function(error) {
       console.error('Error saving last_match_id: ', error);
@@ -1230,7 +1232,7 @@ $(document).ready(function(){
     // Сбрасываем флаг — новая игра, диалог должен снова появиться
     matchWasAlreadyFinished = false;
 
-    scoreboard_collection.doc(game_id).set(resetData)
+    DB.scoreboard.reset(local_game_id, resetData, userInfo)
       .then(function(result) {
         console.log('Scoreboard reset complete:', result);
         // НЕ удаляем последний матч — он должен отображаться в завершенных

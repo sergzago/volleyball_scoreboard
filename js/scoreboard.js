@@ -160,9 +160,9 @@ function getMatchBadgeType(team, data) {
 }
 
 // Подписка на изменения через DB интерфейс (вызывается после DB.init)
-function startScoreboardSubscription() {
-console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
-DB.scoreboard.subscribe(
+function startScoreboardSubscription(game_id) {
+  console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
+  DB.scoreboard.subscribe(
   game_id,
   function(data){
     console.log('sb/ctl: scoreboard data received, show:', data ? data.show : 'null');
@@ -496,9 +496,10 @@ function updateTabloSides(){
 // Инициализация DB при загрузке
 $(document).ready(function() {
   DB.init().then(function() {
-    startScoreboardSubscription();
+    // Получаем game_id из URL и передаем в подписку
+    var game_id = getParameterByName('game');
+    startScoreboardSubscription(game_id || 'test1');
   }).catch(function(err) {
     console.error('DB initialization failed:', err);
   });
 });
-
