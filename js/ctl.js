@@ -341,7 +341,6 @@ function update_db(data){
 function saveMatchResult(setHistory, overallHome, overallAway){
   var isBeach = isBeachMode();
   var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-  var customMode = !!scoreboard_data['custom_mode']; // Проверяем, был ли включен произвольный режим
   var userInfo = getCurrentUserInfo();
 
   if(typeof overallHome === 'undefined' || typeof overallAway === 'undefined'){
@@ -363,23 +362,12 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     overall_score: overallHome + ':' + overallAway,
     sets_score: setHistory || scoreboard_data['set_history'] || [],
     game_type: isBeach ? 'beach' : 'classic',
-    custom_mode: customMode,
     two_wins_mode: twoWinsMode, // Режим до двух побед
     game_id: game_id,
     username: userInfo.username || '',
     displayname: userInfo.displayname || '',
     is_deleted: false // Флаг удаления (для возможности отмены)
   };
-
-  // Если был произвольный режим, добавляем его параметры
-  if (customMode) {
-    matchData.count_wins = scoreboard_data['count_wins'];
-    matchData.score_wins = scoreboard_data['score_wins'];
-    matchData.score_tie = scoreboard_data['score_tie'];
-    matchData.balance = scoreboard_data['balance'];
-    matchData.score_change = scoreboard_data['score_change'];
-    matchData.count_timeouts = scoreboard_data['count_timeouts'];
-  }
 
   matches_collection.add(matchData).then(function(docRef) {
     console.log('Match result saved with ID: ', docRef.id);

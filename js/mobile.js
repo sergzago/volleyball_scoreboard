@@ -4,16 +4,11 @@
   var BASE_URL = window.location.href.replace(/\/[^\/]*$/, '/');
   var DEMO_MODE = false;
   var mobileScoreboardData = {};
-
-  // Группируем состояние игры в один объект
-  var gameState = {
-    connected: false,
-    pendingMatchFinish: null,
-    matchWasAlreadyFinished: false,
-    subscribeCallCount: 0,
-    initialDataLoaded: false
-  };
-
+  var mobileGameConnected = false;
+  var pendingMatchFinish = null;
+  var matchWasAlreadyFinished = false;
+  var _subscribeCallCount = 0;
+  var _initialDataLoaded = false;
   var timeoutTimerInterval = null;
   var timeoutRemainingSeconds = 0;
   var pendingTimeout = null;
@@ -340,15 +335,13 @@
   }
 
   function setupMockDB() {
-    // Создаём локальный мок-объект DB вместо перезаписи глобального window.DB
-    var _mockData = { ...DEMO_DEFAULT_DATA };
-    var mockDB = {
-      init: function() { return Promise.resolve(); },
-      serverTimestamp: function() { return new Date().toISOString(); },
-      deleteField: function() { return null; },
-      getProvider: function() { return 'mock'; },
-      isInitialized: function() { return true; },
-      // ... (остальные мок-методы)
+    var _mockData = {};
+    window.scoreboard_query = {
+      update: function(data) {
+        Object.keys(data).forEach(function(k) {
+          _mockData[k] = data[k];
+        });
+      }
     };
     window.DB = {
       init: function() { return Promise.resolve(); },
@@ -367,15 +360,13 @@
         logAuthEvent: function() { return Promise.resolve(); }
       },
       scoreboard: {
-        get: function(gameId) { return Promise.resolve(mobileScoreboardData); },
-        subscribe: function(gameId, onUpdate) { onUpdate(mobileScoreboardData); return function() {}; },
+        get: function(gameId) { return Promise.resolve(_mockData); },
+        subscribe: function() { return function() {}; },
         update: function(gameId, data) {
           Object.keys(data).forEach(function(k) {
-            if (data[k] === mockDB.deleteField()) delete mobileScoreboardData[k];
-            else mobileScoreboardData[k] = data[k];
+            _mockData[k] = data[k];
           });
-          onUpdate(mobileScoreboardData); // Имитируем обновление
-          return Promise.resolve(mobileScoreboardData);
+          return Promise.resolve();
         },
         create: function() { return Promise.resolve(); },
         delete: function() { return Promise.resolve(); }
@@ -394,14 +385,6 @@
       },
       ensureCollections: function() { return Promise.resolve(); }
     };
-
-    // Для scoreboard_query также используем локальный мок
-    window.scoreboard_query = {
-      update: function(data) {
-        mockDB.scoreboard.update(window.game_id, data);
-      }
-    };
-
   }
 
   // ===== TABS =====
@@ -512,7 +495,7 @@
   function connectToGame() {
     var gameId = document.getElementById('mobileGameId').value.trim();
     if (!gameId) {
-      alert('Введите или сгенерируйте Game ID');
+      alert('Введите Game ID');
       return;
     }
 
@@ -604,7 +587,7 @@
         if (key !== 'id') mobileScoreboardData[key] = data[key];
       });
       // PocketBase system id shadows custom id field — use get('id') for custom game ID
-      if (data && typeof data.get === 'function') {
+      if (typeof data.get === 'function') {
         var customId = data.get('id');
         if (customId) mobileScoreboardData['id'] = customId;
       }
@@ -612,13 +595,13 @@
       var merged = mobileScoreboardData;
 
       _subscribeCallCount++;
-      if (!gameState.initialDataLoaded) {
-        gameState.initialDataLoaded = true;
+      if (!_initialDataLoaded) {
+        _initialDataLoaded = true;
         var beachMode = !!merged['beach_mode'];
         var beachFinished = beachMode && merged['beach_match_finished'];
         var classicFinished = (!beachMode) && merged['classic_match_finished'];
         if (beachFinished || classicFinished) {
-          gameState.matchWasAlreadyFinished = true;
+          matchWasAlreadyFinished = true;
         }
       }
 
@@ -894,7 +877,6 @@
 
     var isBeach = _localBeachMode;
     var twoWinsMode = _localTwoWinsMode;
-    var customMode = isCustomMode();
     var userInfo = getCurrentUserInfo();
 
     if (typeof overallHome === 'undefined' || typeof overallAway === 'undefined') {
@@ -916,7 +898,6 @@
       overall_score: overallHome + ':' + overallAway,
       sets_score: setHistory || mobileScoreboardData['set_history'] || [],
       game_type: isBeach ? 'beach' : 'classic',
-      custom_mode: customMode,
       two_wins_mode: twoWinsMode,
       game_id: game_id,
       username: userInfo.username || '',
@@ -924,21 +905,9 @@
       is_deleted: false
     };
 
-    if (customMode) {
-      syncCustomSettings();
-      matchData.count_wins = _localCustomSettings.count_wins;
-      matchData.score_wins = _localCustomSettings.score_wins;
-      matchData.score_tie = _localCustomSettings.score_tie;
-      matchData.balance = _localCustomSettings.balance;
-      matchData.score_change = _localCustomSettings.score_change;
-      matchData.count_timeouts = _localCustomSettings.count_timeouts;
-    }
-
     DB.matches.add(matchData).then(function(docRef) {
       console.log('Match saved:', docRef.id);
-      DB.scoreboard.update(game_id, { last_match_id: docRef.id }).catch(function(err) {
-        console.error('Failed to save last_match_id:', err);
-      });
+      DB.scoreboard.update(game_id, { last_match_id: docRef.id }).catch(function() {});
     }).catch(function(err) {
       console.error('Error saving match:', err);
     });
