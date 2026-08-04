@@ -190,14 +190,16 @@ function applyTemplate(data) {
   setCssVar('--top-primary-score-text', templateData.top_primary_score_text);
   setCssVar('--top-period-bg', templateData.top_period_bg);
   setCssVar('--top-period-text', templateData.top_period_text);
-  setCssVar('--bottom-team-name-bg', templateData.bottom_team_name_bg);
-  setCssVar('--bottom-team-name-text', templateData.bottom_team_name_text);
-  setCssVar('--bottom-secondary-score-bg', templateData.bottom_secondary_score_bg);
-  setCssVar('--bottom-secondary-score-text', templateData.bottom_secondary_score_text);
-  setCssVar('--bottom-primary-score-bg', templateData.bottom_primary_score_bg);
-  setCssVar('--bottom-primary-score-text', templateData.bottom_primary_score_text);
-  setCssVar('--bottom-time-bg', templateData.bottom_time_bg);
-  setCssVar('--bottom-time-text', templateData.bottom_time_text);
+
+  // Нижнее табло использует те же цвета, что и верхнее (если не заданы отдельные bottom_* поля)
+  setCssVar('--bottom-team-name-bg', templateData.bottom_team_name_bg || templateData.top_team_name_bg);
+  setCssVar('--bottom-team-name-text', templateData.bottom_team_name_text || templateData.top_team_name_text);
+  setCssVar('--bottom-secondary-score-bg', templateData.bottom_secondary_score_bg || templateData.top_secondary_score_bg);
+  setCssVar('--bottom-secondary-score-text', templateData.bottom_secondary_score_text || templateData.top_secondary_score_text);
+  setCssVar('--bottom-primary-score-bg', templateData.bottom_primary_score_bg || templateData.top_primary_score_bg);
+  setCssVar('--bottom-primary-score-text', templateData.bottom_primary_score_text || templateData.top_primary_score_text);
+  setCssVar('--bottom-time-bg', templateData.bottom_time_bg || templateData.top_period_bg);
+  setCssVar('--bottom-time-text', templateData.bottom_time_text || templateData.top_period_text);
 
   // Цвета для бейджей сетбола/матчбола
   setCssVar('--setball-bg', templateData.setball_bg);

@@ -413,6 +413,10 @@
         document.querySelectorAll('.tab-page').forEach(function(p) { p.classList.remove('active'); });
         document.getElementById(target).classList.add('active');
         if (target === 'pageGames') loadGamesList();
+        // Инициализируем визуальный редактор шаблонов при открытии вкладки
+        if (target === 'pageTemplates' && typeof TemplatesVisualMobile !== 'undefined') {
+          TemplatesVisualMobile.init();
+        }
       });
     });
   }

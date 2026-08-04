@@ -12,6 +12,349 @@
   <link rel="icon" type="image/png" href="logo_nvl.png">
   <link rel="apple-touch-icon" href="logo_nvl.png">
   <link rel="stylesheet" href="css/mobile.css">
+  <style>
+    /* ============================================================
+       ВИЗУАЛЬНЫЙ РЕДАКТОР ШАБЛОНОВ (вкладка "Шаблоны")
+       ============================================================ */
+    .template-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 16px 0;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .template-list li {
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #fff;
+      background: rgba(255,255,255,0.05);
+      min-width: 0;
+    }
+    .template-list li:hover { background: rgba(255,255,255,0.15); }
+    .template-list li.active { background: rgba(255,255,255,0.25); font-weight: bold; }
+    .template-list li > span {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-right: 8px;
+    }
+    .template-list li .delete-btn {
+      background: none;
+      border: none;
+      color: #dc3545;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+    .template-list li .delete-btn:hover { color: #ff0000; }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .scoreboard-wrapper {
+      background: #0d1b2a;
+      border-radius: 12px;
+      padding: 30px 12px;
+      position: relative;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #5aa0c4;
+      overflow: hidden;
+    }
+    .template-label {
+      position: absolute;
+      top: 8px;
+      left: 16px;
+      background: #5aa0c4;
+      color: #fff;
+      padding: 4px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      max-width: 70%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      z-index: 5;
+    }
+
+    .scoreboard-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: visible;
+      width: 100%;
+      max-width: 700px;
+    }
+    .scoreboard {
+      display: flex;
+      width: auto;
+      height: 64px;
+      color: white;
+      border-radius: 4px;
+      overflow: visible;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      transform: scale(0.7);
+      transform-origin: center center;
+    }
+    .logo-area {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 3px;
+      position: relative;
+      background-color: #1a2b3c;
+      box-sizing: border-box;
+    }
+    .logo-img { width: 56px; height: 56px; margin-bottom: 4px; object-fit: contain; }
+    .team-colors-area {
+      display: flex;
+      flex-direction: column;
+      width: 16px;
+      background-color: #1a2b3c;
+    }
+    .team-color-block { width: 16px; height: 32px; display: flex; align-items: center; justify-content: center; }
+    .team-color-block:first-child { align-items: flex-start; }
+    .team-color-block:last-child { align-items: flex-end; }
+    .team-color-indicator { width: 10px; height: 32px; border: none; }
+    .teams-area {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      min-width: 140px;
+      padding: 0 12px;
+      background-color: #1a2b3c;
+    }
+    .team-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      height: 28px;
+      font-size: 16px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .scores-area { display: flex; height: 100%; background-color: #1a2b3c; }
+    .score-column {
+      width: 32px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-evenly;
+      align-items: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .score-column.total-score, .score-column.sets-score { color: #ffffff; }
+    .score-column.points-score { color: #ffffff; }
+    .sets-score { background-color: #5aa0c4; }
+    .points-score { background-color: #d65a98; }
+    .total-score { background-color: #5aa0c4; }
+    .scores-and-badges { display: flex; align-items: flex-start; height: 100%; background: transparent !important; }
+    .match-badges-area {
+      display: none;
+      position: relative;
+      height: 100%;
+      width: 84px;
+      margin-left: 0;
+      background: transparent !important;
+    }
+    .match-badge {
+      position: absolute;
+      right: 0;
+      display: none;
+      padding: 3px 6px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      line-height: 1;
+      height: 16px;
+      box-sizing: border-box;
+      color: white;
+    }
+    .badge-setball { background-color: var(--setball-bg, #5aa0c4); color: var(--setball-text, white); }
+    .badge-matchball { background-color: var(--matchball-bg, #d65a98); color: var(--matchball-text, white); }
+    .home-match-badge {
+      position: relative;
+      height: 30px;
+      top: 0;
+      justify-content: center;
+      align-items: center;
+      display: flex;
+      font-weight: bold;
+    }
+    .away-match-badge {
+      position: relative;
+      height: 30px;
+      top: 34px;
+      justify-content: center;
+      align-items: center;
+      display: flex;
+      font-weight: bold;
+    }
+
+    .clickable-block { cursor: pointer; transition: outline 0.15s, filter 0.15s; position: relative; }
+    .clickable-block:hover { outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -2px; filter: brightness(1.15); }
+    .clickable-block.selected { outline: 3px solid #ffc107; outline-offset: -3px; filter: brightness(1.2); }
+    .clickable-block .block-label {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .clickable-block:hover .block-label { display: block; }
+
+    .color-panel {
+      position: fixed;
+      left: -340px;
+      top: 0;
+      width: 320px;
+      height: 100vh;
+      background: #0d1b2a;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+      transition: left 0.3s ease;
+      z-index: 1000;
+      padding: 20px;
+      overflow-y: auto;
+      color: #fff;
+    }
+    .color-panel.open { left: 0; }
+    .color-panel .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .color-panel .panel-title { font-size: 16px; font-weight: bold; }
+    .color-panel .panel-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0 4px;
+      opacity: 0.7;
+    }
+    .color-panel .panel-close:hover { opacity: 1; }
+    .color-panel .color-row { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
+    .color-panel .color-row label { flex: 1; font-size: 13px; color: #ccc; }
+    .color-panel .color-row input[type="color"] {
+      width: 50px;
+      height: 36px;
+      padding: 0;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      background: none;
+    }
+    .color-panel .color-row input[type="text"] {
+      width: 80px;
+      padding: 4px 8px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .color-panel .panel-info { font-size: 12px; color: #888; margin-top: 20px; text-align: center; }
+
+    /* Диалоги редактора шаблонов — scoped по ID, чтобы не переопределять
+       модальные окна мобильного приложения (css/mobile.css .modal-overlay) */
+    #saveDialog, #deleteDialog {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+    #saveDialog.open, #deleteDialog.open { display: flex; }
+    .modal {
+      background: #0d1b2a;
+      border-radius: 12px;
+      padding: 30px;
+      width: 400px;
+      max-width: 90vw;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .modal h3 { margin: 0 0 8px 0; font-size: 20px; color: #fff; }
+    .modal p { color: rgba(255,255,255,0.6); font-size: 14px; margin: 0 0 20px 0; }
+    .modal input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 20px;
+      outline: none;
+    }
+    .modal input[type="text"]:focus { border-color: #5aa0c4; }
+    .modal .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+    .modal .modal-buttons button { padding: 10px 24px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .notification.show { opacity: 1; }
+    .notification.success { background: #28a745; color: #fff; }
+    .notification.error { background: #dc3545; color: #fff; }
+  </style>
   <script src="credentials.js"></script>
   <script src="js/db-config.js"></script>
   <script src="js/db-interface.js"></script>
@@ -461,6 +804,85 @@
         </div>
       </div>
 
+      <!-- ===== TAB: TEMPLATES (visual editor, admin only) ===== -->
+      <div class="tab-page" id="pageTemplates">
+        <div class="section-header">
+          <h2>🎨 Шаблоны табло</h2>
+        </div>
+
+        <div id="templatesEditorContainer">
+          <div class="card">
+            <div class="card-title"><span class="icon">📁</span> Шаблоны</div>
+            <ul class="template-list" id="templateList">
+              <li style="color:#666;font-style:italic;cursor:default;">Загрузка...</li>
+            </ul>
+            <button class="btn btn-primary btn-block" id="btnNewTemplate">+ Новый шаблон</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><span class="icon">🖥️</span> Редактор табло</div>
+            <div class="toolbar">
+              <button class="btn btn-success" id="btnSave">💾 Сохранить</button>
+              <button class="btn btn-secondary" id="btnReset">↺ Сбросить</button>
+            </div>
+
+            <div class="scoreboard-wrapper" id="scoreboardWrapper">
+              <div class="template-label" id="templateLabel">— шаблон не выбран —</div>
+              <div class="scoreboard-container">
+                <div class="scoreboard" id="scoreboard-preview">
+                  <!-- Логотип = фон страницы -->
+                  <div class="logo-area clickable-block" data-style-property="body_bg" data-block-name="Фон страницы">
+                    <span class="block-label">Фон страницы</span>
+                    <img class="logo-img" src="logo_nvl.png" alt="Logo">
+                  </div>
+                  <!-- Цвета команд = фон имени -->
+                  <div class="team-colors-area clickable-block" data-style-property="top_team_name_bg" data-block-name="Фон имени">
+                    <span class="block-label">Фон имени</span>
+                    <div class="team-color-block">
+                      <div class="team-color-indicator" style="background:#ccc;"></div>
+                    </div>
+                    <div class="team-color-block">
+                      <div class="team-color-indicator" style="background:#999;"></div>
+                    </div>
+                  </div>
+                  <!-- Команды = текст имени -->
+                  <div class="teams-area clickable-block" data-style-property="top_team_name_text" data-block-name="Текст имени">
+                    <span class="block-label">Текст имени</span>
+                    <div class="team-row"><span class="tn">КОМАНДА ХОЗЯЕВ</span></div>
+                    <div class="team-row"><span class="tn">КОМАНДА ГОСТЕЙ</span></div>
+                  </div>
+                  <!-- Счёт -->
+                  <div class="scores-and-badges">
+                    <div class="scores-area">
+                      <div class="score-column total-score clickable-block" data-style-property="top_secondary_score_bg" data-block-name="Фон сетов">
+                        <span class="block-label">Фон сетов</span>
+                        <div style="text-align:center;">2</div>
+                        <div style="text-align:center;">1</div>
+                      </div>
+                      <div class="score-column points-score clickable-block" data-style-property="top_primary_score_bg" data-block-name="Фон счета">
+                        <span class="block-label">Фон счета</span>
+                        <div style="text-align:left;">18</div>
+                        <div style="text-align:left;">15</div>
+                      </div>
+                    </div>
+                    <div class="match-badges-area" style="display:flex;">
+                      <div class="home-match-badge match-badge badge-setball clickable-block" data-style-property="setball_bg" data-block-name="Фон Сетбола">
+                        <span class="block-label">Фон Сетбола</span>
+                        СЕТБОЛ
+                      </div>
+                      <div class="away-match-badge match-badge badge-matchball clickable-block" data-style-property="matchball_bg" data-block-name="Фон Матчбола">
+                        <span class="block-label">Фон Матчбола</span>
+                        МАТЧБОЛ
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- BOTTOM TABS -->
@@ -489,7 +911,55 @@
         <span class="tab-icon">🛡️</span>
         <span>Админ</span>
       </button>
+      <button class="tab-btn admin-tab admin-hidden" data-tab="pageTemplates">
+        <span class="tab-icon">🎨</span>
+        <span>Шаблоны</span>
+      </button>
     </nav>
+  </div>
+
+  <!-- COLOR PANEL (templates editor) -->
+  <div class="color-panel" id="colorPanel">
+    <div class="panel-header">
+      <span class="panel-title" id="panelTitle">Выберите цвет</span>
+      <button class="panel-close" id="panelClose">&times;</button>
+    </div>
+    <div class="color-row">
+      <label>Цвет фона</label>
+      <input type="color" id="panelColorPicker" value="#ffffff">
+      <input type="text" id="panelColorHex" value="#ffffff" readonly>
+    </div>
+    <div class="color-row">
+      <label>Цвет текста</label>
+      <input type="color" id="panelTextColorPicker" value="#000000">
+      <input type="text" id="panelTextColorHex" value="#000000" readonly>
+    </div>
+    <p class="panel-info">Изменения применяются сразу. Нажмите "Сохранить" для сохранения в БД.</p>
+  </div>
+
+  <!-- DIALOG: Save template -->
+  <div class="modal-overlay" id="saveDialog">
+    <div class="modal">
+      <h3>💾 Сохранить как...</h3>
+      <p>Введите название для нового шаблона</p>
+      <input type="text" id="saveDialogInput" placeholder="Название шаблона" maxlength="50">
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" id="saveDialogCancel">Отмена</button>
+        <button class="btn btn-success" id="saveDialogConfirm">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIALOG: Delete template -->
+  <div class="modal-overlay" id="deleteDialog">
+    <div class="modal">
+      <h3>🗑 Удалить шаблон</h3>
+      <p id="deleteDialogText">Вы уверены, что хотите удалить этот шаблон?</p>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" id="deleteDialogCancel">Отмена</button>
+        <button class="btn btn-danger" id="deleteDialogConfirm">Удалить</button>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL: Match Finish -->
@@ -555,7 +1025,11 @@
     </div>
   </div>
 
+  <!-- NOTIFICATION (templates editor) -->
+  <div class="notification" id="notification"></div>
+
   <script src="js/common.js"></script>
   <script src="js/mobile.js"></script>
+  <script src="js/templates_visual_mobile.js"></script>
 </body>
 </html>

@@ -22,7 +22,7 @@ var CREDENTIALS = (typeof CREDENTIALS !== 'undefined') ? CREDENTIALS : { firebas
 
 var DB_CONFIG = {
   // Текущий провайдер: 'firebase' | 'pocketbase'
-  provider: 'pocketbase',
+  provider: 'firebase',
 
   // ============================================================================
   // КОНФИГУРАЦИЯ СЕРВЕРА (Node.js API, используется для Firebase Admin операций)
