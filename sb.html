@@ -52,7 +52,7 @@
             display: flex;
             width: auto;
             height: 64px; /* Уменьшено с 80px на 20% */
-            color: white;
+            color: var(--top-team-name-text, white);
             border-radius: 4px;
             overflow: visible;
             box-shadow: none; /*0 4px 10px rgba(0,0,0,0.3);*/
@@ -81,7 +81,7 @@
             display: flex;
             width: auto;
             height: 96px; /* 64px * 1.5 = 96px */
-            color: white;
+            color: var(--bottom-team-name-text, white);
             border-radius: 4px;
             overflow: visible; /* Изменено для позиционирования set-history-block */
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
@@ -104,7 +104,7 @@
             align-items: center;
             padding: 3px;
             position: relative;
-            background-color: #1a2b3c;
+            background-color: var(--bottom-team-name-bg, #1a2b3c);
             box-sizing: border-box; /* Чтобы padding включался в высоту */
         }
 
@@ -137,7 +137,7 @@
             position: relative;
             min-width: 240px; /* 160px * 1.5 */
             padding: 0 18px; /* 12px * 1.5 */
-            background-color: #1a2b3c;
+            background-color: var(--bottom-team-name-bg, #1a2b3c);
         }
 
         .bottom-scoreboard .team-row {
@@ -157,7 +157,7 @@
             flex-direction: column;
             width: 24px; /* 16px * 1.5 */
             margin-right: 0;
-            background-color: #1a2b3c;
+            background-color: var(--bottom-team-name-bg, #1a2b3c);
         }
 
         .bottom-scoreboard .team-color-block {
@@ -185,7 +185,7 @@
         .bottom-scoreboard .scores-area {
             display: flex;
             height: 100%;
-            background-color: #1a2b3c;
+            background-color: var(--bottom-team-name-bg, #1a2b3c);
         }
 
         .bottom-scoreboard .score-column {
@@ -200,15 +200,18 @@
         }
 
         .bottom-scoreboard .sets-score {
-            background-color: #5aa0c4;
+            background-color: var(--bottom-secondary-score-bg, #5aa0c4);
+            color: var(--bottom-secondary-score-text, white);
         }
 
         .bottom-scoreboard .points-score {
-            background-color: #d65a98;
+            background-color: var(--bottom-primary-score-bg, #d65a98);
+            color: var(--bottom-primary-score-text, white);
         }
 
         .bottom-scoreboard .total-score {
-            background-color: #5aa0c4;
+            background-color: var(--bottom-secondary-score-bg, #5aa0c4);
+            color: var(--bottom-secondary-score-text, white);
         }
 
         /* Разделитель между scores-area и блоками сетов */
@@ -222,7 +225,7 @@
         .bottom-scoreboard .sets-blocks-area {
             display: flex;
             height: 100%;
-            background-color: #1a2b3c;
+            background-color: var(--bottom-team-name-bg, #1a2b3c);
         }
 
         .bottom-scoreboard .set-block {
@@ -234,7 +237,7 @@
             align-items: center;
             font-size: 27px;
             font-weight: bold;
-            background-color: #1a2b3c;
+            background-color: var(--bottom-team-name-bg, #1a2b3c);
         }
 
         .bottom-scoreboard .set-block.visible {
@@ -253,11 +256,11 @@
         }
 
         .bottom-scoreboard .set-block .home-set-score {
-            color: #5aa0c4;
+            color: var(--bottom-secondary-score-bg, #5aa0c4);
         }
 
         .bottom-scoreboard .set-block .away-set-score {
-            color: #d65a98;
+            color: var(--bottom-primary-score-bg, #d65a98);
         }
 
         .bottom-scoreboard .set-separator {
@@ -276,7 +279,7 @@
             align-items: center;
             padding: 3px; /* Уменьшено с 4px */
             position: relative;
-            background-color: #1a2b3c;
+            background-color: var(--top-team-name-bg, #1a2b3c);
             box-sizing: border-box; /* Чтобы padding включался в высоту */
         }
 
@@ -310,7 +313,7 @@
             position: relative;
             min-width: 160px; /* Уменьшено с 200px на 20% */
             padding: 0 12px 0 12px; /* Уменьшено с 15px */
-            background-color: #1a2b3c;
+            background-color: var(--top-team-name-bg, #1a2b3c);
         }
 
         .team-row {
@@ -331,7 +334,7 @@
             flex-direction: column;
             width: 16px; /* Уменьшено с 20px на 20% */
             margin-right: 0;
-            background-color: #1a2b3c;
+            background-color: var(--top-team-name-bg, #1a2b3c);
         }
 
         .team-color-block {
@@ -361,7 +364,7 @@
         .scores-area {
             display: flex;
             height: 100%;
-            background-color: #1a2b3c;
+            background-color: var(--top-team-name-bg, #1a2b3c);
         }
 
         /* История по сетам */
@@ -370,8 +373,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background-color: #1a2b3c; /* Фон как у основного контейнера */
-            color: white;
+            background-color: var(--top-team-name-bg, #1a2b3c); /* Фон как у основного контейнера */
+            color: var(--top-team-name-text, white);
             border-top: 2px solid rgba(255,255,255,0.3); /* Тонкая разделительная линия */
             padding: 0 12px; /* Уменьшено с 15px */
             font-size: 11px; /* Уменьшено с 14px на 20% */
@@ -408,15 +411,18 @@
 
         /* Цвета колонок счета */
         .sets-score {
-            background-color: #5aa0c4; /* Голубой цвет для сетов */
+            background-color: var(--top-secondary-score-bg, #5aa0c4); /* Голубой цвет для сетов */
+            color: var(--top-secondary-score-text, white);
         }
 
         .points-score {
-            background-color: #d65a98; /* Розовый цвет для очков */
+            background-color: var(--top-primary-score-bg, #d65a98); /* Розовый цвет для очков */
+            color: var(--top-primary-score-text, white);
         }
 
         .total-score {
-            background-color: #5aa0c4; /* Голубой цвет для общего счета (как у сетов) */
+            background-color: var(--top-secondary-score-bg, #5aa0c4); /* Голубой цвет для общего счета (как у сетов) */
+            color: var(--top-secondary-score-text, white);
         }
 
         /* Правая часть: Счет и бейджи */
@@ -466,12 +472,15 @@
             color: white;
         }
 
+        /* Цвета для бейджей (настраиваются через CSS переменные) */
         .badge-setball {
-            background-color: #5aa0c4;
+            background-color: var(--setball-bg, #5aa0c4);
+            color: var(--setball-text, white);
         }
 
         .badge-matchball {
-            background-color: #5aa0c4;
+            background-color: var(--matchball-bg, #d65a98);
+            color: var(--matchball-text, white);
         }
 
         .home-match-badge {
@@ -497,8 +506,8 @@
         /* Блок истории сетов под основным табло */
         .set-history-block {
             position: absolute;
-            background-color: #1a2b3c;
-            color: white;
+            background-color: var(--bottom-time-bg, #1a2b3c);
+            color: var(--bottom-time-text, white);
             border-radius: 4px;
             padding: 5px 12px;
             font-size: 11px;

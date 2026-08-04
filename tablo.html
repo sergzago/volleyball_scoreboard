@@ -74,8 +74,8 @@
         width: 100%;
         height: 100%;
         margin: 0;
-        background: #ffffff;
-        color: #000;
+        background: var(--body-bg, #ffffff);
+        color: var(--top-team-name-text, #000);
         font-family: 'Rubik Mono One', sans-serif;
         overflow: hidden;
         transition: background 0.3s, color 0.3s;
@@ -144,7 +144,7 @@
       .tablo-general-score {
         font-size: clamp(20px, 2.5vw, 32px);
         font-weight: bold;
-        color: #333;
+        color: var(--top-secondary-score-text, #333);
         margin: 0 clamp(10px, 2vw, 30px);
       }
       .tablo-score {
@@ -165,8 +165,8 @@
       
       .set-history {
         display: none;
-        background-color: #fff;
-        color: #000;
+        background-color: var(--bottom-time-bg, #fff);
+        color: var(--bottom-time-text, #000);
         letter-spacing: 1px;
         text-transform: uppercase;
         border-radius: 4px;

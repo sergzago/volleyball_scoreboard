@@ -21,19 +21,19 @@
       td { text-align: center; vertical-align: middle; margin: 0; }
       tr { margin: 0 }
       .sqr { width: 30px; height: 30px; }
-      .period { background-color: white; color: black; font-size: 50px;}
-      td.team-name { background-color: #0303b5; color: white; padding: 0 10px 0 3px; text-align: left; }
+      .period { background-color: var(--top-period-bg, white); color: var(--top-period-text, black); font-size: 50px;}
+      td.team-name { background-color: var(--top-team-name-bg, #0303b5); color: var(--top-team-name-text, white); padding: 0 10px 0 3px; text-align: left; }
       td.team-name span.tn { display: inline-block;}
       td.team-name span.tc {
         width: 5px;
         display: inline-block;
         height: 20px;
-        margin-bottom: -5px; 
+        margin-bottom: -5px;
         border: 1px solid white;
         margin-right: 3px;
       }
-      .secondary-score { background-color: red; color: white; }
-      .primary-score { background-color: white; color: black; }
+      .secondary-score { background-color: var(--top-secondary-score-bg, red); color: var(--top-secondary-score-text, white); }
+      .primary-score { background-color: var(--top-primary-score-bg, white); color: var(--top-primary-score-text, black); }
       .period { width: 60px; height: 60px; }
       table { margin-left: 50px; margin-top: -80px; }
       table#top.top-hidden { display: none; }
@@ -68,7 +68,7 @@
         width: 350px;
         height: 100px;
         display: inline-block;
-        color: black;
+        color: var(--bottom-team-name-text, black);
         vertical-align: middle;
         text-align: center;
       }
@@ -76,24 +76,24 @@
         width: 98px;
         height: 100px;
         display: inline-block;
-        background-color: white;
+        background-color: var(--bottom-time-bg, white);
         border-left: 1px solid black;
         border-right: 1px solid black;
-        color: black;
+        color: var(--bottom-time-text, black);
         font-size: 80px;
         vertical-align: middle;
         text-align: center;
       }
       div.team-name {
-        background-color: #0303b5;
-        color: white;
+        background-color: var(--bottom-team-name-bg, #0303b5);
+        color: var(--bottom-team-name-text, white);
         width: 100%;
         height: 50px;
       }
       div.team-name span.tn {
         display: inline-block;
         font-size: 30px;
-        margin-top: 5px; 
+        margin-top: 5px;
       }
       div.team-name span.tc {
         width: 20px;
@@ -133,8 +133,8 @@
       }
       .set-history {
         display: none;
-        background-color: #fff;
-        color: #000;
+        background-color: var(--bottom-time-bg, #fff);
+        color: var(--bottom-time-text, #000);
         letter-spacing: 1px;
         text-transform: uppercase;
         border-radius: 4px;

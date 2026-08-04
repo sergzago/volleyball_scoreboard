@@ -132,7 +132,8 @@
       two_wins_mode: _localTwoWinsMode,
       invert_tablo: _localInvertTablo,
       unlimited_score: _localUnlimitedScore,
-      custom_mode: _localCustomMode
+      custom_mode: _localCustomMode,
+      template_id: document.getElementById('mobileTemplateSelect').value || ''
     };
     if (_localCustomMode) {
       syncCustomSettings();
@@ -254,6 +255,10 @@
         document.getElementById('mobileUserInfo').textContent = infoText;
       }
     }
+    // Загружаем список шаблонов после того, как DB инициализирован
+    if (typeof loadMobileTemplateSelect === 'function') {
+      loadMobileTemplateSelect();
+    }
   }
 
   function showError(msg) {
@@ -286,8 +291,8 @@
       DEMO_MODE = true;
       btn.disabled = false;
       btn.textContent = 'Войти';
-      showApp('test', 'user');
       setupMockDB();
+      showApp('test', 'user');
       loadGamesList();
       return;
     }
@@ -385,7 +390,14 @@
         updatePassword: function() { return Promise.resolve(); },
         delete: function() { return Promise.resolve(); }
       },
-      ensureCollections: function() { return Promise.resolve(); }
+      templates: {
+        list: function() { return Promise.resolve([]); },
+        get: function() { return Promise.resolve(null); },
+        subscribe: function() { return function() {}; },
+        update: function() { return Promise.resolve(); },
+        delete: function() { return Promise.resolve(); },
+        getDefaultTemplate: function() { return {}; }
+      }
     };
   }
 
@@ -607,6 +619,10 @@
         }
       }
 
+      // Обновляем список шаблонов при получении данных игры
+      // (на случай, если список ещё не загрузился или изменился в другом окне)
+      loadMobileTemplateSelect();
+
       updateSettingsUI(merged);
       updateTeamsUI(merged);
       updateControlUI(merged);
@@ -642,6 +658,15 @@
         document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
       }
     }
+
+    // Обновляем выбор шаблона (всегда, не только при !_localSettingsDirty)
+    var templateId = data['template_id'] || '';
+    var select = document.getElementById('mobileTemplateSelect');
+    // Устанавливаем значение только если список уже загружен (есть option'ы)
+    if (select.options.length > 1) {
+      select.value = templateId;
+    }
+    // Если список ещё не загружен — loadMobileTemplateSelect() восстановит значение после загрузки
 
     var customCard = document.getElementById('customSettingsCard');
     if (_localCustomMode) {
@@ -904,7 +929,8 @@
       game_id: game_id,
       username: userInfo.username || '',
       displayname: userInfo.displayname || '',
-      is_deleted: false
+      is_deleted: false,
+      template_id: mobileScoreboardData['template_id'] || ''
     };
 
     DB.matches.add(matchData).then(function(docRef) {
@@ -1424,6 +1450,17 @@
       }
     });
 
+    // ======================================================================
+    // ШАБЛОН ОФОРМЛЕНИЯ
+    // ======================================================================
+
+    // При изменении шаблона — сразу сохраняем в БД
+    document.getElementById('mobileTemplateSelect').addEventListener('change', function() {
+      if (!_recordExists) return;
+      var templateId = this.value || '';
+      update_db({template_id: templateId});
+    });
+
     // Save custom settings — save to DB (existing record only)
     document.getElementById('saveCustomSettings').addEventListener('click', function() {
       if (!mobileGameConnected) return;
@@ -1865,6 +1902,51 @@
         });
       });
     }
+  }
+
+  // ===== TEMPLATE SELECT =====
+
+  // Загружаем список шаблонов и заполняем select
+  function loadMobileTemplateSelect() {
+    if (!DB || !DB.templates || typeof DB.templates.list !== 'function') {
+      console.warn('[Mobile] DB.templates not available, skipping template list load');
+      return;
+    }
+    // Оборачиваем в try/catch, чтобы синхронная ошибка (например, отсутствие
+    // коллекции templates в PocketBase) не прерывала загрузку данных игры
+    var listPromise;
+    try {
+      listPromise = DB.templates.list();
+    } catch (e) {
+      console.error('[Mobile] Sync error loading template list:', e);
+      document.getElementById('mobileTemplateSelect').value = '';
+      return;
+    }
+    if (!listPromise || typeof listPromise.then !== 'function') {
+      document.getElementById('mobileTemplateSelect').value = '';
+      return;
+    }
+    listPromise.then(function(list) {
+      var select = document.getElementById('mobileTemplateSelect');
+      // Сохраняем текущее значение (из select или из загруженных данных игры)
+      var currentVal = select.value || (mobileScoreboardData && mobileScoreboardData.template_id) || '';
+      // Удаляем все option кроме первого (пустого)
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+      for (var i = 0; i < list.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = list[i].id;
+        opt.textContent = list[i].name;
+        select.appendChild(opt);
+      }
+      // Восстанавливаем выбранное значение (всегда, даже если пусто — выбираем "Без шаблона")
+      select.value = currentVal;
+    }).catch(function(err) {
+      console.error('[Mobile] Error loading template list:', err);
+      // При ошибке загрузки сбрасываем на "Без шаблона"
+      document.getElementById('mobileTemplateSelect').value = '';
+    });
   }
 
   // ===== INIT =====

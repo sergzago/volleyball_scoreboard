@@ -184,249 +184,6 @@
   }
 
   // ============================================================================
-  // POCKETBASE COLLECTION SCHEMA DEFINITIONS
-  // ============================================================================
-
-  /**
-   * Определения схем коллекций PocketBase
-   * Каждая коллекция содержит поля, необходимые для работы приложения
-   */
-  var POCKETBASE_COLLECTION_SCHEMAS = {
-    // Коллекция пользователей для авторизации
-    // Это auth collection — PocketBase автоматически хеширует пароли
-    // (аналогично встроенной коллекции 'users')
-    scoreusers: {
-      name: 'scoreusers',
-      type: 'auth', // auth collection — пароли хешируются автоматически
-      fields: [
-        { name: 'username', type: 'text', required: true, unique: true },
-        { name: 'email', type: 'email', required: true, unique: true },
-        { name: 'name', type: 'text', required: false },
-        { name: 'role', type: 'select', required: false, values: ['admin', 'user', 'moderator'] },
-        { name: 'avatar', type: 'file', required: false }
-      ],
-      authOptions: {
-        allowEmailAuth: true,
-        allowOAuth2Auth: true,
-        allowUsernameAuth: true,
-        exceptEmailDomains: null,
-        manageRule: null,
-        minPasswordLength: 8,
-        onlyEmailDomains: null,
-        onlyVerified: false,
-        requireEmail: false
-      }
-    },
-    volleyball: {
-      name: 'volleyball',
-      type: 'base',
-      fields: [
-        { name: 'id', type: 'text', required: false, unique: true },
-        { name: 'home_team', type: 'text', required: false },
-        { name: 'away_team', type: 'text', required: false },
-        { name: 'home_score', type: 'number', required: false },
-        { name: 'away_score', type: 'number', required: false },
-        { name: 'home_sets', type: 'number', required: false },
-        { name: 'away_sets', type: 'number', required: false },
-        { name: 'current_set', type: 'number', required: false },
-        { name: 'home_sets_history', type: 'json', required: false },
-        { name: 'away_sets_history', type: 'json', required: false },
-        { name: 'serving_team', type: 'text', required: false },
-        { name: 'status', type: 'select', required: false, values: ['not_started', 'in_progress', 'finished', 'paused'] },
-        { name: 'match_type', type: 'select', required: false, values: ['classic', 'beach'] },
-        { name: 'matchmode', type: 'text', required: false },
-        { name: 'count_wins', type: 'number', required: false },
-        { name: 'score_wins', type: 'number', required: false },
-        { name: 'score_tie', type: 'number', required: false },
-        { name: 'balance', type: 'bool', required: false },
-        { name: 'score_change', type: 'number', required: false },
-        { name: 'count_timeouts', type: 'number', required: false },
-        { name: 'lastEdited', type: 'date', required: false },
-        { name: 'created', type: 'date', required: false }
-      ]
-    },
-    matches: {
-      name: 'matches',
-      type: 'base',
-      fields: [
-        { name: 'game_id', type: 'text', required: false },
-        { name: 'date_time', type: 'date', required: false },
-        { name: 'home_team', type: 'text', required: false },
-        { name: 'away_team', type: 'text', required: false },
-        { name: 'home_score', type: 'number', required: false },
-        { name: 'away_score', type: 'number', required: false },
-        { name: 'home_sets', type: 'number', required: false },
-        { name: 'away_sets', type: 'number', required: false },
-        { name: 'match_type', type: 'select', required: false, values: ['classic', 'beach'] },
-        { name: 'is_deleted', type: 'bool', required: false },
-        { name: 'deleted_at', type: 'date', required: false },
-        { name: 'notes', type: 'text', required: false }
-      ]
-    },
-    auth_log: {
-      name: 'auth_log',
-      type: 'base',
-      fields: [
-        { name: 'username', type: 'text', required: false },
-        { name: 'event', type: 'text', required: false },
-        { name: 'timestamp', type: 'date', required: false },
-        { name: 'ip_address', type: 'text', required: false },
-        { name: 'user_agent', type: 'text', required: false },
-        { name: 'details', type: 'json', required: false }
-      ]
-    }
-  };
-
-  /**
-   * Проверить существование коллекции в PocketBase
-   * @param {PocketBase} pb — клиент PocketBase
-   * @param {string} collectionName — имя коллекции
-   * @returns {Promise<boolean>}
-   */
-  function pbCollectionExists(pb, collectionName) {
-    return pb.collections.getList().then(function(collections) {
-      return collections.some(function(c) { return c.name === collectionName; });
-    });
-  }
-
-  /**
-   * Создать коллекцию в PocketBase с заданной схемой
-   * @param {PocketBase} pb — клиент PocketBase (с авторизацией администратора)
-   * @param {Object} schema — определение схемы коллекции
-   * @returns {Promise<Object>}
-   */
-  function pbCreateCollection(pb, schema) {
-    var collectionPayload = {
-      name: schema.name,
-      type: schema.type || 'base',
-      listRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
-      viewRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
-      createRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
-      updateRule: schema.type === 'auth' ? '' : '@request.auth.id != ""',
-      deleteRule: schema.type === 'auth' ? null : 'role = "admin"',
-      schema: schema.fields.map(function(field) {
-        var baseField = {
-          name: field.name,
-          type: field.type,
-          required: field.required || false,
-          unique: field.unique || false
-        };
-
-        // Добавляем специфичные параметры для разных типов полей
-        if (field.type === 'select') {
-          baseField.maxSelect = 1;
-          baseField.values = field.values || [];
-        } else if (field.type === 'text' && field.max !== undefined) {
-          baseField.max = field.max;
-        } else if (field.type === 'file') {
-          baseField.maxSelect = field.maxSelect || 1;
-          baseField.mimeTypes = field.mimeTypes || ['image/*'];
-          baseField.thumbs = field.thumbs || [];
-        }
-
-        return baseField;
-      })
-    };
-
-    // Для auth коллекций добавляем дополнительные опции
-    if (schema.type === 'auth' && schema.authOptions) {
-      collectionPayload.options = schema.authOptions;
-    }
-
-    return pb.collections.create(collectionPayload);
-  }
-
-  /**
-   * Проверить существование всех необходимых коллекций и создать их при необходимости
-   * 
-   * ВАЖНО: Из-за CORS ограничений в браузере, создание коллекций может не работать.
-   * Коллекции следует создавать через админ-панель PocketBase (http://your-server:8090/_/)
-   * или через серверный скрипт.
-   * 
-   * Эта функция выполняет проверку и даёт рекомендации.
-   * @returns {Promise<void>}
-   */
-  function ensurePocketBaseCollections() {
-    if (provider !== 'pocketbase') {
-      return Promise.resolve();
-    }
-
-    return init().then(function() {
-      var pb = getPocketBaseClient();
-
-      // Пробуем получить список коллекций
-      return pb.collections.getList().then(function(existingCollections) {
-        var existingNames = existingCollections.map(function(c) { return c.name; });
-        var requiredCollections = [
-          'volleyball',
-          'matches',
-          'auth_log'
-        ];
-
-        var missingCollections = requiredCollections.filter(function(name) {
-          return !existingNames.includes(name);
-        });
-
-        if (missingCollections.length > 0) {
-          console.warn('[DB] Отсутствуют необходимые коллекции в PocketBase:');
-          console.warn('[DB]   - ' + missingCollections.join('\n[DB]   - '));
-          console.warn('[DB]');
-          console.warn('[DB] Для создания коллекций выполните одно из действий:');
-          console.warn('[DB] 1. Откройте админ-панель PocketBase: ' + DB_CONFIG.pocketbase.url + '/_/');
-          console.warn('[DB]    и создайте коллекции вручную');
-          console.warn('[DB] 2. Запустите серверный скрипт: node server/scripts/create-collections.js');
-          console.warn('[DB] 3. Импортируйте файл pocketbase_collections_export.json');
-          console.warn('[DB]');
-          console.warn('[DB] Операции с несуществующими коллекциями будут завершаться с ошибкой!');
-
-          // Выбрасываем ошибку, чтобы привлечь внимание
-          throw new Error(
-            'Отсутствуют коллекции в PocketBase: ' + missingCollections.join(', ') +
-            '. Создайте их через админ-панель: ' + DB_CONFIG.pocketbase.url + '/_/'
-          );
-        }
-
-        console.log('[DB] Все необходимые коллекции найдены в PocketBase');
-        return Promise.resolve();
-      }).catch(function(err) {
-        // Проверяем, является ли ошибка CORS
-        var isCorsError = err.message && (
-          err.message.includes('Failed to fetch') ||
-          err.message.includes('CORS') ||
-          err.message.includes('cors') ||
-          err.code === 0
-        );
-
-        if (isCorsError) {
-          console.error('[DB] ⚠️ ОШИБКА CORS: Браузер блокирует запросы к PocketBase');
-          console.error('[DB]');
-          console.error('[DB] Причина: PocketBase не настроен для обработки CORS запросов');
-          console.error('[DB]');
-          console.error('[DB] Решение (выберите один вариант):');
-          console.error('[DB]');
-          console.error('[DB] 1. Запустить PocketBase с флагом --origins (рекомендуется):');
-          console.error('[DB]    ./pocketbase serve --http="0.0.0.0:8090" --origins="*"');
-          console.error('[DB]');
-          console.error('[DB] 2. Настроить Nginx как reverse proxy с CORS заголовками');
-          console.error('[DB]    См. файл CORS_SETUP.md');
-          console.error('[DB]');
-          console.error('[DB] 3. Для разработки: запустить Chrome с флагом:');
-          console.error('[DB]    google-chrome --disable-web-security --user-data-dir="/tmp/chrome-dev"');
-          console.error('[DB]');
-          console.error('[DB] Подробности: файл CORS_SETUP.md в корне проекта');
-        } else {
-          // Не удалось получить список коллекций (другая ошибка)
-          console.error('[DB] Не удалось проверить существование коллекций PocketBase:', err.message);
-          console.warn('[DB] Убедитесь, что коллекции volleyball, matches, auth_log существуют');
-          console.warn('[DB] Проверьте через админ-панель: ' + DB_CONFIG.pocketbase.url + '/_/');
-        }
-        // Не блокируем работу — даём приложению попытаться работать
-        return Promise.resolve();
-      });
-    });
-  }
-
-  // ============================================================================
   // INIT
   // ============================================================================
 
@@ -758,7 +515,10 @@
       .getFullList()
       .then(function(records) {
         for (var i = 0; i < records.length; i++) {
-          if (records[i].get('id') === gameId) return records[i];
+          var rec = records[i];
+          // PocketBase Record имеет метод get(); обычный объект — нет
+          var recId = typeof rec.get === 'function' ? rec.get('id') : rec.id;
+          if (recId === gameId) return rec;
         }
         return null;
       });
@@ -782,6 +542,11 @@
 
       var pb = getPocketBaseClient();
       return findVolleyballRecord(pb, gameId)
+        .then(function(record) {
+          // Возвращаем простой объект, чтобы вызывающий код мог использовать
+          // Object.keys() и прямые обращения к полям (Record не перечисляет данные)
+          return record ? utils.getPlainObject(record) : null;
+        })
         .catch(function() {
           return null;
         });
@@ -814,7 +579,7 @@
       // Сначала получаем текущие данные
       findVolleyballRecord(pb, gameId)
         .then(function(record) {
-          if (record) onUpdate(record);
+          if (record) onUpdate(utils.getPlainObject(record));
         })
         .catch(function(err) {
           if (onError) onError(err);
@@ -824,9 +589,11 @@
       pb.collection(DB_CONFIG.collections.VOLLEYBALL)
         .subscribe('*', function(e) {
           if (e.action === 'update' || e.action === 'create') {
-            var recordGameId = e.record ? e.record.get('id') : null;
+            var record = e.record;
+            if (!record) return;
+            var recordGameId = typeof record.get === 'function' ? record.get('id') : record.id;
             if (recordGameId && recordGameId === gameId) {
-              onUpdate(e.record);
+              onUpdate(utils.getPlainObject(record));
             }
           }
         })
@@ -1310,6 +1077,295 @@
   };
 
   // ============================================================================
+  // TEMPLATES MODULE
+  // ============================================================================
+
+  /**
+   * Дефолтная цветовая схема для шаблонов табло
+   * Используется когда документ шаблона ещё не создан в БД
+   * Все цвета соответствуют sb.html (нижнее табло)
+   */
+  var DEFAULT_TEMPLATE_DATA = {
+    // Фон страницы (sb.html: body без фона, но табло на #1a2b3c)
+    body_bg: '#1a2b3c',
+    // Имя команды (sb.html: .teams-area background #1a2b3c, color white)
+    top_team_name_bg: '#1a2b3c',
+    top_team_name_text: '#ffffff',
+    // Основной счёт (sb.html: .points-score background #d65a98, color white)
+    top_primary_score_bg: '#d65a98',
+    top_primary_score_text: '#ffffff',
+    // Сеты (sb.html: .total-score background #5aa0c4, color white)
+    top_secondary_score_bg: '#5aa0c4',
+    top_secondary_score_text: '#ffffff',
+    // Период (sb.html: не используется отдельно, как имя команды)
+    top_period_bg: '#1a2b3c',
+    top_period_text: '#ffffff',
+    // Нижнее табло (sb.html) — имя команды (sb.html: .teams-area background #1a2b3c, color white)
+    bottom_team_name_bg: '#1a2b3c',
+    bottom_team_name_text: '#ffffff',
+    // Нижнее табло — основной счёт (sb.html: .points-score background #d65a98)
+    bottom_primary_score_bg: '#d65a98',
+    bottom_primary_score_text: '#ffffff',
+    // Нижнее табло — сеты (sb.html: .total-score background #5aa0c4)
+    bottom_secondary_score_bg: '#5aa0c4',
+    bottom_secondary_score_text: '#ffffff',
+    // Нижнее табло — время/история (sb.html: .set-history background #1a2b3c)
+    bottom_time_bg: '#1a2b3c',
+    bottom_time_text: '#ffffff',
+    // Бейдж Сетбола (sb.html: --setball-bg #5aa0c4)
+    setball_bg: '#5aa0c4',
+    setball_text: '#ffffff',
+    // Бейдж Матчбола (sb.html: --matchball-bg #d65a98)
+    matchball_bg: '#d65a98',
+    matchball_text: '#ffffff'
+  };
+
+  /**
+   * Поиск записи шаблона в PocketBase по кастомному полю template_id
+   */
+  function findTemplateRecord(pb, templateId) {
+    // Коллекция templates может отсутствовать — не даём синхронной ошибке
+    // прервать загрузку данных игры
+    var collection;
+    try {
+      collection = pb.collection('templates');
+    } catch (e) {
+      return Promise.resolve(null);
+    }
+    return collection.getFullList()
+      .then(function(records) {
+        for (var i = 0; i < records.length; i++) {
+          var recordTemplateId = typeof records[i].get === 'function'
+            ? records[i].get('template_id')
+            : records[i].template_id;
+          if (recordTemplateId === templateId) return records[i];
+        }
+        return null;
+      })
+      .catch(function() {
+        return null;
+      });
+  }
+
+  var templates = {
+
+    /**
+     * Получить данные шаблона (однократно)
+     * @param {string} templateId - ID шаблона ('default_classic' или 'default_beach')
+     * @returns {Promise<Object|null>}
+     */
+    get: function(templateId) {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection('templates')
+          .doc(templateId)
+          .get()
+          .then(function(doc) {
+            return doc.exists ? doc.data() : null;
+          });
+      }
+
+      var pb = getPocketBaseClient();
+      return findTemplateRecord(pb, templateId)
+        .then(function(record) {
+          return record ? record : null;
+        })
+        .catch(function() {
+          return null;
+        });
+    },
+
+    /**
+     * Подписка на изменения шаблона (real-time)
+     * @param {string} templateId
+     * @param {function(Object)} onUpdate — вызывается при каждом изменении
+     * @param {function(Error)} onError — ошибка
+     * @returns {function()} — функция отписки
+     */
+    subscribe: function(templateId, onUpdate, onError) {
+      if (provider === 'firebase') {
+        var unsubscribe = firebase.firestore()
+          .collection('templates')
+          .doc(templateId)
+          .onSnapshot(function(snapshot) {
+            if (snapshot.exists) {
+              onUpdate(snapshot.data());
+            } else {
+              // Документ не существует — передаём null, вызывающий код применит дефолты
+              onUpdate(null);
+            }
+          }, function(err) {
+            if (onError) onError(err);
+          });
+        return unsubscribe;
+      }
+
+      // PocketBase
+      var pb = getPocketBaseClient();
+      var subscriptionKey = 'templates_' + templateId;
+
+      // Сначала получаем текущие данные
+      findTemplateRecord(pb, templateId)
+        .then(function(record) {
+          if (record) {
+            onUpdate(record);
+          } else {
+            onUpdate(null);
+          }
+        })
+        .catch(function(err) {
+          if (onError) onError(err);
+        });
+
+      // Подписываемся на изменения коллекции templates
+      try {
+        pb.collection('templates')
+          .subscribe('*', function(e) {
+            if (e.action === 'update' || e.action === 'create') {
+              var record = e.record;
+              if (!record) return;
+              var recordTemplateId = typeof record.get === 'function'
+                ? record.get('template_id')
+                : record.template_id;
+              if (recordTemplateId && recordTemplateId === templateId) {
+                onUpdate(record);
+              }
+            }
+          })
+          .catch(function(err) {
+            if (onError) onError(err);
+          });
+      } catch (e) {
+        if (onError) onError(e);
+      }
+
+      // Функция отписки
+      return function() {
+        try {
+          pb.collection('templates').unsubscribe(subscriptionKey);
+        } catch (e) {}
+      };
+    },
+
+    /**
+     * Сохранить или обновить шаблон (upsert)
+     * @param {string} templateId
+     * @param {Object} data - цветовая схема
+     * @returns {Promise}
+     */
+    update: function(templateId, data) {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection('templates')
+          .doc(templateId)
+          .set(data, { merge: true });
+      }
+
+      var pb = getPocketBaseClient();
+      return findTemplateRecord(pb, templateId)
+        .then(function(record) {
+          var collection;
+          try {
+            collection = pb.collection('templates');
+          } catch (e) {
+            throw new Error('Коллекция templates не существует: ' + e.message);
+          }
+          if (record) {
+            return collection.update(record.id, data);
+          }
+          // Запись не найдена — создаём
+          return collection.create(
+            Object.assign({ template_id: templateId }, data)
+          );
+        });
+    },
+
+    /**
+     * Получить список всех шаблонов
+     * @returns {Promise<Array<{id: string, name: string}>>}
+     */
+    list: function() {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection('templates')
+          .get()
+          .then(function(snapshot) {
+            var results = [];
+            snapshot.forEach(function(doc) {
+              var data = doc.data();
+              results.push({
+                id: doc.id,
+                name: data.name || doc.id
+              });
+            });
+            return results;
+          });
+      }
+
+      var pb = getPocketBaseClient();
+      // Коллекция templates может отсутствовать — не даём синхронной ошибке
+      // прервать загрузку данных игры
+      var collection;
+      try {
+        collection = pb.collection('templates');
+      } catch (e) {
+        return Promise.resolve([]);
+      }
+      return collection.getFullList()
+        .then(function(records) {
+          return records.map(function(record) {
+            var data = record;
+            // PocketBase Record может иметь метод get()
+            var templateId = typeof data.get === 'function' ? data.get('template_id') : data.template_id;
+            var name = typeof data.get === 'function' ? (data.get('name') || templateId) : (data.name || templateId);
+            return { id: templateId, name: name };
+          });
+        })
+        .catch(function() {
+          return [];
+        });
+    },
+
+    /**
+     * Удалить шаблон
+     * @param {string} templateId
+     * @returns {Promise}
+     */
+    'delete': function(templateId) {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection('templates')
+          .doc(templateId)
+          .delete();
+      }
+
+      var pb = getPocketBaseClient();
+      return findTemplateRecord(pb, templateId)
+        .then(function(record) {
+          if (record) {
+            var collection;
+            try {
+              collection = pb.collection('templates');
+            } catch (e) {
+              return Promise.resolve();
+            }
+            return collection.delete(record.id);
+          }
+          return Promise.resolve();
+        });
+    },
+
+    /**
+     * Вернуть дефолтную цветовую схему
+     * @param {string} [templateId] - опционально, для future use
+     * @returns {Object}
+     */
+    getDefaultTemplate: function(templateId) {
+      return JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_DATA));
+    }
+  };
+
+  // ============================================================================
   // PUBLIC API
   // ============================================================================
 
@@ -1322,12 +1378,11 @@
     scoreboard: scoreboard,
     matches: matches,
     users: users,
+    templates: templates,
     // Получение текущего провайдера
     getProvider: function() { return provider; },
     // Проверка инициализации
     isInitialized: function() { return initialized; },
-    // Проверка и создание коллекций PocketBase (публичный API)
-    ensureCollections: ensurePocketBaseCollections,
     // Получение данных текущего пользователя
     getCurrentUser: function() {
       if (provider === 'firebase') {

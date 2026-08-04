@@ -1,6 +1,9 @@
 var scoreboard_data={};
 var _unsubscribe = null;
 
+var currentTemplateId = null;
+var _unsubscribeTemplate = null;
+
 // Дефолтные данные (если документ ещё не создан)
 var DEFAULT_SCOREBOARD_DATA = {
   "show": 1,
@@ -23,7 +26,8 @@ var DEFAULT_SCOREBOARD_DATA = {
   "home_side": "left",
   "away_side": "right",
   "classic_tiebreak_switch_done": true,
-  "invert_tablo": false
+  "invert_tablo": false,
+  "template_id": ""
 };
 
 /**
@@ -159,6 +163,49 @@ function getMatchBadgeType(team, data) {
   return null;
 }
 
+/**
+ * Применяет цвета из данных шаблона к CSS переменным
+ * @param {object | null} data - данные шаблона или null для сброса
+ */
+function applyTemplate(data) {
+  var templateData = data || {};
+  var root = document.documentElement;
+
+  // Функция-помощник для установки CSS переменной
+  function setCssVar(varName, value) {
+    if (value) {
+      root.style.setProperty(varName, value);
+    } else {
+      root.style.removeProperty(varName); // Сброс к дефолту из CSS
+    }
+  }
+
+  // Устанавливаем цвета из шаблона
+  setCssVar('--body-bg', templateData.body_bg);
+  setCssVar('--top-team-name-bg', templateData.top_team_name_bg);
+  setCssVar('--top-team-name-text', templateData.top_team_name_text);
+  setCssVar('--top-secondary-score-bg', templateData.top_secondary_score_bg);
+  setCssVar('--top-secondary-score-text', templateData.top_secondary_score_text);
+  setCssVar('--top-primary-score-bg', templateData.top_primary_score_bg);
+  setCssVar('--top-primary-score-text', templateData.top_primary_score_text);
+  setCssVar('--top-period-bg', templateData.top_period_bg);
+  setCssVar('--top-period-text', templateData.top_period_text);
+  setCssVar('--bottom-team-name-bg', templateData.bottom_team_name_bg);
+  setCssVar('--bottom-team-name-text', templateData.bottom_team_name_text);
+  setCssVar('--bottom-secondary-score-bg', templateData.bottom_secondary_score_bg);
+  setCssVar('--bottom-secondary-score-text', templateData.bottom_secondary_score_text);
+  setCssVar('--bottom-primary-score-bg', templateData.bottom_primary_score_bg);
+  setCssVar('--bottom-primary-score-text', templateData.bottom_primary_score_text);
+  setCssVar('--bottom-time-bg', templateData.bottom_time_bg);
+  setCssVar('--bottom-time-text', templateData.bottom_time_text);
+
+  // Цвета для бейджей сетбола/матчбола
+  setCssVar('--setball-bg', templateData.setball_bg);
+  setCssVar('--setball-text', templateData.setball_text);
+  setCssVar('--matchball-bg', templateData.matchball_bg);
+  setCssVar('--matchball-text', templateData.matchball_text);
+}
+
 // Подписка на изменения через DB интерфейс (вызывается после DB.init)
 function startScoreboardSubscription(game_id) {
   console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
@@ -169,6 +216,37 @@ function startScoreboardSubscription(game_id) {
     var pdata = scoreboard_data;
     // Если данные не пришли — используем дефолтные
     scoreboard_data = data || DEFAULT_SCOREBOARD_DATA;
+
+    // --- Логика шаблонов ---
+    // Шаблон теперь выбирается через поле template_id в данных игры.
+    // Если template_id пустой или не указан — используем дефолтные цвета (applyTemplate(null))
+    var newTemplateId = scoreboard_data.template_id || '';
+    if (newTemplateId !== currentTemplateId) {
+      if (_unsubscribeTemplate) {
+        _unsubscribeTemplate();
+        _unsubscribeTemplate = null;
+      }
+      currentTemplateId = newTemplateId;
+      if (newTemplateId) {
+        _unsubscribeTemplate = DB.templates.subscribe(
+          currentTemplateId,
+          function(templateData) {
+            console.log('Applying template:', currentTemplateId, templateData);
+            applyTemplate(templateData);
+          },
+          function(error) {
+            console.error('Error listening to template:', error);
+            applyTemplate(null);
+          }
+        );
+      } else {
+        // Нет шаблона — сбрасываем на стандартные цвета CSS
+        console.log('No template selected, using default CSS colors');
+        applyTemplate(null);
+      }
+    }
+    // --- Конец логики шаблонов ---
+
     if(pdata['show'] != scoreboard_data['show']){
       if(scoreboard_data.show & 2){
         $(".big-table").animate({"left":80},1000)
@@ -498,6 +576,8 @@ $(document).ready(function() {
   DB.init().then(function() {
     // Получаем game_id из URL и передаем в подписку
     var game_id = getParameterByName('game');
+    // Сбрасываем стили при первой загрузке
+    applyTemplate(null);
     startScoreboardSubscription(game_id || 'test1');
   }).catch(function(err) {
     console.error('DB initialization failed:', err);

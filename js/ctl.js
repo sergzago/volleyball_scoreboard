@@ -194,6 +194,15 @@ $(document).ready(function() {
     $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
     $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
 
+    // Обновляем выбор шаблона — подгружаем список, если ещё не загружен
+    var templateId = scoreboard_data['template_id'] || '';
+    if ($('#template_select option').length <= 1) {
+      // Список ещё не загружен — загружаем и восстанавливаем значение
+      loadTemplateSelect();
+    } else {
+      $('#template_select').val(templateId);
+    }
+
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
     var classicSwitchNeeded = !!scoreboard_data['classic_switch_needed'];
@@ -368,7 +377,8 @@ function saveMatchResult(setHistory, overallHome, overallAway){
     game_id: local_game_id,
     username: userInfo.username || '',
     displayname: userInfo.displayname || '',
-    is_deleted: false // Флаг удаления (для возможности отмены)
+    is_deleted: false, // Флаг удаления (для возможности отмены)
+    template_id: scoreboard_data['template_id'] || ''
   };
 
   matches_collection.add(matchData).then(function(docRef) {
@@ -1356,6 +1366,73 @@ $(document).ready(function(){
   $("#unlimited_score_toggle").change(function(){
     update_db({unlimited_score: $(this).is(':checked')});
   });
+
+  // ========================================================================
+  // ШАБЛОН ОФОРМЛЕНИЯ
+  // ========================================================================
+
+  // Загружаем список шаблонов и заполняем select
+  function loadTemplateSelect() {
+    // Оборачиваем в try/catch, чтобы синхронная ошибка (например, отсутствие
+    // коллекции templates в PocketBase) не прерывала загрузку данных игры
+    var listPromise;
+    try {
+      listPromise = DB.templates.list();
+    } catch (e) {
+      console.error('[CTL] Sync error loading template list:', e);
+      $('#template_select').val('');
+      return;
+    }
+    if (!listPromise || typeof listPromise.then !== 'function') {
+      $('#template_select').val('');
+      return;
+    }
+    listPromise.then(function(list) {
+      var $select = $('#template_select');
+      // Если select ещё пуст — берём значение из загруженных данных игры
+      var currentVal = $select.val() || (scoreboard_data && scoreboard_data['template_id']) || '';
+      $select.find('option:not([value=""])').remove();
+      for (var i = 0; i < list.length; i++) {
+        var $opt = $('<option>').val(list[i].id).text(list[i].name);
+        $select.append($opt);
+      }
+      // Восстанавливаем выбранное значение (всегда, даже если пусто — выбираем "Без шаблона")
+      $select.val(currentVal);
+    }).catch(function(err) {
+      console.error('[CTL] Error loading template list:', err);
+      // При ошибке загрузки сбрасываем на "Без шаблона"
+      $('#template_select').val('');
+    });
+  }
+
+  // При изменении шаблона — сохраняем в БД
+  $("#template_select").change(function(){
+    var templateId = $(this).val() || '';
+    update_db({template_id: templateId});
+  });
+
+  // Загружаем список шаблонов при старте (после инициализации DB)
+  // DB.init() уже мог быть вызван из AuthModule.checkAuth(), но он идемпотентен
+  if (typeof DB !== 'undefined' && typeof DB.isInitialized === 'function') {
+    if (DB.isInitialized()) {
+      loadTemplateSelect();
+    } else {
+      // Если DB ещё не инициализирован — ждём
+      DB.init().then(function() {
+        loadTemplateSelect();
+      }).catch(function(err) {
+        console.error('[CTL] DB init failed, cannot load templates:', err);
+      });
+    }
+  } else {
+    console.warn('[CTL] DB not available, cannot load templates');
+  }
+
+  // Перезагружаем список шаблонов при каждом обновлении данных (на случай, если
+  // шаблон был добавлен/удалён в другом окне)
+  var _origUpdateCb = null;
+  // Подписываемся на изменения данных, чтобы обновлять список шаблонов
+  // (используем существующий callback subscription)
 
   $("#two_wins_mode_toggle").change(function(){
     var twoWinsMode = $(this).is(':checked');
