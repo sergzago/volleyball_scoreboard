@@ -264,7 +264,9 @@
 
     // Добавляем name в данные
     var dataToSave = JSON.parse(JSON.stringify(currentData));
-    dataToSave.name = name || templateId;
+    // Сохраняем отображаемое имя из поля name (если не передано явно),
+    // чтобы не перезаписывать его транслитерированным templateId
+    dataToSave.name = name || currentData.name || templateId;
 
     DB.templates.update(templateId, dataToSave).then(function() {
       showNotification('Шаблон "' + (name || templateId) + '" сохранён', 'success');
