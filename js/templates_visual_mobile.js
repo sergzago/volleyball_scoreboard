@@ -455,16 +455,40 @@ window.TemplatesVisualMobile = (function() {
     // COLOR PICKER
     var bgPicker = $('panelColorPicker');
     var textPicker = $('panelTextColorPicker');
+    var bgHex = $('panelColorHex');
+    var textHex = $('panelTextColorHex');
     if (bgPicker) {
       bgPicker.addEventListener('input', function() {
-        $('panelColorHex').value = bgPicker.value;
+        if (bgHex) bgHex.value = bgPicker.value;
         updateBlockColor(bgPicker.value, textPicker ? textPicker.value : null);
       });
     }
     if (textPicker) {
       textPicker.addEventListener('input', function() {
-        $('panelTextColorHex').value = textPicker.value;
+        if (textHex) textHex.value = textPicker.value;
         updateBlockColor(bgPicker ? bgPicker.value : null, textPicker.value);
+      });
+    }
+
+    // Ручной ввод hex-кода цвета фона
+    if (bgHex) {
+      bgHex.addEventListener('input', function() {
+        var value = bgHex.value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+          if (bgPicker) bgPicker.value = value;
+          updateBlockColor(value, textPicker ? textPicker.value : null);
+        }
+      });
+    }
+
+    // Ручной ввод hex-кода цвета текста
+    if (textHex) {
+      textHex.addEventListener('input', function() {
+        var value = textHex.value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+          if (textPicker) textPicker.value = value;
+          updateBlockColor(bgPicker ? bgPicker.value : null, value);
+        }
       });
     }
 

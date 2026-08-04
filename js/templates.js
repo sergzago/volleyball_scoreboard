@@ -43,6 +43,32 @@
   }
 
   /**
+   * Синхронизирует текстовое поле hex-кода с color picker'ом
+   * @param {jQuery} $colorInput - color picker
+   * @param {jQuery} $hexInput - текстовое поле
+   */
+  function syncHexFromColor($colorInput, $hexInput) {
+    if ($hexInput.length) {
+      $hexInput.val($colorInput.val());
+    }
+  }
+
+  /**
+   * Синхронизирует color picker с текстовым полем hex-кода
+   * @param {jQuery} $hexInput - текстовое поле
+   * @param {jQuery} $colorInput - color picker
+   * @returns {boolean} true если значение валидно и применено
+   */
+  function syncColorFromHex($hexInput, $colorInput) {
+    var value = $.trim($hexInput.val());
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      $colorInput.val(value);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Заполняет color picker'ы формы значениями из объекта данных
    * @param {string} templateId
    * @param {Object} data - цветовая схема
@@ -54,6 +80,11 @@
       var property = $(this).data('style-property');
       if (data[property]) {
         $(this).val(data[property]);
+        // Синхронизируем текстовое поле hex-кода
+        var $hex = $(formId).find('input[type="text"].color-hex-input[data-style-property="' + property + '"]');
+        if ($hex.length) {
+          $hex.val(data[property]);
+        }
       }
     });
   }
@@ -178,6 +209,11 @@
     $('input[type="color"][data-style-property]').on('input', function() {
       var $form = $(this).closest('.template-form');
       var templateId = $form.find('.btn-save').data('template-id');
+      var property = $(this).data('style-property');
+
+      // Синхронизируем текстовое поле hex-кода
+      var $hex = $form.find('input[type="text"].color-hex-input[data-style-property="' + property + '"]');
+      syncHexFromColor($(this), $hex);
 
       // Собираем текущие значения из формы
       var currentData = collectFormData(templateId);
@@ -187,6 +223,26 @@
 
       // Применяем для preview
       applyPreview(currentData);
+    });
+
+    // При изменении текстового поля hex-кода обновляем preview
+    $('input[type="text"].color-hex-input[data-style-property]').on('input', function() {
+      var $form = $(this).closest('.template-form');
+      var templateId = $form.find('.btn-save').data('template-id');
+      var property = $(this).data('style-property');
+
+      // Синхронизируем color picker с введённым значением
+      var $colorInput = $form.find('input[type="color"][data-style-property="' + property + '"]');
+      if (syncColorFromHex($(this), $colorInput)) {
+        // Собираем текущие значения из формы
+        var currentData = collectFormData(templateId);
+
+        // Обновляем кэш
+        templateCache[templateId] = currentData;
+
+        // Применяем для preview
+        applyPreview(currentData);
+      }
     });
 
     // ==========================================================================

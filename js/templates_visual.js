@@ -429,6 +429,24 @@
       updateBlockColor($('#panelColorPicker').val(), color);
     });
 
+    // Ручной ввод hex-кода цвета фона
+    $('#panelColorHex').on('input', function() {
+      var value = $.trim($(this).val());
+      if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+        $('#panelColorPicker').val(value);
+        updateBlockColor(value, $('#panelTextColorPicker').val());
+      }
+    });
+
+    // Ручной ввод hex-кода цвета текста
+    $('#panelTextColorHex').on('input', function() {
+      var value = $.trim($(this).val());
+      if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+        $('#panelTextColorPicker').val(value);
+        updateBlockColor($('#panelColorPicker').val(), value);
+      }
+    });
+
     // ========================================================================
     // ЗАКРЫТИЕ ПАНЕЛИ
     // ========================================================================

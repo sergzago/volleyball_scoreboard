@@ -1168,7 +1168,9 @@
       var pb = getPocketBaseClient();
       return findTemplateRecord(pb, templateId)
         .then(function(record) {
-          return record ? record : null;
+          // Возвращаем простой объект, чтобы поля (в т.ч. name) были доступны
+          // как обычные свойства, а не через метод Record.get()
+          return record ? utils.getPlainObject(record) : null;
         })
         .catch(function() {
           return null;
@@ -1208,7 +1210,7 @@
       findTemplateRecord(pb, templateId)
         .then(function(record) {
           if (record) {
-            onUpdate(record);
+            onUpdate(utils.getPlainObject(record));
           } else {
             onUpdate(null);
           }
@@ -1228,7 +1230,7 @@
                 ? record.get('template_id')
                 : record.template_id;
               if (recordTemplateId && recordTemplateId === templateId) {
-                onUpdate(record);
+                onUpdate(utils.getPlainObject(record));
               }
             }
           })

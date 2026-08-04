@@ -313,6 +313,8 @@ $(document).ready(function() {
     $('#in_venue').val(scoreboard_data['venue'] || '');
     $('#col_home_team').val(scoreboard_data['home_color'])
     $('#col_away_team').val(scoreboard_data['away_color'])
+    $('#col_home_team_hex').val(scoreboard_data['home_color'] || '#ff0000')
+    $('#col_away_team_hex').val(scoreboard_data['away_color'] || '#00ff00')
     $('#home_score').html(scoreboard_data['home_score'])
     $('#home_fouls').html(beachMode ? ensureNumber(scoreboard_data['home_sets']) : scoreboard_data['home_fouls'])
     $('#period').html(scoreboard_data['current_period'])
@@ -1172,6 +1174,26 @@ $(document).ready(function(){
     update_db(update);
   });
 
+  // Синхронизация hex-кода цвета с color picker'ом (ручной ввод)
+  $("#col_home_team").on('input', function() {
+    $("#col_home_team_hex").val($(this).val());
+  });
+  $("#col_away_team").on('input', function() {
+    $("#col_away_team_hex").val($(this).val());
+  });
+  $("#col_home_team_hex").on('input', function() {
+    var value = $.trim($(this).val());
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      $("#col_home_team").val(value);
+    }
+  });
+  $("#col_away_team_hex").on('input', function() {
+    var value = $.trim($(this).val());
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      $("#col_away_team").val(value);
+    }
+  });
+
   // Обработчики кнопок модального окна подтверждения завершения матча
   $("#matchFinishYes").click(function(){
     confirmMatchFinish();
@@ -1259,6 +1281,8 @@ $(document).ready(function(){
           $('#in_venue').val(scoreboard_data['venue'] || '');
           $('#col_home_team').val(scoreboard_data['home_color'] || '');
           $('#col_away_team').val(scoreboard_data['away_color'] || '');
+          $('#col_home_team_hex').val(scoreboard_data['home_color'] || '#ff0000');
+          $('#col_away_team_hex').val(scoreboard_data['away_color'] || '#00ff00');
           $('#home_score').html('0');
           $('#away_score').html('0');
           $('#home_fouls').html('0');
