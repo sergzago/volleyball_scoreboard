@@ -328,8 +328,21 @@ router.post('/log', async (req, res) => {
   const path = require('path');
 
   const data = req.body || {};
-  const logLine = JSON.stringify({
+
+  // Определяем IP-адрес клиента.
+  // Если сервер стоит за прокси (nginx и т.п.), реальный IP приходит в x-forwarded-for.
+  const forwarded = req.headers['x-forwarded-for'];
+  const clientIp = (forwarded ? String(forwarded).split(',')[0].trim() : req.socket.remoteAddress || req.ip || '')
+    .replace(/^::ffff:/, '');
+
+  // Обогащаем данные события IP-адресом клиента (серверный источник — надёжнее клиентского)
+  const logData = {
     ...data,
+    ipAddress: clientIp
+  };
+
+  const logLine = JSON.stringify({
+    ...logData,
     serverReceivedAt: new Date().toISOString()
   });
 
@@ -350,9 +363,9 @@ router.post('/log', async (req, res) => {
     if (dbConfig && dbConfig.db) {
       const authLogCollection = process.env.AUTH_LOG_COLLECTION || 'auth_log';
       if (dbConfig.provider === 'firebase') {
-        await dbConfig.db.collection(authLogCollection).add(data);
+        await dbConfig.db.collection(authLogCollection).add(logData);
       } else if (dbConfig.provider === 'pocketbase' && dbConfig.client) {
-        await dbConfig.client.collection(authLogCollection).create(data);
+        await dbConfig.client.collection(authLogCollection).create(logData);
       }
       return res.json({ ok: true, target: 'db' });
     }
