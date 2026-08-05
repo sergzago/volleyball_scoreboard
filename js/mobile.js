@@ -283,11 +283,40 @@
     return 15;
   }
 
+  // Кэш определённого IP-адреса клиента
+  var _detectedIp = '';
+
+  // Асинхронное определение IP-адреса клиента.
+  // Использует WebRTC (RTCPeerConnection) для получения локального IP браузера.
+  // Результат кэшируется в _detectedIp. Запускается заранее (при инициализации),
+  // чтобы к моменту логина IP уже был определён.
+  function detectClientIp() {
+    try {
+      if (typeof window === 'undefined' || !window.RTCPeerConnection) return;
+      var rtc = new RTCPeerConnection({ iceServers: [] });
+      rtc.createDataChannel('');
+      rtc.createOffer().then(function(offer) {
+        return rtc.setLocalDescription(offer);
+      }).catch(function() {});
+      rtc.onicecandidate = function(e) {
+        try {
+          if (!e.candidate) return;
+          var parts = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
+          if (parts && parts[1]) {
+            _detectedIp = parts[1];
+            rtc.close();
+          }
+        } catch (err) {}
+      };
+    } catch (e) {}
+  }
+
   // Получение IP-адреса (если доступно) — иначе пустая строка.
+  // Возвращает кэшированный IP, определённый через detectClientIp().
   // Надёжный источник IP — серверная сторона (/api/auth/log),
   // которая фиксирует реальный IP клиента из запроса.
   function getClientIp() {
-    return '';
+    return _detectedIp;
   }
 
   // Формирование объекта события для auth_log
@@ -2086,6 +2115,9 @@
   // ===== INIT =====
 
   function init() {
+    // Начинаем определение IP-адреса клиента заранее,
+    // чтобы к моменту логина он был доступен для записи в auth_log
+    detectClientIp();
     initTheme();
     initProviderBadge();
     initLogo();
