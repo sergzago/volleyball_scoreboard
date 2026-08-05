@@ -273,6 +273,103 @@
     errorEl.classList.remove('visible');
   }
 
+  // ===== ЛОГИРОВАНИЕ АУТЕНТИФИКАЦИИ =====
+
+  // Таймаут входа (сек). Настраивается в db-config.js (DB_CONFIG.AUTH_LOGIN_TIMEOUT_SECONDS)
+  function getLoginTimeoutSeconds() {
+    if (typeof DB_CONFIG !== 'undefined' && DB_CONFIG.AUTH_LOGIN_TIMEOUT_SECONDS != null) {
+      return parseInt(DB_CONFIG.AUTH_LOGIN_TIMEOUT_SECONDS, 10) || 15;
+    }
+    return 15;
+  }
+
+  // Получение IP-адреса (если доступно) — иначе пустая строка
+  function getClientIp() {
+    try {
+      if (window.RTCPeerConnection) {
+        // Не блокируем — просто возвращаем пустую строку, IP не критичен для лога
+      }
+    } catch (e) {}
+    return '';
+  }
+
+  // Формирование объекта события для auth_log
+  function buildAuthLogData(extra) {
+    var data = {
+      username: (extra && extra.username) || '',
+      uid: (extra && extra.uid) || '',
+      email: (extra && extra.email) || '',
+      loginAt: new Date().toISOString(),
+      ipAddress: getClientIp(),
+      userAgent: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '',
+      isAdminPage: false
+    };
+    if (extra) {
+      for (var key in extra) {
+        if (key !== 'username' && key !== 'uid' && key !== 'email') {
+          data[key] = extra[key];
+        }
+      }
+    }
+    return data;
+  }
+
+  // Логирование в файл через серверный API (используется, когда БД недоступна)
+  function logAuthToFile(data) {
+    // URL сервера: приоритет CREDENTIALS.server.url, иначе текущий origin
+    var serverBase = '';
+    try {
+      if (typeof CREDENTIALS !== 'undefined' && CREDENTIALS.server && CREDENTIALS.server.url) {
+        serverBase = CREDENTIALS.server.url;
+      }
+    } catch (e) {}
+    if (!serverBase) {
+      serverBase = window.location.origin;
+    }
+    var serverUrl = serverBase.replace(/\/+$/, '') + '/api/auth/log';
+    try {
+      return fetch(serverUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).catch(function() {
+        // Если и сервер недоступен — пишем в консоль
+        console.warn('[auth_log] Сервер недоступен, событие не записано в файл:', data);
+      });
+    } catch (e) {
+      console.warn('[auth_log] Не удалось записать в файл:', e);
+      return Promise.resolve();
+    }
+  }
+
+  // Запись события аутентификации в auth_log.
+  // Сначала пробуем БД, при недоступности БД — логируем в файл через сервер.
+  function logAuthEvent(data) {
+    var logData = buildAuthLogData(data);
+    var dbAvailable = false;
+
+    // Пробуем записать в БД
+    try {
+      if (typeof DB !== 'undefined' && DB.auth && typeof DB.auth.logAuthEvent === 'function') {
+        return DB.auth.logAuthEvent(logData).then(function() {
+          return { target: 'db' };
+        }).catch(function() {
+          // БД недоступна — логируем в файл
+          return logAuthToFile(logData).then(function() {
+            return { target: 'file' };
+          });
+        });
+      }
+    } catch (e) {
+      dbAvailable = false;
+    }
+
+    // DB недоступен — логируем в файл
+    return logAuthToFile(logData).then(function() {
+      return { target: 'file' };
+    });
+  }
+
   function doLogin() {
     var username = document.getElementById('loginUsername').value.trim();
     var password = document.getElementById('loginPassword').value;
@@ -297,7 +394,27 @@
       return;
     }
 
+    // Таймаут входа (сек)
+    var timeoutSeconds = getLoginTimeoutSeconds();
+    var timedOut = false;
+
+    // Логируем начало попытки входа
+    logAuthEvent({ username: username, status: 'attempt', message: 'Попытка входа' });
+
+    // Таймер таймаута
+    var timeoutTimer = setTimeout(function() {
+      timedOut = true;
+      btn.disabled = false;
+      btn.textContent = 'Войти';
+      var msg = 'Превышено время ожидания ответа (' + timeoutSeconds + ' сек). Попробуйте ещё раз.';
+      showError(msg);
+      // Логируем событие таймаута
+      logAuthEvent({ username: username, status: 'timeout', message: msg });
+    }, timeoutSeconds * 1000);
+
     DB.auth.login(username, password).then(function(userData) {
+      if (timedOut) return;
+      clearTimeout(timeoutTimer);
       btn.disabled = false;
       btn.textContent = 'Войти';
       var role = userData.role || 'user';
@@ -311,7 +428,18 @@
         });
       }
       loadGamesList();
+
+      // Логируем успешный вход
+      logAuthEvent({
+        username: userData.username || username,
+        uid: userData.uid || '',
+        email: userData.email || '',
+        status: 'success',
+        message: 'Успешный вход'
+      });
     }).catch(function(err) {
+      if (timedOut) return;
+      clearTimeout(timeoutTimer);
       btn.disabled = false;
       btn.textContent = 'Войти';
       var msg = err.message || 'Ошибка авторизации';
@@ -319,8 +447,13 @@
         msg = 'Неверный логин или пароль';
       } else if (msg.includes('сеть') || msg.includes('fetch')) {
         msg = 'Ошибка сети. Проверьте подключение к интернету.';
+      } else if (msg.includes('importKey') || msg.includes('deriveBits') || msg.includes('crypto.subtle')) {
+        msg = 'Ошибка авторизации: страница открыта по HTTP. Для входа используйте HTTPS или localhost.';
       }
       showError(msg);
+
+      // Логируем неудачный вход
+      logAuthEvent({ username: username, status: 'failed', message: msg });
     });
   }
 

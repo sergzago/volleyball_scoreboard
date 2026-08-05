@@ -317,4 +317,64 @@ router.post('/update-password', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/auth/log
+ * Запись события аутентификации в auth_log.
+ * Сначала пробует записать в БД; если БД недоступна — пишет в файл.
+ * Используется мобильной версией как fallback при недоступности БД.
+ */
+router.post('/log', async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+
+  const data = req.body || {};
+  const logLine = JSON.stringify({
+    ...data,
+    serverReceivedAt: new Date().toISOString()
+  });
+
+  // Путь к файлу лога (настраивается в db-config.js или по умолчанию)
+  let logFilePath = 'logs/auth_log.log';
+  try {
+    const { DB_CONFIG } = require('../../../js/db-config');
+    if (DB_CONFIG && DB_CONFIG.AUTH_LOG_FILE) {
+      logFilePath = DB_CONFIG.AUTH_LOG_FILE;
+    }
+  } catch (e) {
+    // используем значение по умолчанию
+  }
+
+  // Пытаемся записать в БД (auth_log коллекция)
+  try {
+    const dbConfig = req.app.locals.db;
+    if (dbConfig && dbConfig.db) {
+      const authLogCollection = process.env.AUTH_LOG_COLLECTION || 'auth_log';
+      if (dbConfig.provider === 'firebase') {
+        await dbConfig.db.collection(authLogCollection).add(data);
+      } else if (dbConfig.provider === 'pocketbase' && dbConfig.client) {
+        await dbConfig.client.collection(authLogCollection).create(data);
+      }
+      return res.json({ ok: true, target: 'db' });
+    }
+  } catch (dbError) {
+    console.warn('[auth_log] БД недоступна, пишем в файл:', dbError.message);
+  }
+
+  // БД недоступна — пишем в файл
+  try {
+    const absolutePath = path.isAbsolute(logFilePath)
+      ? logFilePath
+      : path.join(__dirname, '..', '..', '..', logFilePath);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.appendFileSync(absolutePath, logLine + '\n', 'utf8');
+    return res.json({ ok: true, target: 'file', file: logFilePath });
+  } catch (fileError) {
+    console.error('[auth_log] Не удалось записать в файл:', fileError.message);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Не удалось записать лог аутентификации'
+    });
+  }
+});
+
 module.exports = router;
