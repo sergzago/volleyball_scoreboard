@@ -283,42 +283,6 @@
     return 15;
   }
 
-  // Кэш определённого IP-адреса клиента
-  var _detectedIp = '';
-
-  // Асинхронное определение IP-адреса клиента.
-  // Использует WebRTC (RTCPeerConnection) для получения локального IP браузера.
-  // Результат кэшируется в _detectedIp. Запускается заранее (при инициализации),
-  // чтобы к моменту логина IP уже был определён.
-  function detectClientIp() {
-    try {
-      if (typeof window === 'undefined' || !window.RTCPeerConnection) return;
-      var rtc = new RTCPeerConnection({ iceServers: [] });
-      rtc.createDataChannel('');
-      rtc.createOffer().then(function(offer) {
-        return rtc.setLocalDescription(offer);
-      }).catch(function() {});
-      rtc.onicecandidate = function(e) {
-        try {
-          if (!e.candidate) return;
-          var parts = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
-          if (parts && parts[1]) {
-            _detectedIp = parts[1];
-            rtc.close();
-          }
-        } catch (err) {}
-      };
-    } catch (e) {}
-  }
-
-  // Получение IP-адреса (если доступно) — иначе пустая строка.
-  // Возвращает кэшированный IP, определённый через detectClientIp().
-  // Надёжный источник IP — серверная сторона (/api/auth/log),
-  // которая фиксирует реальный IP клиента из запроса.
-  function getClientIp() {
-    return _detectedIp;
-  }
-
   // Формирование объекта события для auth_log
   function buildAuthLogData(extra) {
     var data = {
@@ -326,7 +290,6 @@
       uid: (extra && extra.uid) || '',
       email: (extra && extra.email) || '',
       loginAt: new Date().toISOString(),
-      ipAddress: getClientIp(),
       userAgent: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '',
       isAdminPage: false
     };
@@ -425,7 +388,6 @@
     var timedOut = false;
 
     // Логируем начало попытки входа
-    logAuthEvent({ username: username, status: 'attempt', message: 'Попытка входа' });
 
     // Таймер таймаута
     var timeoutTimer = setTimeout(function() {
@@ -435,7 +397,6 @@
       var msg = 'Превышено время ожидания ответа (' + timeoutSeconds + ' сек). Попробуйте ещё раз.';
       showError(msg);
       // Логируем событие таймаута
-      logAuthEvent({ username: username, status: 'timeout', message: msg });
     }, timeoutSeconds * 1000);
 
     DB.auth.login(username, password).then(function(userData) {
@@ -456,13 +417,6 @@
       loadGamesList();
 
       // Логируем успешный вход
-      logAuthEvent({
-        username: userData.username || username,
-        uid: userData.uid || '',
-        email: userData.email || '',
-        status: 'success',
-        message: 'Успешный вход'
-      });
     }).catch(function(err) {
       if (timedOut) return;
       clearTimeout(timeoutTimer);
@@ -479,7 +433,6 @@
       showError(msg);
 
       // Логируем неудачный вход
-      logAuthEvent({ username: username, status: 'failed', message: msg });
     });
   }
 
@@ -2115,9 +2068,6 @@
   // ===== INIT =====
 
   function init() {
-    // Начинаем определение IP-адреса клиента заранее,
-    // чтобы к моменту логина он был доступен для записи в auth_log
-    detectClientIp();
     initTheme();
     initProviderBadge();
     initLogo();
