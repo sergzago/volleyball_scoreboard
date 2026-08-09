@@ -176,7 +176,10 @@
           mobileScoreboardData[key] = data[key];
         }
       });
+      // Обновляем все вкладки, чтобы UI был консистентным
+      updateSettingsUI(mobileScoreboardData);
       updateControlUI(mobileScoreboardData);
+      updateTeamsUI(mobileScoreboardData);
       return;
     }
     // Напрямую используем DB.scoreboard.update, чтобы получить Promise с обновленными данными
@@ -1859,11 +1862,8 @@
       delete mobileScoreboardData['beach_switch_message'];
       delete mobileScoreboardData['classic_switch_shown'];
       highlightSideSwitch(false);
-      if (DEMO_MODE) {
-        update_db(update);
-      } else {
-        scoreboard_query.update(update);
-      }
+      // Используем стандартную функцию update_db, которая работает для всех режимов
+      update_db(update);
     });
 
     // New set
