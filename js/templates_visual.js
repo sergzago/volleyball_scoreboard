@@ -56,6 +56,23 @@
   // ВСПОМОГАТЕЛЬНЫЕ
   // ============================================================================
 
+  function getContrastColor(hexcolor) {
+    if (!hexcolor || typeof hexcolor !== 'string') return '#ffffff';
+    if (hexcolor.startsWith('#')) {
+      hexcolor = hexcolor.slice(1);
+    }
+    if (hexcolor.length === 3) {
+      hexcolor = hexcolor.split('').map(char => char + char).join('');
+    }
+    if (hexcolor.length !== 6) return '#ffffff';
+
+    const r = parseInt(hexcolor.substr(0, 2), 16);
+    const g = parseInt(hexcolor.substr(2, 2), 16);
+    const b = parseInt(hexcolor.substr(4, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? '#000000' : '#ffffff';
+  }
+
   function showNotification(message, type) {
     type = type || 'success';
     var $n = $('#notification');
@@ -79,7 +96,15 @@
 
   function updateScoreboardColors(data) {
     if (!data) return;
-    $('body').css('background-color', data.body_bg || '#1a2b3c');
+    var bodyBg = data.body_bg || '#1a2b3c';
+    $('body').css('background-color', bodyBg);
+
+    var contrastColor = getContrastColor(bodyBg);
+    if (contrastColor === '#000000') {
+        $('body').addClass('light-theme').removeClass('dark-theme');
+    } else {
+        $('body').addClass('dark-theme').removeClass('light-theme');
+    }
 
     // Обновляем фон и текст для каждого кликабельного блока
     $('.clickable-block[data-style-property]').each(function() {

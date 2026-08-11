@@ -32,6 +32,7 @@ window.TemplatesVisualMobile = (function() {
 
   /** Карта: data-style-property → { bg, text } */
   var PROPERTY_MAP = {
+    logo_base64:           { bg: null,                    text: null },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_team_name_text:    { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
@@ -49,10 +50,10 @@ window.TemplatesVisualMobile = (function() {
     bottom_secondary_score_text:{ bg: 'bottom_secondary_score_bg',text: 'bottom_secondary_score_text' },
     bottom_time_bg:        { bg: 'bottom_time_bg',        text: 'bottom_time_text' },
     bottom_time_text:      { bg: 'bottom_time_bg',        text: 'bottom_time_text' },
-    setball_bg:            { bg: 'setball_bg',            text: 'setball_text' },
-    setball_text:          { bg: 'setball_bg',            text: 'setball_text' },
-    matchball_bg:          { bg: 'matchball_bg',          text: 'matchball_text' },
-    matchball_text:        { bg: 'matchball_bg',          text: 'matchball_text' }
+    setball_bg:            { bg: 'setball_bg',            text: 'setball_text' }, // Фон Сетбола
+    setball_text:          { bg: 'setball_bg',            text: 'setball_text' }, // Текст Сетбола
+    matchball_bg:          { bg: 'matchball_bg',          text: 'matchball_text' }, // Фон Матчбола
+    matchball_text:        { bg: 'matchball_bg',          text: 'matchball_text' } // Текст Матчбола
   };
 
   // ============================================================================
@@ -80,12 +81,18 @@ window.TemplatesVisualMobile = (function() {
     if (!data) return;
     var root = document.documentElement;
     for (var key in data) {
-      if (data.hasOwnProperty(key) && data[key]) {
+      if (data.hasOwnProperty(key) && data[key] && key !== 'logo_base64') {
         root.style.setProperty('--' + key.replace(/_/g, '-'), data[key]);
       }
     }
     root.style.setProperty('--top-primary-score-text', data.top_primary_score_text || '#ffffff');
     root.style.setProperty('--top-secondary-score-text', data.top_secondary_score_text || '#ffffff');
+
+    // Обновляем логотип в предпросмотре
+    var logoImg = document.querySelector('#scoreboard-preview .logo-img');
+    if (logoImg) {
+      logoImg.src = data.logo_base64 || 'logo_nvl.png';
+    }
   }
 
   /**
@@ -242,6 +249,13 @@ window.TemplatesVisualMobile = (function() {
     applyPreview(currentData);
     var labelEl = $('templateLabel');
     if (labelEl) labelEl.textContent = label || '— шаблон не выбран —';
+
+    // Управляем видимостью кнопки удаления логотипа
+    var btnDeleteLogo = $('btnDeleteLogo');
+    if (btnDeleteLogo) {
+      btnDeleteLogo.style.display = currentData.logo_base64 ? 'inline-block' : 'none';
+    }
+
     closeColorPanel();
     // Пересчитываем масштаб после применения данных
     setTimeout(fitScoreboardToContainer, 0);
@@ -252,8 +266,15 @@ window.TemplatesVisualMobile = (function() {
   // ============================================================================
 
   function openColorPanel(block) {
-    selectedBlock = block;
     var prop = block.getAttribute('data-style-property');
+
+    // Специальная логика для логотипа
+    if (prop === 'logo_base64') {
+      $('logoUpload').click(); // Открываем диалог выбора файла
+      return;
+    }
+
+    selectedBlock = block;
     var blockName = block.getAttribute('data-block-name') || prop;
     var mapping = PROPERTY_MAP[prop];
     if (!mapping) return;
@@ -537,6 +558,44 @@ window.TemplatesVisualMobile = (function() {
         applyPreview(currentData);
         closeColorPanel();
         showNotification('Шаблон сброшен. Нажмите "Сохранить" для применения.', 'success');
+      });
+    }
+
+    // ОБРАБОТЧИК ЗАГРУЗКИ ЛОГОТИПА
+    var logoUpload = $('logoUpload');
+    if (logoUpload) {
+      logoUpload.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+          var base64String = event.target.result;
+          currentData.logo_base64 = base64String;
+          applyPreview(currentData);
+          
+          var btnDeleteLogo = $('btnDeleteLogo');
+          if (btnDeleteLogo) {
+            btnDeleteLogo.style.display = 'inline-block';
+          }
+          showNotification('Логотип обновлён. Нажмите "Сохранить".', 'success');
+        };
+        reader.onerror = function() {
+          showNotification('Ошибка чтения файла', 'error');
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ОБРАБОТЧИК УДАЛЕНИЯ ЛОГОТИПА
+    var btnDeleteLogo = $('btnDeleteLogo');
+    if (btnDeleteLogo) {
+      btnDeleteLogo.addEventListener('click', function() {
+        if (!confirm('Удалить собственный логотип из этого шаблона?')) return;
+        currentData.logo_base64 = null;
+        applyPreview(currentData);
+        btnDeleteLogo.style.display = 'none';
+        showNotification('Логотип удалён. Нажмите "Сохранить".', 'success');
       });
     }
   }

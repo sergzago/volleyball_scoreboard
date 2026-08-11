@@ -33,7 +33,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      color: #fff;
+      color: var(--text-primary);
       background: rgba(255,255,255,0.05);
       min-width: 0;
     }
@@ -354,6 +354,17 @@
     .notification.show { opacity: 1; }
     .notification.success { background: #28a745; color: #fff; }
     .notification.error { background: #dc3545; color: #fff; }
+
+    /* Исправление для длинных названий команд на вкладке "Управление" */
+    #pageControl .team-name {
+      word-wrap: break-word; /* Для старых браузеров */
+      overflow-wrap: break-word; /* Стандартное свойство */
+      white-space: normal;
+      min-height: 42px; /* Чтобы вместить 2 строки */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   </style>
   <script src="credentials.js"></script>
   <script src="js/db-config.js"></script>
@@ -827,12 +838,16 @@
             </div>
 
             <div class="scoreboard-wrapper" id="scoreboardWrapper">
-              <div class="template-label" id="templateLabel">— шаблон не выбран —</div>
+              <input type="file" id="logoUpload" accept="image/*" style="display:none;">
+              <div id="templateHeader" style="display: flex; align-items: center; justify-content: flex-end; position: absolute; top: 8px; left: 16px; right: 10px; z-index: 5;">
+                <div class="template-label" id="templateLabel">— шаблон не выбран —</div>
+                <button class="btn btn-danger btn-sm" id="btnDeleteLogo" style="display:none;">Удалить логотип</button>
+              </div>
               <div class="scoreboard-container">
                 <div class="scoreboard" id="scoreboard-preview">
-                  <!-- Логотип = фон страницы -->
-                  <div class="logo-area clickable-block" data-style-property="body_bg" data-block-name="Фон страницы">
-                    <span class="block-label">Фон страницы</span>
+                  <!-- Логотип -->
+                  <div class="logo-area clickable-block" data-style-property="logo_base64" data-block-name="Логотип">
+                    <span class="block-label">Логотип</span>
                     <img class="logo-img" src="logo_nvl.png" alt="Logo">
                   </div>
                   <!-- Цвета команд = фон имени -->
@@ -877,6 +892,7 @@
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>

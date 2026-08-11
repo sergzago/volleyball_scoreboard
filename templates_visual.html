@@ -188,6 +188,11 @@
             white-space: nowrap;
         }
 
+        /* Кнопка удаления логотипа */
+        .btn-delete-logo {
+            position: absolute; top: 10px; right: 10px; z-index: 5;
+        }
+
         /* ============================================================
            ТАБЛО
            ============================================================ */
@@ -607,12 +612,15 @@
                 </div>
 
                 <div class="scoreboard-wrapper" id="scoreboardWrapper">
+                    <input type="file" id="logoUpload" accept="image/*" style="display:none;">
+                    <button class="btn-delete-logo btn btn-danger btn-sm" id="btnDeleteLogo" style="display:none;">Удалить логотип</button>
+
                     <div class="template-label" id="templateLabel">— шаблон не выбран —</div>
                     <div class="scoreboard-container">
                         <div class="scoreboard" id="scoreboard-preview">
-                            <!-- Логотип = фон страницы -->
-                            <div class="logo-area clickable-block" data-style-property="body_bg" data-block-name="Фон страницы">
-                                <span class="block-label">Фон страницы</span>
+                            <!-- Логотип -->
+                            <div class="logo-area clickable-block" data-style-property="logo_base64" data-block-name="Логотип">
+                                <span class="block-label">Логотип</span>
                                 <img class="logo-img" src="" alt="Logo">
                             </div>
                             <!-- Цвета команд = фон имени -->

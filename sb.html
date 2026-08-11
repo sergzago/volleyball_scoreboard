@@ -769,15 +769,6 @@
 
     // Вызываем updateScoreboard1Display после загрузки страницы
     $(document).ready(function() {
-        // Загружаем и устанавливаем логотип из файла
-        if (typeof loadLogo === 'function') {
-            loadLogo(function(logoData) {
-                if (logoData) {
-                    $('.logo-img').attr('src', logoData);
-                }
-            });
-        }
-
         // Не вызываем updateScoreboard1Display здесь — данные ещё не загружены.
         // Функция будет вызвана автоматически из scoreboard.js когда придут данные
         // через updateScoreboard1History().

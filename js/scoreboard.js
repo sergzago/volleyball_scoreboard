@@ -180,6 +180,20 @@ function applyTemplate(data) {
     }
   }
 
+  // Устанавливаем логотип
+  if (templateData.logo_base64) {
+    $('.logo-img').attr('src', templateData.logo_base64);
+  } else {
+    // Если в шаблоне нет лого, загружаем дефолтный
+    if (typeof loadLogo === 'function') {
+      loadLogo(function(logoData) {
+        if (logoData) {
+          $('.logo-img').attr('src', logoData);
+        }
+      });
+    }
+  }
+
   // Устанавливаем цвета из шаблона
   setCssVar('--body-bg', templateData.body_bg);
   setCssVar('--top-team-name-bg', templateData.top_team_name_bg);
