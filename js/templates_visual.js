@@ -29,6 +29,7 @@
 
   /** Карта: data-style-property → { bg, text } */
   var PROPERTY_MAP = {
+    logo_base64:           { bg: null,                    text: null },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_team_name_text:    { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
@@ -85,13 +86,19 @@
     if (!data) return;
     var root = document.documentElement;
     for (var key in data) {
-      if (data.hasOwnProperty(key) && data[key]) {
+      if (data.hasOwnProperty(key) && data[key] && key !== 'logo_base64') {
         root.style.setProperty('--' + key.replace(/_/g, '-'), data[key]);
       }
     }
     // Также устанавливаем CSS-переменные для текста счёта (используются в sb.html)
     root.style.setProperty('--top-primary-score-text', data.top_primary_score_text || '#ffffff');
     root.style.setProperty('--top-secondary-score-text', data.top_secondary_score_text || '#ffffff');
+
+    // Обновляем логотип в предпросмотре
+    var logoImg = $('#scoreboard-preview .logo-img');
+    if (logoImg.length) {
+      logoImg.attr('src', data.logo_base64 || 'logo_nvl.png');
+    }
   }
 
   function updateScoreboardColors(data) {
@@ -217,6 +224,17 @@
     currentData = JSON.parse(JSON.stringify(data));
     updateScoreboardColors(currentData);
     applyPreview(currentData);
+
+    // Управляем видимостью кнопки удаления логотипа
+    var btnDeleteLogo = $('#btnDeleteLogo');
+    if (btnDeleteLogo) {
+      if (currentData.logo_base64) {
+        btnDeleteLogo.show();
+      } else {
+        btnDeleteLogo.hide();
+      }
+    }
+
     $('#templateLabel').text(label || '— шаблон не выбран —');
     closeColorPanel();
   }
@@ -230,6 +248,17 @@
     var prop = $block.data('style-property');
     var blockName = $block.data('block-name') || prop;
     var mapping = PROPERTY_MAP[prop];
+
+    // Специальная логика для логотипа
+    if (prop === 'logo_base64') {
+      $('#logoUpload').click(); // Открываем диалог выбора файла
+      return;
+    }
+
+    // Если для логотипа открылась панель (не должно, но на всякий случай)
+    if (!mapping) return;
+
+
     if (!mapping) return;
 
     var bgColor = currentData[mapping.bg] || '#ffffff';
@@ -522,6 +551,45 @@
       applyPreview(currentData);
       closeColorPanel();
       showNotification('Шаблон сброшен. Нажмите "Сохранить" для применения.', 'success');
+    });
+
+    // ========================================================================
+    // ЗАГРУЗКА И УДАЛЕНИЕ ЛОГОТИПА
+    // ========================================================================
+
+    // ОБРАБОТЧИК ЗАГРУЗКИ ЛОГОТИПА
+    var logoUpload = $('#logoUpload');
+    if (logoUpload) {
+      logoUpload.on('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+          var base64String = event.target.result;
+          currentData.logo_base64 = base64String;
+          applyPreview(currentData);
+          
+          var btnDeleteLogo = $('#btnDeleteLogo');
+          if (btnDeleteLogo) {
+            btnDeleteLogo.show();
+          }
+          showNotification('Логотип обновлён. Нажмите "Сохранить".', 'success');
+        };
+        reader.onerror = function() {
+          showNotification('Ошибка чтения файла', 'error');
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ОБРАБОТЧИК УДАЛЕНИЯ ЛОГОТИПА
+    $('#btnDeleteLogo').on('click', function() {
+      if (!confirm('Удалить собственный логотип из этого шаблона?')) return;
+      currentData.logo_base64 = null;
+      applyPreview(currentData);
+      $(this).hide();
+      showNotification('Логотип удалён. Нажмите "Сохранить".', 'success');
     });
   }
 
