@@ -633,16 +633,11 @@
    * Поиск записи в volleyball по полю id (кастомному, не системному).
    * PocketBase getOne/getFirstListItem используют системный id, а не кастомное поле.
    */
-  function findVolleyballRecord(pb, gameId) {
-    return pb.collection(DB_CONFIG.collections.VOLLEYBALL)
-      .getFullList()
-      .then(function(records) {
-        for (var i = 0; i < records.length; i++) {
-          var rec = records[i];
-          // PocketBase Record имеет метод get(); обычный объект — нет
-          var recId = typeof rec.get === 'function' ? rec.get('id') : rec.id;
-          if (recId === gameId) return rec;
-        }
+  function findRecordByCustomId(pb, collectionName, customIdField, customId) {
+    return pb.collection(collectionName)
+      .getFirstListItem(customIdField + '="' + customId + '"')
+      .catch(function(err) {
+        // getFirstListItem выбрасывает ошибку, если ничего не найдено
         return null;
       });
   }
@@ -664,7 +659,7 @@
       }
 
       var pb = getPocketBaseClient();
-      return findVolleyballRecord(pb, gameId)
+      return findRecordByCustomId(pb, DB_CONFIG.collections.VOLLEYBALL, 'id', gameId)
         .then(function(record) {
           // Возвращаем простой объект, чтобы вызывающий код мог использовать
           // Object.keys() и прямые обращения к полям (Record не перечисляет данные)
@@ -700,7 +695,7 @@
       var subscriptionKey = DB_CONFIG.collections.VOLLEYBALL + '_' + gameId;
 
       // Сначала получаем текущие данные
-      findVolleyballRecord(pb, gameId)
+      findRecordByCustomId(pb, DB_CONFIG.collections.VOLLEYBALL, 'id', gameId)
         .then(function(record) {
           if (record) onUpdate(utils.getPlainObject(record));
         })
@@ -770,7 +765,7 @@
       });
 
       // PocketBase: сначала ищем запись по полю id, потом обновляем по системному ID
-      return findVolleyballRecord(pb, gameId)
+      return findRecordByCustomId(pb, DB_CONFIG.collections.VOLLEYBALL, 'id', gameId)
         .then(function(record) {
           if (record) {
             return pb.collection(DB_CONFIG.collections.VOLLEYBALL).update(record.id, updateData)
@@ -988,7 +983,7 @@
       }
 
       var pb = getPocketBaseClient();
-      return findVolleyballRecord(pb, gameId)
+      return findRecordByCustomId(pb, DB_CONFIG.collections.VOLLEYBALL, 'id', gameId)
         .then(function(record) {
           if (record) {
             return pb.collection(DB_CONFIG.collections.VOLLEYBALL).delete(record.id);
@@ -1247,27 +1242,7 @@
    * Поиск записи шаблона в PocketBase по кастомному полю template_id
    */
   function findTemplateRecord(pb, templateId) {
-    // Коллекция templates может отсутствовать — не даём синхронной ошибке
-    // прервать загрузку данных игры
-    var collection;
-    try {
-      collection = pb.collection('templates');
-    } catch (e) {
-      return Promise.resolve(null);
-    }
-    return collection.getFullList()
-      .then(function(records) {
-        for (var i = 0; i < records.length; i++) {
-          var recordTemplateId = typeof records[i].get === 'function'
-            ? records[i].get('template_id')
-            : records[i].template_id;
-          if (recordTemplateId === templateId) return records[i];
-        }
-        return null;
-      })
-      .catch(function() {
-        return null;
-      });
+    return findRecordByCustomId(pb, DB_CONFIG.collections.TEMPLATES, 'template_id', templateId);
   }
 
   var templates = {
@@ -1280,7 +1255,7 @@
     get: function(templateId) {
       if (provider === 'firebase') {
         return firebase.firestore()
-          .collection('templates')
+          .collection(DB_CONFIG.collections.TEMPLATES)
           .doc(templateId)
           .get()
           .then(function(doc) {
@@ -1310,7 +1285,7 @@
     subscribe: function(templateId, onUpdate, onError) {
       if (provider === 'firebase') {
         var unsubscribe = firebase.firestore()
-          .collection('templates')
+          .collection(DB_CONFIG.collections.TEMPLATES)
           .doc(templateId)
           .onSnapshot(function(snapshot) {
             if (snapshot.exists) {
@@ -1327,7 +1302,7 @@
 
       // PocketBase
       var pb = getPocketBaseClient();
-      var subscriptionKey = 'templates_' + templateId;
+      var subscriptionKey = DB_CONFIG.collections.TEMPLATES + '_' + templateId;
 
       // Сначала получаем текущие данные
       findTemplateRecord(pb, templateId)
@@ -1344,7 +1319,7 @@
 
       // Подписываемся на изменения коллекции templates
       try {
-        pb.collection('templates')
+        pb.collection(DB_CONFIG.collections.TEMPLATES)
           .subscribe('*', function(e) {
             if (e.action === 'update' || e.action === 'create') {
               var record = e.record;
@@ -1367,7 +1342,7 @@
       // Функция отписки
       return function() {
         try {
-          pb.collection('templates').unsubscribe(subscriptionKey);
+          pb.collection(DB_CONFIG.collections.TEMPLATES).unsubscribe(subscriptionKey);
         } catch (e) {}
       };
     },
@@ -1381,9 +1356,20 @@
     update: function(templateId, data) {
       if (provider === 'firebase') {
         return firebase.firestore()
-          .collection('templates')
+          .collection(DB_CONFIG.collections.TEMPLATES)
           .doc(templateId)
           .set(data, { merge: true });
+      }
+
+      // PocketBase: Если logo_base64 - это Rich Editor, он ожидает HTML.
+      // Если есть base64-строка, оборачиваем ее в img-тег.
+      // Если логотип удален (null), отправляем пустую строку.
+      if (data.logo_base64) {
+        // Предполагаем, что data.logo_base64 уже является data-URL
+        // Оборачиваем его в img-тег для Rich Editor поля
+        data.logo_base64 = '<img src="' + data.logo_base64 + '" alt="Logo">';
+      } else if (data.logo_base64 === null || typeof data.logo_base64 === 'undefined') {
+        data.logo_base64 = ''; // Пустая строка для удаления/отсутствия логотипа
       }
 
       var pb = getPocketBaseClient();
@@ -1391,17 +1377,19 @@
         .then(function(record) {
           var collection;
           try {
-            collection = pb.collection('templates');
+            collection = pb.collection(DB_CONFIG.collections.TEMPLATES);
           } catch (e) {
-            throw new Error('Коллекция templates не существует: ' + e.message);
+            throw new Error('Коллекция ' + DB_CONFIG.collections.TEMPLATES + ' не существует: ' + e.message);
           }
           if (record) {
             return collection.update(record.id, data);
           }
           // Запись не найдена — создаём
-          return collection.create(
-            Object.assign({ template_id: templateId }, data)
-          );
+          // PocketBase сам сгенерирует системный 'id'. Наш 'template_id' уже есть в 'data'.
+          // Мы не можем передавать наш 'templateId' как системный 'id', так как
+          // он может не соответствовать формату системного ID PocketBase.
+          // Поэтому просто создаём запись с переданными данными.
+          return collection.create(data);
         });
     },
 
@@ -1412,7 +1400,7 @@
     list: function() {
       if (provider === 'firebase') {
         return firebase.firestore()
-          .collection('templates')
+          .collection(DB_CONFIG.collections.TEMPLATES)
           .get()
           .then(function(snapshot) {
             var results = [];
@@ -1432,7 +1420,7 @@
       // прервать загрузку данных игры
       var collection;
       try {
-        collection = pb.collection('templates');
+        collection = pb.collection(DB_CONFIG.collections.TEMPLATES);
       } catch (e) {
         return Promise.resolve([]);
       }
@@ -1459,7 +1447,7 @@
     'delete': function(templateId) {
       if (provider === 'firebase') {
         return firebase.firestore()
-          .collection('templates')
+          .collection(DB_CONFIG.collections.TEMPLATES)
           .doc(templateId)
           .delete();
       }
@@ -1470,7 +1458,7 @@
           if (record) {
             var collection;
             try {
-              collection = pb.collection('templates');
+              collection = pb.collection(DB_CONFIG.collections.TEMPLATES);
             } catch (e) {
               return Promise.resolve();
             }

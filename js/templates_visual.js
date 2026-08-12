@@ -32,7 +32,6 @@
     logo_base64:           { bg: null,                    text: null },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
-    top_team_name_text:    { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_primary_score_bg:  { bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
     top_primary_score_text:{ bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
     top_secondary_score_bg:{ bg: 'top_secondary_score_bg', text: 'top_secondary_score_text' },
@@ -97,7 +96,14 @@
     // Обновляем логотип в предпросмотре
     var logoImg = $('#scoreboard-preview .logo-img');
     if (logoImg.length) {
-      logoImg.attr('src', data.logo_base64 || 'logo_nvl.png');
+      var logoSrc = 'logo_nvl.png'; // Дефолтный логотип
+      if (data.logo_base64) {
+        // Если это Rich Editor, то data.logo_base64 содержит HTML.
+        // Извлекаем src из img-тега.
+        var tempDiv = $('<div>').html(data.logo_base64);
+        logoSrc = tempDiv.find('img').attr('src') || 'logo_nvl.png';
+      }
+      logoImg.attr('src', logoSrc);
     }
   }
 
@@ -321,6 +327,7 @@
     // Сохраняем отображаемое имя из поля name (если не передано явно),
     // чтобы не перезаписывать его транслитерированным templateId
     dataToSave.name = name || currentData.name || templateId;
+    dataToSave.template_id = templateId;
 
     DB.templates.update(templateId, dataToSave).then(function() {
       showNotification('Шаблон "' + (name || templateId) + '" сохранён', 'success');
@@ -361,6 +368,7 @@
 
     var dataToSave = JSON.parse(JSON.stringify(currentData));
     dataToSave.name = name;
+    dataToSave.template_id = id;
 
     var $btn = $('#btnSave');
     $btn.prop('disabled', true).text('💾 Сохранение...');

@@ -35,7 +35,6 @@ window.TemplatesVisualMobile = (function() {
     logo_base64:           { bg: null,                    text: null },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
-    top_team_name_text:    { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_primary_score_bg:  { bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
     top_primary_score_text:{ bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
     top_secondary_score_bg:{ bg: 'top_secondary_score_bg', text: 'top_secondary_score_text' },
@@ -91,7 +90,15 @@ window.TemplatesVisualMobile = (function() {
     // Обновляем логотип в предпросмотре
     var logoImg = document.querySelector('#scoreboard-preview .logo-img');
     if (logoImg) {
-      logoImg.src = data.logo_base64 || 'logo_nvl.png';
+      var logoSrc = 'logo_nvl.png'; // Дефолтный логотип
+      if (data.logo_base64) {
+        // Если это Rich Editor, то data.logo_base64 содержит HTML.
+        // Извлекаем src из img-тега.
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = data.logo_base64;
+        logoSrc = (tempDiv.querySelector('img') && tempDiv.querySelector('img').src) || 'logo_nvl.png';
+      }
+      logoImg.src = logoSrc;
     }
   }
 
@@ -335,6 +342,7 @@ window.TemplatesVisualMobile = (function() {
     // Сохраняем отображаемое имя из поля name (если не передано явно),
     // чтобы не перезаписывать его транслитерированным templateId
     dataToSave.name = name || currentData.name || templateId;
+    dataToSave.template_id = templateId; // Убеждаемся, что ID всегда присутствует
 
     DB.templates.update(templateId, dataToSave).then(function() {
       showNotification('Шаблон "' + (name || templateId) + '" сохранён', 'success');
@@ -373,6 +381,7 @@ window.TemplatesVisualMobile = (function() {
 
     var dataToSave = JSON.parse(JSON.stringify(currentData));
     dataToSave.name = name;
+    dataToSave.template_id = id;
 
     var btn = $('btnSave');
     if (btn) { btn.disabled = true; btn.textContent = '💾 Сохранение...'; }
