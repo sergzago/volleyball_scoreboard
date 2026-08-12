@@ -181,18 +181,22 @@ function applyTemplate(data) {
   }
 
   // Устанавливаем логотип
-  if (templateData.logo_base64) {
-    $('.logo-img').attr('src', templateData.logo_base64);
-  } else {
-    // Если в шаблоне нет лого, загружаем дефолтный
-    if (typeof loadLogo === 'function') {
-      loadLogo(function(logoData) {
-        if (logoData) {
-          $('.logo-img').attr('src', logoData);
-        }
-      });
+  var logoData = templateData.logo_base64;
+  var finalLogoSrc = 'logo_nvl.png'; // Конечный запасной вариант
+
+  if (logoData) { // Если есть какие-либо данные логотипа
+    if (logoData.startsWith('<img')) { // Данные из PocketBase (Rich Editor)
+      var tempDiv = $('<div>').html(logoData);
+      var extractedSrc = tempDiv.find('img').attr('src');
+      if (extractedSrc) {
+        finalLogoSrc = extractedSrc;
+      }
+    } else if (logoData.startsWith('data:image')) { // Данные из Firebase или свежезагруженный base64
+      finalLogoSrc = logoData;
     }
   }
+  // Устанавливаем полученный или дефолтный логотип
+  $('.logo-img').attr('src', finalLogoSrc);
 
   // Устанавливаем цвета из шаблона
   setCssVar('--body-bg', templateData.body_bg);

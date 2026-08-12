@@ -91,12 +91,17 @@ window.TemplatesVisualMobile = (function() {
     var logoImg = document.querySelector('#scoreboard-preview .logo-img');
     if (logoImg) {
       var logoSrc = 'logo_nvl.png'; // Дефолтный логотип
-      if (data.logo_base64) {
-        // Если это Rich Editor, то data.logo_base64 содержит HTML.
-        // Извлекаем src из img-тега.
-        var tempDiv = document.createElement('div');
-        tempDiv.innerHTML = data.logo_base64;
-        logoSrc = (tempDiv.querySelector('img') && tempDiv.querySelector('img').src) || 'logo_nvl.png';
+      var logoData = data.logo_base64;
+      if (logoData) {
+        if (logoData.startsWith('<img')) {
+          // Для PocketBase (Rich Editor) извлекаем src из HTML
+          var tempDiv = document.createElement('div');
+          tempDiv.innerHTML = logoData;
+          logoSrc = (tempDiv.querySelector('img') && tempDiv.querySelector('img').src) || logoSrc;
+        } else if (logoData.startsWith('data:image')) {
+          // Для Firebase или нового файла (чистый base64)
+          logoSrc = logoData;
+        }
       }
       logoImg.src = logoSrc;
     }

@@ -1361,15 +1361,15 @@
           .set(data, { merge: true });
       }
 
-      // PocketBase: Если logo_base64 - это Rich Editor, он ожидает HTML.
-      // Если есть base64-строка, оборачиваем ее в img-тег.
-      // Если логотип удален (null), отправляем пустую строку.
-      if (data.logo_base64) {
-        // Предполагаем, что data.logo_base64 уже является data-URL
-        // Оборачиваем его в img-тег для Rich Editor поля
-        data.logo_base64 = '<img src="' + data.logo_base64 + '" alt="Logo">';
-      } else if (data.logo_base64 === null || typeof data.logo_base64 === 'undefined') {
-        data.logo_base64 = ''; // Пустая строка для удаления/отсутствия логотипа
+      if (provider === 'pocketbase') {
+        // PocketBase: Если logo_base64 - это Rich Editor, он ожидает HTML.
+        // Если есть base64-строка, оборачиваем ее в img-тег.
+        // Если логотип удален (null), отправляем пустую строку.
+        if (data.logo_base64 && data.logo_base64.startsWith('data:')) {
+          data.logo_base64 = '<img src="' + data.logo_base64 + '" alt="Logo">';
+        } else if (data.logo_base64 === null || typeof data.logo_base64 === 'undefined') {
+          data.logo_base64 = ''; // Пустая строка для удаления/отсутствия логотипа
+        }
       }
 
       var pb = getPocketBaseClient();

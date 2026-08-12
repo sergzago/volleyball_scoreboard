@@ -97,11 +97,16 @@
     var logoImg = $('#scoreboard-preview .logo-img');
     if (logoImg.length) {
       var logoSrc = 'logo_nvl.png'; // Дефолтный логотип
-      if (data.logo_base64) {
-        // Если это Rich Editor, то data.logo_base64 содержит HTML.
-        // Извлекаем src из img-тега.
-        var tempDiv = $('<div>').html(data.logo_base64);
-        logoSrc = tempDiv.find('img').attr('src') || 'logo_nvl.png';
+      var logoData = data.logo_base64;
+      if (logoData) {
+        if (logoData.startsWith('<img')) {
+          // Для PocketBase (Rich Editor) извлекаем src из HTML
+          var tempDiv = $('<div>').html(logoData);
+          logoSrc = tempDiv.find('img').attr('src') || logoSrc;
+        } else if (logoData.startsWith('data:image')) {
+          // Для Firebase или нового файла (чистый base64)
+          logoSrc = logoData;
+        }
       }
       logoImg.attr('src', logoSrc);
     }
