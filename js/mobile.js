@@ -6,6 +6,7 @@
   var mobileScoreboardData = {};
   var mobileGameConnected = false;
   var pendingMatchFinish = null;
+  var pendingSetFinish = null; // Добавлено для подтверждения завершения сета
   var matchWasAlreadyFinished = false;
   var _subscribeCallCount = 0;
   var _initialDataLoaded = false;
@@ -186,11 +187,22 @@
     DB.scoreboard.update(game_id, data)
       .then(function(updatedDoc) {
         if (updatedDoc) {
+          // Сбрасываем флаг "грязных" настроек после успешного обновления в БД
+          _localSettingsDirty = false;
           mobileScoreboardData = DB.utils.getPlainObject(updatedDoc);
         }
       }).catch(function(err) {
         console.error("Mobile update failed:", err);
       });
+  }
+
+  // Функция для сохранения настроек в зависимости от состояния игры
+  function saveSettings() {
+    if (_recordExists) { // Если запись игры существует, сохраняем сразу
+      update_db(buildSavePayload());
+    } else { // Если записи нет, просто помечаем настройки как измененные локально
+      _localSettingsDirty = true;
+    }
   }
 
   // ===== AUTH =====
@@ -645,6 +657,7 @@
     hide(document.getElementById('controlContent'));
 
     updateLinks();
+    _localSettingsDirty = false; // Сбрасываем флаг при подключении к игре
 
     if (DEMO_MODE) {
       Object.keys(DEMO_DEFAULT_DATA).forEach(function(key) {
@@ -679,6 +692,7 @@
     Object.keys(data).forEach(function(key) {
       mobileScoreboardData[key] = data[key];
     });
+    _localSettingsDirty = false; // Сбрасываем флаг при применении данных игры
     updateSettingsUI(mobileScoreboardData);
     updateTeamsUI(mobileScoreboardData);
     updateControlUI(mobileScoreboardData);
@@ -856,10 +870,12 @@
     var beachFinished = beachMode && data['beach_match_finished'];
     var classicFinished = (!beachMode) && data['classic_match_finished'];
     var matchPending = !!pendingMatchFinish;
-    var matchFinished = beachFinished || classicFinished || matchPending;
+    var setPending = !!pendingSetFinish; // Добавлено
+    var matchFinished = beachFinished || classicFinished || matchPending || setPending; // Обновлено
 
     var statusEl = document.getElementById('mobileMatchStatus');
     if (matchPending) {
+      // Если матч в ожидании подтверждения, показываем соответствующий статус
       statusEl.className = 'match-status pending';
       statusEl.textContent = 'Ожидание подтверждения...';
       show(statusEl);
@@ -874,7 +890,7 @@
     var pendingNewSet = !!data['pending_new_set'];
     var startOfSet = ensureNumber(data['home_score']) === 0 && ensureNumber(data['away_score']) === 0;
     var isTimeoutActive = ensureNumber(data['show']) === 6;
-
+    
     // Highlight active show button
     var currentShow = ensureNumber(data['show']);
     document.querySelectorAll('.show-select').forEach(function(btn) {
@@ -882,7 +898,7 @@
       btn.classList.toggle('active', val === currentShow);
     });
 
-    var scoreButtonsDisabled = pendingNewSet || matchFinished || isTimeoutActive;
+    var scoreButtonsDisabled = pendingNewSet || matchFinished || isTimeoutActive || setPending; // Обновлено
     document.querySelectorAll('.score-btn').forEach(function(btn) { btn.disabled = scoreButtonsDisabled; });
 
     var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
@@ -917,7 +933,7 @@
     var sideSwitchBtn = document.querySelector('.side-switch-btn');
     var resetBtn = document.querySelector('.reset-btn');
     var periodBtns = document.querySelectorAll('.period-btn');
-
+    
     newSetBtn.disabled = !pendingNewSet || matchFinished;
     sideSwitchBtn.disabled = matchFinished;
     periodBtns.forEach(function(btn) {
@@ -1018,6 +1034,44 @@
     document.getElementById('mobileMatchFinishModal').classList.add('hidden');
   }
 
+  /**
+   * Показать модальное окно подтверждения завершения сета.
+   */
+  function showMobileSetFinishDialog(update) {
+    console.log('[Mobile] showMobileSetFinishDialog вызван.');
+
+    // Сохраняем данные для последующего использования
+    pendingSetFinish = {
+      update: update
+    };
+
+    document.getElementById('mobileSetFinishModal').classList.remove('hidden');
+    // Блокируем кнопки на время подтверждения
+    document.querySelectorAll('.score-btn').forEach(function(btn) { btn.disabled = true; });
+  }
+
+  /**
+   * Подтвердить завершение сета — обновить БД.
+   */
+  function confirmMobileSetFinish() {
+    if (!pendingSetFinish) return;
+
+    update_db(pendingSetFinish.update);
+
+    pendingSetFinish = null;
+    document.getElementById('mobileSetFinishModal').classList.add('hidden');
+    // Разблокировка кнопок произойдет при следующем обновлении данных из БД
+  }
+
+  /**
+   * Отменить завершение сета — НЕ фиксировать счёт.
+   */
+  function cancelMobileSetFinish() {
+    if (!pendingSetFinish) return;
+    pendingSetFinish = null;
+    document.getElementById('mobileSetFinishModal').classList.add('hidden');
+    document.querySelectorAll('.score-btn').forEach(function(btn) { btn.disabled = false; });
+  }
   function saveMatchResult(setHistory, overallHome, overallAway) {
     if (DEMO_MODE) return;
 
@@ -1241,7 +1295,7 @@
       if (matchFinished && !matchWasAlreadyFinished) {
         showMatchFinishDialog(update, update['set_history'], homeSets, awaySets, 'beach');
       } else {
-        update_db(update);
+        showMobileSetFinishDialog(update); // Show dialog for set finish in beach mode
       }
     } else {
       var homeFouls = ensureNumber(mobileScoreboardData['home_fouls']);
@@ -1297,7 +1351,7 @@
         saveMatchResult(update2['set_history'], homeFouls, awayFouls);
         update_db(update2);
       } else {
-        update_db(update2);
+        showMobileSetFinishDialog(update2); // Изменено: показываем диалог подтверждения сета
       }
     }
   }
@@ -1494,55 +1548,45 @@
       document.getElementById('mobileDeleteConfirmModal').classList.add('hidden');
     });
 
-    // Mode toggles — local state only, no DB write
+    // Mode toggles
     document.getElementById('mobileBeachMode').addEventListener('change', function() {
       _localBeachMode = this.checked;
-      _localSettingsDirty = true;
       if (_localBeachMode) { _localTwoWinsMode = false; _localCustomMode = false; }
       document.getElementById('mobileTwoWinsMode').checked = _localTwoWinsMode;
       document.getElementById('mobileCustomMode').checked = _localCustomMode;
-      document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
-      document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
-      document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
-      document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+      updateModeTogglesState();
+      saveSettings(); // Вызываем новую функцию saveSettings
     });
 
     document.getElementById('mobileTwoWinsMode').addEventListener('change', function() {
       _localTwoWinsMode = this.checked;
-      _localSettingsDirty = true;
       if (_localTwoWinsMode) { _localBeachMode = false; _localCustomMode = false; }
       document.getElementById('mobileBeachMode').checked = _localBeachMode;
       document.getElementById('mobileCustomMode').checked = _localCustomMode;
-      document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
-      document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
-      document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
-      document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+      updateModeTogglesState(); 
+      saveSettings(); // Вызываем новую функцию saveSettings
     });
 
     document.getElementById('mobileInvertTablo').addEventListener('change', function() {
       _localInvertTablo = this.checked;
-      _localSettingsDirty = true;
+      saveSettings(); // Вызываем новую функцию saveSettings
     });
 
     document.getElementById('mobileUnlimitedScore').addEventListener('change', function() {
       _localUnlimitedScore = this.checked;
-      _localSettingsDirty = true;
+      saveSettings(); // Вызываем новую функцию saveSettings
     });
 
     // Custom mode toggle — local state only, load from DB if available
     document.getElementById('mobileCustomMode').addEventListener('change', function() {
       _localCustomMode = this.checked;
-      _localSettingsDirty = true;
       if (_localCustomMode) {
-        _localBeachMode = false;
-        _localTwoWinsMode = false;
-        document.getElementById('mobileBeachMode').checked = false;
-        document.getElementById('mobileTwoWinsMode').checked = false;
+        _localBeachMode = false; // Отключаем пляжный режим
+        _localTwoWinsMode = false; // Отключаем режим до двух побед
+        document.getElementById('mobileBeachMode').checked = false; // Обновляем UI
+        document.getElementById('mobileTwoWinsMode').checked = false; // Обновляем UI
       }
-      document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
-      document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
-      document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
-      document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+      updateModeTogglesState();
 
       var customCard = document.getElementById('customSettingsCard');
       if (_localCustomMode) {
@@ -1567,7 +1611,15 @@
         customCard.style.display = 'none';
         _customFieldsEditing = false;
       }
+      saveSettings(); // Вызываем новую функцию saveSettings
     });
+
+    function updateModeTogglesState() {
+        document.getElementById('mobileTwoWinsMode').disabled = _localBeachMode || _localCustomMode;
+        document.getElementById('mobileBeachMode').disabled = _localTwoWinsMode || _localCustomMode;
+        document.getElementById('mobileUnlimitedScore').disabled = _localCustomMode;
+        document.getElementById('mobileCustomMode').disabled = _localBeachMode || _localTwoWinsMode;
+    }
 
     // ======================================================================
     // ШАБЛОН ОФОРМЛЕНИЯ
@@ -1576,35 +1628,38 @@
     // При изменении шаблона — сразу сохраняем в БД
     document.getElementById('mobileTemplateSelect').addEventListener('change', function() {
       if (!_recordExists) return;
-      var templateId = this.value || '';
-      update_db({template_id: templateId});
+      saveSettings(); // Здесь _recordExists всегда true, поэтому вызовется update_db
     });
 
     // Save custom settings — save to DB (existing record only)
     document.getElementById('saveCustomSettings').addEventListener('click', function() {
+      var payload = buildSavePayload();
       if (!mobileGameConnected) return;
       _customFieldsEditing = false;
       syncCustomSettings();
-      if (!_recordExists) return;
+      if (!_recordExists) return; // Эта кнопка должна быть активна только при существующей записи
       _localSettingsDirty = false;
       var payload = buildSavePayload();
-      payload.classic_match_finished = false;
-      payload.beach_match_finished = false;
-      payload.set_history = [];
-      payload.home_fouls = 0;
-      payload.away_fouls = 0;
-      payload.home_score = 0;
-      payload.away_score = 0;
-      payload.current_period = 1;
-      payload.classic_tiebreak_switch_done = true;
-      payload.home_timeouts = 0;
-      payload.away_timeouts = 0;
-      payload.pending_new_set = DB.deleteField();
-      payload.next_period = DB.deleteField();
-      payload.classic_switch_needed = DB.deleteField();
-      payload.classic_switch_shown = DB.deleteField();
-      payload.classic_switch_message = DB.deleteField();
-      update_db(payload);
+      // При применении кастомных настроек сбрасываем игру
+      var resetPayload = {
+        classic_match_finished: false,
+        beach_match_finished: false,
+        set_history: [],
+        home_fouls: 0,
+        away_fouls: 0,
+        home_score: 0,
+        away_score: 0,
+        current_period: 1,
+        classic_tiebreak_switch_done: true,
+        home_timeouts: 0,
+        away_timeouts: 0,
+        pending_new_set: DB.deleteField(),
+        next_period: DB.deleteField(),
+        classic_switch_needed: DB.deleteField(),
+        classic_switch_shown: DB.deleteField(),
+        classic_switch_message: DB.deleteField()
+      };
+      update_db(Object.assign(payload, resetPayload));
     });
 
     // Track editing on custom form fields
@@ -1615,7 +1670,6 @@
 
     // Teams save
     document.getElementById('saveTeamsBtn').addEventListener('click', function() {
-      _localSettingsDirty = false;
       var update = {
         away_team: document.getElementById('mobileAwayTeam').value,
         away_color: document.getElementById('mobileAwayColor').value,
@@ -1624,8 +1678,6 @@
         tournament_name: document.getElementById('mobileTournament').value || 'НВЛ',
         venue: document.getElementById('mobileVenue').value || ''
       };
-      var modePayload = buildSavePayload();
-      Object.keys(modePayload).forEach(function(k) { update[k] = modePayload[k]; });
       if (!_recordExists) update.show = 1;
       update_db(update);
       showControlContent();
@@ -1652,6 +1704,7 @@
         var team = this.getAttribute('data-team');
         var delta = parseInt(this.getAttribute('data-delta'), 10);
 
+        // Логика отката выигрыша сета (если есть pending new set и delta = -1)
         var pendingNewSet = !!mobileScoreboardData['pending_new_set'];
         if (delta < 0 && pendingNewSet) {
           var history = Array.isArray(mobileScoreboardData['set_history']) ? mobileScoreboardData['set_history'] : [];
@@ -1855,12 +1908,10 @@
       update['classic_switch_needed'] = DEL;
       update['classic_switch_message'] = DEL;
       update['beach_switch_message'] = DEL;
-      update['classic_switch_shown'] = DEL;
       update['lastEdited'] = DB.serverTimestamp();
       delete mobileScoreboardData['classic_switch_needed'];
       delete mobileScoreboardData['classic_switch_message'];
       delete mobileScoreboardData['beach_switch_message'];
-      delete mobileScoreboardData['classic_switch_shown'];
       highlightSideSwitch(false);
       // Используем стандартную функцию update_db, которая работает для всех режимов
       update_db(update);
@@ -1889,6 +1940,7 @@
       update['pending_home_side'] = null;
       update['pending_away_side'] = null;
       update['pending_classic_tiebreak_switch_done'] = null;
+      update['classic_switch_shown'] = null; // Сбрасываем флаг показа смены сторон для нового сета
       update['pending_new_set'] = null;
       update_db(update);
     });
@@ -1945,6 +1997,10 @@
     // Match finish modal
     document.getElementById('mobileMatchFinishYes').addEventListener('click', confirmMatchFinish);
     document.getElementById('mobileMatchFinishNo').addEventListener('click', cancelMatchFinish);
+    
+    // Set finish modal
+    document.getElementById('mobileSetFinishYes').addEventListener('click', confirmMobileSetFinish);
+    document.getElementById('mobileSetFinishNo').addEventListener('click', cancelMobileSetFinish);
 
     // Offline detection
     window.addEventListener('online', function() {

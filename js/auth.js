@@ -50,7 +50,7 @@ window.AuthModule = (function() {
                 }
 
                 currentUser = user;
-                currentRole = user.role || 'user';
+                currentRole = user.role || (user.data ? user.data.role : 'user') || 'user';
 
                 // Проверяем роль
                 if (requiredRole === 'admin' && currentRole !== 'admin') {
@@ -72,6 +72,10 @@ window.AuthModule = (function() {
      * @returns {Object|null}
      */
     function getCurrentUser() {
+        // Ensure displayname is always present if username is
+        if (currentUser && currentUser.username && !currentUser.displayname) {
+            currentUser.displayname = currentUser.displayName || currentUser.username;
+        }
         return currentUser;
     }
 

@@ -384,7 +384,7 @@
                   role: userData.role || 'user',
                   email: userData.email,
                   uid: doc.id,
-                  displayName: userData.displayName || username
+                  displayname: userData.displayname || userData.displayName || username
                 };
                 return firebase.firestore().collection(sessionsCollection).doc(token).set({
                   uid: doc.id,
@@ -415,7 +415,7 @@
               role: authData.record.role || 'user',
               email: authData.record.email,
               uid: authData.record.id,
-              displayName: authData.record.name || authData.record.username || loginUsername
+              displayname: authData.record.name || authData.record.username || loginUsername
             };
           })
           .catch(function(firstError) {
@@ -428,7 +428,7 @@
                   role: authData.record.role || 'user',
                   email: authData.record.email,
                   uid: authData.record.id,
-                  displayName: authData.record.name || loginUsername
+                  displayname: authData.record.name || loginUsername
                 };
               })
               .catch(function(secondError) {
@@ -488,7 +488,7 @@
             email: model.email,
             uid: model.id,
             role: model.role || 'user',
-            displayName: model.name || model.username
+            displayname: model.name || model.username
           });
         } else {
           callback(null);
@@ -504,7 +504,7 @@
           email: record.email,
           uid: record.id,
           role: record.role || 'user',
-          displayName: record.name || record.username
+          displayname: record.name || record.username
         });
       } else {
         // Важно: вызываем callback(null) для совместимости с AuthModule.checkAuth()
@@ -526,7 +526,7 @@
             email: email,
             username: username.toLowerCase(),
             password: hashedPassword,
-            displayName: displayName,
+            displayname: displayName,
             role: role || 'user',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
@@ -739,17 +739,8 @@
           .collection(DB_CONFIG.collections.VOLLEYBALL)
           .doc(gameId)
           .set(data, { merge: true })
-          .then(function() {
-            // Возвращаем обновленный документ, так как некоторый код (ctl.js)
-            // ожидает получить обновленные данные в .then()
-            return firebase.firestore()
-              .collection(DB_CONFIG.collections.VOLLEYBALL)
-              .doc(gameId)
-              .get()
-              .then(function(snapshot) {
-                return snapshot.exists ? utils.getPlainObject(snapshot.data()) : null;
-              });
-          });
+          // После обновления получаем и возвращаем обновленный документ
+          .then(() => scoreboard.get(gameId));
       }
 
       var pb = getPocketBaseClient();
@@ -1502,7 +1493,7 @@
         try {
           var stored = JSON.parse(localStorage.getItem('firebase_user'));
           if (!stored) return null;
-          return { username: stored.username, displayname: stored.displayName || stored.username };
+          return { username: stored.username, displayname: stored.displayname || stored.displayName || stored.username };
         } catch (e) { return null; }
       }
       if (provider === 'pocketbase') {

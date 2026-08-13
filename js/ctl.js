@@ -11,6 +11,8 @@ var CLASSIC_TIEBREAK_POINTS_TO_WIN = 15;
 
 // Данные для отложенного завершения матча (ожидание подтверждения пользователя)
 var pendingMatchFinish = null;
+// Данные для отложенного завершения сета
+var pendingSetFinish = null;
 // Запоминваем, был ли матч уже завершён ПРЕЖДЕ чем мы начали играть
 var matchWasAlreadyFinished = false;
 // Счётчик обновлений подписки — для определения первой загрузки
@@ -35,6 +37,42 @@ function getCurrentUserInfo() {
   var user = DB.getCurrentUser();
   if (user) _currentUserInfo = user;
   return _currentUserInfo || {};
+}
+
+// ========================================================================
+// ШАБЛОН ОФОРМЛЕНИЯ
+// ========================================================================
+
+/**
+ * Загружает список шаблонов и заполняет select
+ */
+function loadTemplateSelect() {
+  // Оборачиваем в try/catch, чтобы синхронная ошибка (например, отсутствие
+  // коллекции templates в PocketBase) не прерывала загрузку данных игры
+  var listPromise;
+  try {
+    listPromise = DB.templates.list();
+  } catch (e) {
+    console.error('[CTL] Sync error loading template list:', e);
+    $('#template_select').val('');
+    return;
+  }
+  if (!listPromise || typeof listPromise.then !== 'function') {
+    $('#template_select').val('');
+    return;
+  }
+  listPromise.then(function(list) {
+    var $select = $('#template_select');
+    var currentVal = $select.val() || (scoreboard_data && scoreboard_data['template_id']) || '';
+    $select.find('option:not([value=""])').remove();
+    list.forEach(function(item) {
+      $select.append($('<option>').val(item.id).text(item.name));
+    });
+    $select.val(currentVal);
+  }).catch(function(err) {
+    console.error('[CTL] Error loading template list:', err);
+    $('#template_select').val('');
+  });
 }
 
 /**
@@ -122,6 +160,49 @@ function cancelMatchFinish() {
   $('#matchFinishModal').addClass('dialog-hidden');
 }
 
+/**
+ * Показать модальное окно подтверждения завершения сета.
+ */
+function showSetFinishDialog(update) {
+  console.log('[SET] showSetFinishDialog вызван.');
+
+  // Сохраняем данные для последующего использования
+  pendingSetFinish = {
+    update: update
+  };
+
+  $('#setFinishModal').removeClass('dialog-hidden');
+  // Блокируем кнопки на время подтверждения
+  $(".score-btn").prop('disabled', true);
+}
+
+/**
+ * Подтвердить завершение сета — обновить БД.
+ */
+function confirmSetFinish() {
+  if (!pendingSetFinish) return;
+
+  update_db(pendingSetFinish.update);
+
+  pendingSetFinish = null;
+  $('#setFinishModal').addClass('dialog-hidden');
+  // Разблокировка кнопок произойдет при следующем обновлении данных из БД
+}
+
+/**
+ * Отменить завершение сета — НЕ фиксировать счёт.
+ * Очко, которое привело к завершению сета, не засчитывается.
+ */
+function cancelSetFinish() {
+  if (!pendingSetFinish) return;
+
+  // НЕ вызываем update_db — счёт и результат сета НЕ фиксируются.
+  pendingSetFinish = null;
+  $('#setFinishModal').addClass('dialog-hidden');
+  // Разблокируем кнопки, чтобы можно было продолжить
+  $(".score-btn").prop('disabled', false);
+}
+
 // Подписка на изменения после загрузки DOM
 $(document).ready(function() {
   // Инициализируем DB
@@ -139,7 +220,7 @@ $(document).ready(function() {
       local_game_id,
       function(data) {
         if (!data) {
-          console.warn('Document does not exist:', game_id);
+          console.warn('Document does not exist:', local_game_id);
           return;
         }
         $(".hidden").removeClass("hidden");
@@ -215,12 +296,13 @@ $(document).ready(function() {
     var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
     // Учитываем pendingMatchFinish — матч в процессе подтверждения
     var matchPending = !!pendingMatchFinish;
-    if(beachFinished || classicFinished || matchPending){
+    var setPending = !!pendingSetFinish;
+    if(beachFinished || classicFinished || matchPending || setPending){
       $(".beach-match-status").removeClass("hidden").text(matchPending ? "Ожидание подтверждения..." : "Матч завершён");
     }else{
       $(".beach-match-status").addClass("hidden").text("");
     }
-    var matchFinished = beachFinished || classicFinished || matchPending;
+    var matchFinished = beachFinished || classicFinished || matchPending || setPending;
     var pendingNewSet = !!scoreboard_data['pending_new_set'];
     var startOfSet = (ensureNumber(scoreboard_data['home_score'])===0) && (ensureNumber(scoreboard_data['away_score'])===0);
 
@@ -294,7 +376,7 @@ $(document).ready(function() {
     // Period buttons: enable only at initial moment or after set/match end (but not during confirmation)
     var unlimitedScore = !!scoreboard_data['unlimited_score'];
     var enablePeriodButtons = (unlimitedScore || startOfSet || pendingNewSet || !!scoreboard_data['classic_match_finished'] || !!scoreboard_data['beach_match_finished']) && !matchPending;
-    var periodDisabled = !enablePeriodButtons;
+    var periodDisabled = !enablePeriodButtons || setPending;
     $(".period-btn").prop('disabled', periodDisabled);
 
     //$("#show").prop("checked",(scoreboard_data['show']));
@@ -336,7 +418,7 @@ function update_db(data){
   var userInfo = getCurrentUserInfo();
   if (userInfo.username) {
     data.username = userInfo.username;
-    data.displayname = userInfo.displayname;
+    data.displayname = userInfo.displayname || userInfo.displayName;
   }
   data.lastEdited = DB.serverTimestamp();  
   // Напрямую используем DB.scoreboard.update, чтобы получить Promise с обновленными данными
@@ -435,6 +517,7 @@ function performNewSetUpdate(){
   update['pending_home_side'] = DB.deleteField();
   update['pending_away_side'] = DB.deleteField();
   update['pending_classic_tiebreak_switch_done'] = DB.deleteField();
+  update['classic_switch_shown'] = DB.deleteField(); // Сбрасываем флаг показа смены сторон для нового сета
   update['pending_new_set'] = DB.deleteField();
   update_db(update);
 }
@@ -644,10 +727,10 @@ function applySetWin(team, homeScore, awayScore, baseUpdate){
       console.log('[MATCH] applySetWin (beach): matchFinished=true, показываем диалог');
       showMatchFinishDialog(update, updatedHistory, homeSets, awaySets, 'beach');
     } else {
-      update_db(update);
       if(matchFinished) {
         console.log('[MATCH] applySetWin (beach): matchFinished=true, но matchWasAlreadyFinished=true — диалог пропущен');
       }
+      showSetFinishDialog(update);
     }
   } else {
     // Логика классического волейбола - используем fouls для подсчета сетов
@@ -695,7 +778,7 @@ function applySetWin(team, homeScore, awayScore, baseUpdate){
       saveMatchResult(updatedHistory, homeFouls, awayFouls);
       update_db(update);
     } else {
-      update_db(update);
+      showSetFinishDialog(update);
     }
   }
 }
@@ -843,7 +926,7 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
     saveMatchResult(updatedHistory, homeFouls, awayFouls);
     update_db(update);
   } else {
-    update_db(update);
+    showSetFinishDialog(update);
   }
 }
 
@@ -1203,6 +1286,15 @@ $(document).ready(function(){
     cancelMatchFinish();
   });
 
+  // Обработчики кнопок модального окна подтверждения завершения сета
+  $("#setFinishYes").click(function(){
+    confirmSetFinish();
+  });
+
+  $("#setFinishNo").click(function(){
+    cancelSetFinish();
+  });
+
   $(".reset-btn").click(function(){
     // Блокировка при ожидании подтверждения завершения матча
     if(pendingMatchFinish) return;
@@ -1377,8 +1469,17 @@ $(document).ready(function(){
 
   $("#beach_mode_toggle").change(function(){
     var beachMode = $(this).is(':checked');
+    // Этот чекбокс имеет сложную логику, поэтому его click-событие не дублируем
     toggleBeachMode(beachMode);
     // Блокируем/разблокируем чекбокс two_wins_mode
+    $('#two_wins_mode_toggle').prop('disabled', beachMode);
+    $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
+  });
+
+  // Дублируем на 'click' для надежности на мобильных устройствах
+  $("#beach_mode_toggle").on('click', function(){
+    var beachMode = $(this).is(':checked');
+    toggleBeachMode(beachMode);
     $('#two_wins_mode_toggle').prop('disabled', beachMode);
     $('#two_wins_mode_toggle').parent('label').toggleClass('disabled-label', beachMode);
   });
@@ -1387,49 +1488,21 @@ $(document).ready(function(){
     update_db({invert_tablo: $(this).is(':checked')});
   });
 
+  // Дублируем на 'click' для надежности на мобильных устройствах
+  $("#invert_tablo_toggle").on('click', function(){
+    update_db({invert_tablo: $(this).is(':checked')});
+  });
+
   $("#unlimited_score_toggle").change(function(){
     update_db({unlimited_score: $(this).is(':checked')});
   });
 
-  // ========================================================================
-  // ШАБЛОН ОФОРМЛЕНИЯ
-  // ========================================================================
-
-  // Загружаем список шаблонов и заполняем select
-  function loadTemplateSelect() {
-    // Оборачиваем в try/catch, чтобы синхронная ошибка (например, отсутствие
-    // коллекции templates в PocketBase) не прерывала загрузку данных игры
-    var listPromise;
-    try {
-      listPromise = DB.templates.list();
-    } catch (e) {
-      console.error('[CTL] Sync error loading template list:', e);
-      $('#template_select').val('');
-      return;
-    }
-    if (!listPromise || typeof listPromise.then !== 'function') {
-      $('#template_select').val('');
-      return;
-    }
-    listPromise.then(function(list) {
-      var $select = $('#template_select');
-      // Если select ещё пуст — берём значение из загруженных данных игры
-      var currentVal = $select.val() || (scoreboard_data && scoreboard_data['template_id']) || '';
-      $select.find('option:not([value=""])').remove();
-      for (var i = 0; i < list.length; i++) {
-        var $opt = $('<option>').val(list[i].id).text(list[i].name);
-        $select.append($opt);
-      }
-      // Восстанавливаем выбранное значение (всегда, даже если пусто — выбираем "Без шаблона")
-      $select.val(currentVal);
-    }).catch(function(err) {
-      console.error('[CTL] Error loading template list:', err);
-      // При ошибке загрузки сбрасываем на "Без шаблона"
-      $('#template_select').val('');
-    });
-  }
-
   // При изменении шаблона — сохраняем в БД
+  $("#unlimited_score_toggle").on('click', function(){
+    update_db({unlimited_score: $(this).is(':checked')});
+  });
+
+  // Для select-элемента дублирование не требуется
   $("#template_select").change(function(){
     var templateId = $(this).val() || '';
     update_db({template_id: templateId});
@@ -1460,8 +1533,17 @@ $(document).ready(function(){
 
   $("#two_wins_mode_toggle").change(function(){
     var twoWinsMode = $(this).is(':checked');
+    // Этот чекбокс имеет сложную логику, поэтому его click-событие не дублируем
     toggleTwoWinsMode(twoWinsMode);
     // Блокируем/разблокируем чекбокс beach_mode
+    $('#beach_mode_toggle').prop('disabled', twoWinsMode);
+    $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
+  });
+
+  // Дублируем на 'click' для надежности на мобильных устройствах
+  $("#two_wins_mode_toggle").on('click', function(){
+    var twoWinsMode = $(this).is(':checked');
+    toggleTwoWinsMode(twoWinsMode);
     $('#beach_mode_toggle').prop('disabled', twoWinsMode);
     $('#beach_mode_toggle').parent('label').toggleClass('disabled-label', twoWinsMode);
   });
@@ -1474,15 +1556,9 @@ $(document).ready(function(){
     update['classic_switch_needed'] = DEL;
     update['classic_switch_message'] = DEL;
     update['beach_switch_message'] = DEL;
+//    update['classic_switch_shown'] = DEL; // Сбрасываем этот флаг при ручной смене сторон
     update['lastEdited'] = DB.serverTimestamp();
-    scoreboard_query.update(update).then(function(){
-      // Немедленно возвращаем белый фон кнопки после успешной записи
-      $(".side-switch-btn").css('background-color', '').css('color', '');
-    }).catch(function(err){
-      console.error('Error updating side switch:', err);
-      // В любом случае сбросим визуально
-      $(".side-switch-btn").css('background-color', '').css('color', '');
-    });
+    update_db(update);
   });
   $(".new-set-btn").click(function(){
     // Сбросить счёт для начала нового сета. Остальные параметры (period/set number)
