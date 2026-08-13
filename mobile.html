@@ -365,6 +365,17 @@
       align-items: center;
       justify-content: center;
     }
+
+    /* Анимация мигания для кнопок */
+    @keyframes blink-animation {
+      50% { background-color: #e94560; }
+    }
+    .blinking {
+      animation: blink-animation 1.5s infinite;
+      color: white !important;
+      border-color: #e94560;
+    }
+
   </style>
   <script src="credentials.js"></script>
   <script src="js/db-config.js"></script>

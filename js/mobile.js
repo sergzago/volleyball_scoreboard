@@ -951,13 +951,7 @@
 
     var classicSwitchNeeded = !!data['classic_switch_needed'];
     var beachSwitchMessage = data['beach_switch_message'];
-    if ((beachMode && beachSwitchMessage) || classicSwitchNeeded) {
-      sideSwitchBtn.style.background = '#e94560';
-      sideSwitchBtn.style.color = 'white';
-    } else {
-      sideSwitchBtn.style.background = '';
-      sideSwitchBtn.style.color = '';
-    }
+    sideSwitchBtn.classList.toggle('blinking', (beachMode && !!beachSwitchMessage) || classicSwitchNeeded);
 
     renderSetHistoryCtl(data['set_history']);
   }
@@ -1394,13 +1388,7 @@
 
   function highlightSideSwitch(needed, message) {
     var btn = document.querySelector('.side-switch-btn');
-    if (needed) {
-      btn.style.background = '#e94560';
-      btn.style.color = 'white';
-    } else {
-      btn.style.background = '';
-      btn.style.color = '';
-    }
+    btn.classList.toggle('blinking', needed);
   }
 
   function handleClassicScore(team, delta) {
@@ -1424,27 +1412,23 @@
     if (isCustomMode()) {
       syncCustomSettings();
       if (getCustomSideSwitch()) {
+        var homeBefore = (team === 'home') ? currentScore : otherScore;
+        var awayBefore = (team === 'home') ? otherScore : currentScore;
+        var totalBefore = homeBefore + awayBefore;
+        var totalAfter = homeAfter + awayAfter;
         var interval = getCustomSideSwitchPoints();
-        var totalScore = homeAfter + awayAfter;
-        var shouldSwitch = totalScore > 0 && totalScore % interval === 0;
-        if (shouldSwitch) {
-          if (!mobileScoreboardData['classic_switch_shown']) {
-            update['classic_switch_needed'] = true;
-            update['classic_switch_message'] = 'Смена площадок — счёт ' + formatScore(homeAfter, awayAfter);
-            update['classic_switch_shown'] = true;
-            mobileScoreboardData['classic_switch_needed'] = true;
-            mobileScoreboardData['classic_switch_message'] = update['classic_switch_message'];
-            sideSwitchTriggered = true;
-          }
-        } else if (mobileScoreboardData['classic_switch_needed']) {
-          var DEL = DB.deleteField();
-          update['classic_switch_needed'] = DEL;
-          update['classic_switch_message'] = DEL;
-          delete mobileScoreboardData['classic_switch_needed'];
-          delete mobileScoreboardData['classic_switch_message'];
+
+        // Смена происходит, когда пересекается граница, кратная интервалу
+        if (delta > 0 && interval > 0 && Math.floor(totalAfter / interval) > Math.floor(totalBefore / interval)) {
+          update['classic_switch_needed'] = true;
+          update['classic_switch_message'] = 'Смена площадок — счёт ' + formatScore(homeAfter, awayAfter);
+          mobileScoreboardData['classic_switch_needed'] = true; // Обновляем локальное состояние для UI
+          mobileScoreboardData['classic_switch_message'] = update['classic_switch_message'];
+          sideSwitchTriggered = true;
         }
       }
     } else if (!isCustomMode()) {
+      // Логика для стандартного режима (не трогаем)
       var tiebreakSet = twoWinsMode ? 3 : 5;
       if (!isBeachMode() && currentPeriod === tiebreakSet && Math.max(homeAfter, awayAfter) >= 8) {
         if (!mobileScoreboardData['classic_switch_shown']) {
@@ -1912,7 +1896,7 @@
       delete mobileScoreboardData['classic_switch_needed'];
       delete mobileScoreboardData['classic_switch_message'];
       delete mobileScoreboardData['beach_switch_message'];
-      highlightSideSwitch(false);
+      this.classList.remove('blinking');
       // Используем стандартную функцию update_db, которая работает для всех режимов
       update_db(update);
     });

@@ -287,11 +287,7 @@ $(document).ready(function() {
     var reminder=scoreboard_data['beach_switch_message'];
     var sideSwitchBtn=$(".side-switch-btn");
     var classicSwitchNeeded = !!scoreboard_data['classic_switch_needed'];
-    if((beachMode && reminder) || classicSwitchNeeded){
-      sideSwitchBtn.css('background-color', '#ff0000').css('color', '#ffffff');
-    }else{
-      sideSwitchBtn.css('background-color', '').css('color', '');
-    }
+    sideSwitchBtn.toggleClass('blinking', (beachMode && !!reminder) || classicSwitchNeeded);
     var beachFinished = beachMode && scoreboard_data['beach_match_finished'];
     var classicFinished = (!beachMode) && scoreboard_data['classic_match_finished'];
     // Учитываем pendingMatchFinish — матч в процессе подтверждения
@@ -945,23 +941,24 @@ function handleClassicScore(team, delta){
   var homeAfter=team=='home'?newScore:ensureNumber(scoreboard_data['home_score']);
   var awayAfter=team=='home'?otherScore:newScore;
 
-  // If condition for manual mid‑set switch is met, set the flag and message.
-  if(shouldClassicMidSwitch(homeAfter, awayAfter)){
-    // Only set the visual request once per match/set: if we haven't shown it yet
-    if(!scoreboard_data['classic_switch_shown']){
-      var twoWinsMode = !!scoreboard_data['two_wins_mode'];
-      var tiebreakSet = twoWinsMode ? 3 : 5;
-      update['classic_switch_needed'] = true;
-      update['classic_switch_message'] = 'Смена площадок — ' + tiebreakSet + '-й сет, счёт '+formatScore(homeAfter, awayAfter);
-      update['classic_switch_shown'] = true;
+  // Логика смены сторон
+  // Для произвольного режима (custom mode)
+  if (scoreboard_data['custom_mode'] && scoreboard_data['score_change'] > 0) {
+    var interval = ensureNumber(scoreboard_data['score_change']);
+    var homeBefore = team === 'home' ? currentScore : otherScore;
+    var awayBefore = team === 'home' ? otherScore : currentScore;
+    var totalBefore = homeBefore + awayBefore;
+    var totalAfter = homeAfter + awayAfter;
+
+    if (delta > 0 && interval > 0 && Math.floor(totalAfter / interval) > Math.floor(totalBefore / interval)) {
+        update['classic_switch_needed'] = true;
+        update['classic_switch_message'] = 'Смена площадок — счёт ' + formatScore(homeAfter, awayAfter);
     }
-  } else {
-    // If condition is no longer met, remove only the 'needed' visual flag/message
-    if(scoreboard_data['classic_switch_needed']){
-      var DEL = DB.deleteField();
-      update['classic_switch_needed'] = DEL;
-      update['classic_switch_message'] = DEL;
-      // keep 'classic_switch_shown' to avoid re-triggering highlight again
+  } else if (!scoreboard_data['custom_mode']) { // Для стандартного режима
+    if (shouldClassicMidSwitch(homeAfter, awayAfter) && !scoreboard_data['classic_switch_shown']) {
+        update['classic_switch_needed'] = true;
+        update['classic_switch_message'] = 'Смена площадок — 5-й сет, счёт ' + formatScore(homeAfter, awayAfter);
+        update['classic_switch_shown'] = true;
     }
   }
 
@@ -1557,7 +1554,7 @@ $(document).ready(function(){
     update['classic_switch_message'] = DEL;
     update['beach_switch_message'] = DEL;
 //    update['classic_switch_shown'] = DEL; // Сбрасываем этот флаг при ручной смене сторон
-    update['lastEdited'] = DB.serverTimestamp();
+    update['lastEdited'] = DB.serverTimestamp();    
     update_db(update);
   });
   $(".new-set-btn").click(function(){
