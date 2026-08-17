@@ -94,6 +94,17 @@
         color: #ff0000;
       }
 
+      /* Принудительные стили для светлой темы (бело-черная) */
+      body:not(.dark-theme) {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      body:not(.dark-theme) .tablo-general-score,
+      body:not(.dark-theme) .set-history {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+
       /* Кнопка переключения темы */
       #theme-toggle {
         position: fixed;
@@ -144,7 +155,7 @@
       .tablo-general-score {
         font-size: clamp(20px, 2.5vw, 32px);
         font-weight: bold;
-        color: var(--top-secondary-score-text, #333);
+        color: var(--top-secondary-score-text, #000);
         margin: 0 clamp(10px, 2vw, 30px);
       }
       .tablo-score {
@@ -211,4 +222,3 @@
     </div>
   </body>
 </html>
-

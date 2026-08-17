@@ -240,12 +240,21 @@
             document.querySelectorAll('.admin-tab').forEach(function(el) {
               el.classList.remove('admin-hidden');
             });
+            // Активируем кнопку "Подключиться" для администратора
+            document.getElementById('connectGameBtn').disabled = false;
+          } else {
+            // Для обычных пользователей кнопка остается неактивной (disabled)
+            document.getElementById('connectGameBtn').disabled = true;
+            document.getElementById('connectGameBtn').title = 'Доступно только администраторам';
           }
           loadGamesList();
         }).catch(function() {
           showApp(user.email || username, 'user');
           loadGamesList();
         });
+      }).catch(function() {
+        // В случае ошибки авторизации, убедимся, что кнопка неактивна
+        document.getElementById('connectGameBtn').disabled = true;
       });
     }).catch(function(e) {
       clearTimeout(loginFallback);
@@ -394,6 +403,8 @@
       btn.textContent = 'Войти';
       setupMockDB();
       showApp('test', 'user');
+      // В демо-режиме кнопка неактивна
+      document.getElementById('connectGameBtn').disabled = true;
       loadGamesList();
       return;
     }
@@ -428,6 +439,10 @@
         document.querySelectorAll('.admin-tab').forEach(function(el) {
           el.classList.remove('admin-hidden');
         });
+        document.getElementById('connectGameBtn').disabled = false;
+      } else {
+        document.getElementById('connectGameBtn').disabled = true;
+        document.getElementById('connectGameBtn').title = 'Доступно только администраторам';
       }
       loadGamesList();
 
