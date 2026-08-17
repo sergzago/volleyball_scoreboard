@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  pocketbase:
+    image: ghcr.io/pocketbase/pocketbase:latest
+    container_name: volleyball_pb
+    restart: unless-stopped
+    command: serve --http="0.0.0.0:8090" --origins="*"
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/pb_data
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8090/api/health || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: volleyball_server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Переменные окружения для подключения к PocketBase внутри Docker
+      - DB_PROVIDER=pocketbase
+      - POCKETBASE_URL=http://pocketbase:8090
+      - POCKETBASE_ADMIN_EMAIL=supervisor@volleyball.local
+      - POCKETBASE_ADMIN_PASSWORD=Mer1in00
+      - PORT=3000
+      - ALLOWED_ORIGINS=*
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+
+volumes:
+  pb_data:
+    driver: local
