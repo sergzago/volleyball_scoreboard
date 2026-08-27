@@ -1195,8 +1195,13 @@
    * Все цвета соответствуют sb.html (нижнее табло)
    */
   var DEFAULT_TEMPLATE_DATA = {
-    // Фон страницы (sb.html: body без фона, но табло на #1a2b3c)
+        // Фон страницы (sb.html: body без фона, но табло на #1a2b3c)
     body_bg: '#1a2b3c',
+    // Фон блока логотипа (sb.html: .logo-area; если не задан — используется фон зон команд)
+    logo_bg: '#1a2b3c',
+    // Лейбл custom_label вверху табло (sb.html: .top_label)
+    label_bg: '#595959',
+    label_text: '#ffffff',
     // Имя команды (sb.html: .teams-area background #1a2b3c, color white)
     top_team_name_bg: '#1a2b3c',
     top_team_name_text: '#ffffff',

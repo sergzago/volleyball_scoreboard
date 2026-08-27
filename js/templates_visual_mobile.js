@@ -33,6 +33,8 @@ window.TemplatesVisualMobile = (function() {
   /** Карта: data-style-property → { bg, text } */
   var PROPERTY_MAP = {
     logo_base64:           { bg: null,                    text: null },
+    logo_bg:               { bg: 'logo_bg',               text: null },
+    label_bg:              { bg: 'label_bg',              text: 'label_text' },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_primary_score_bg:  { bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
@@ -153,6 +155,10 @@ window.TemplatesVisualMobile = (function() {
     document.querySelectorAll('.teams-area').forEach(function(el) { el.style.backgroundColor = teamNameBg; });
     document.querySelectorAll('.team-colors-area').forEach(function(el) { el.style.backgroundColor = teamNameBg; });
     document.querySelectorAll('.scores-area').forEach(function(el) { el.style.backgroundColor = teamNameBg; });
+
+    // Фон блока логотипа (задается кликом по краю блока логотипа)
+    var logoBg = data.logo_bg || '#1a2b3c';
+    document.querySelectorAll('.logo-area').forEach(function(el) { el.style.backgroundColor = logoBg; });
 
     // Цвет текста имени команды — применяем ко всем дочерним элементам
     var teamNameText = data.top_team_name_text || '#ffffff';
@@ -312,6 +318,7 @@ window.TemplatesVisualMobile = (function() {
     var panel = $('colorPanel');
     if (panel) panel.classList.remove('open');
     document.querySelectorAll('.clickable-block.selected').forEach(function(el) { el.classList.remove('selected'); });
+    document.querySelectorAll('.logo-edge-zone.selected').forEach(function(el) { el.classList.remove('selected'); });
     selectedBlock = null;
   }
 
@@ -484,6 +491,14 @@ window.TemplatesVisualMobile = (function() {
       block.addEventListener('click', function(e) {
         e.stopPropagation();
         openColorPanel(block);
+      });
+    });
+
+    // КЛИК ПО КРАЯМ БЛОКА ЛОГОТИПА (выбор цвета фона логотипа)
+    document.querySelectorAll('.logo-edge-zone').forEach(function(zone) {
+      zone.addEventListener('click', function(e) {
+        e.stopPropagation(); // не проваливаемся в родительский .logo-area (загрузка файла)
+        openColorPanel(zone);
       });
     });
 

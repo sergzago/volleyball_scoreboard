@@ -105,7 +105,7 @@
       width: 100%;
       max-width: 700px;
     }
-    .scoreboard {
+        .scoreboard {
       display: flex;
       width: auto;
       height: 64px;
@@ -117,6 +117,23 @@
       transform: scale(0.7);
       transform-origin: center center;
     }
+    /* Верхний лейбл custom_label — кликабельный для выбора фона/цвета текста */
+    .scoreboard .top_label {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background-color: var(--label-bg, #595959);
+      color: var(--label-text, #ffffff);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      cursor: pointer;
+      opacity: 1;
+    }
     .logo-area {
       width: 64px;
       height: 64px;
@@ -126,8 +143,25 @@
       align-items: center;
       padding: 3px;
       position: relative;
-      background-color: #1a2b3c;
+      background-color: var(--logo-bg, #1a2b3c);
       box-sizing: border-box;
+    }
+    /* Зоны клика по краям блока логотипа (6px): центр — логотип, края — фон */
+    .logo-edge-zone {
+      position: absolute;
+      z-index: 5;
+      background: transparent;
+      cursor: pointer;
+    }
+    .logo-edge-zone.edge-top    { top: 0;    left: 0;  right: 0; height: 6px; }
+    .logo-edge-zone.edge-bottom { bottom: 0; left: 0;  right: 0; height: 6px; }
+    .logo-edge-zone.edge-left   { top: 0;    bottom: 0; left: 0;  width: 6px; }
+    .logo-edge-zone.edge-right  { top: 0;    bottom: 0; right: 0; width: 6px; }
+    .logo-edge-zone.selected {
+      background: rgba(255, 193, 7, 0.75);
+    }
+    .logo-edge-zone:hover {
+      background: rgba(255, 193, 7, 0.55);
     }
     .logo-img { width: 100%; height: 100%; object-fit: scale-down; }
     .team-colors-area {
@@ -855,11 +889,20 @@
                 <button class="btn btn-danger btn-sm" id="btnDeleteLogo" style="display:none;">Удалить логотип</button>
               </div>
               <div class="scoreboard-container">
-                <div class="scoreboard" id="scoreboard-preview">
+                                <div class="scoreboard" id="scoreboard-preview">
+                  <!-- Верхний лейбл (custom_label) — клик = выбор фона/цвета текста -->
+                  <div class="top_label clickable-block" data-style-property="label_bg" data-block-name="Лейбл">
+                    <span class="block-label">Фон и текст лейбла</span>
+                  </div>
                   <!-- Логотип -->
                   <div class="logo-area clickable-block" data-style-property="logo_base64" data-block-name="Логотип">
                     <span class="block-label">Логотип</span>
                     <img class="logo-img" src="logo_nvl.png" alt="Logo">
+                    <!-- Зоны по краям (6px) — выбор цвета фона логотипа -->
+                    <div class="logo-edge-zone edge-top" data-style-property="logo_bg" data-block-name="Фон логотипа"></div>
+                    <div class="logo-edge-zone edge-right" data-style-property="logo_bg" data-block-name="Фон логотипа"></div>
+                    <div class="logo-edge-zone edge-bottom" data-style-property="logo_bg" data-block-name="Фон логотипа"></div>
+                    <div class="logo-edge-zone edge-left" data-style-property="logo_bg" data-block-name="Фон логотипа"></div>
                   </div>
                   <!-- Цвета формы команд (нередактируемый) -->
                   <div class="team-colors-area">

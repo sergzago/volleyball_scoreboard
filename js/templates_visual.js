@@ -30,6 +30,8 @@
   /** Карта: data-style-property → { bg, text } */
   var PROPERTY_MAP = {
     logo_base64:           { bg: null,                    text: null },
+        logo_bg:               { bg: 'logo_bg',               text: null },
+    label_bg:              { bg: 'label_bg',              text: 'label_text' },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_primary_score_bg:  { bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
@@ -140,6 +142,9 @@
     $('.teams-area').css('background-color', data.top_team_name_bg || '#1a2b3c');
     $('.team-colors-area').css('background-color', data.top_team_name_bg || '#1a2b3c');
     $('.scores-area').css('background-color', data.top_team_name_bg || '#1a2b3c');
+
+    // Фон блока логотипа (задается кликом по краю блока логотипа)
+    $('.logo-area').css('background-color', data.logo_bg || '#1a2b3c');
 
     // Цвет текста имени команды — применяем ко всем дочерним элементам,
     // чтобы переопределить возможные CSS-стили
@@ -295,6 +300,7 @@
   function closeColorPanel() {
     $('#colorPanel').removeClass('open');
     $('.clickable-block.selected').removeClass('selected');
+    $('.logo-edge-zone.selected').removeClass('selected');
     selectedBlock = null;
   }
 
@@ -477,6 +483,15 @@
 
     $('.clickable-block').on('click', function(e) {
       e.stopPropagation();
+      openColorPanel($(this));
+    });
+
+    // ========================================================================
+    // КЛИК ПО КРАЯМ БЛОКА ЛОГОТИПА (выбор цвета фона логотипа)
+    // ========================================================================
+
+    $('.logo-edge-zone').on('click', function(e) {
+      e.stopPropagation(); // не проваливаемся в родительский .logo-area (загрузка файла)
       openColorPanel($(this));
     });
 

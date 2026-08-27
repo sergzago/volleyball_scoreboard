@@ -31,12 +31,12 @@
         }
 
         /* Верхний лейбл (custom_label) */
-        .top_label {
+                .top_label {
             position: absolute;
             top: 10px;
             left: -500px;
-            background: #595959;
-            color: white;
+            background: var(--label-bg, #595959);
+            color: var(--label-text, #ffffff);
             padding: 5px 15px;
             border-radius: 4px;
             font-size: 16px;
@@ -104,7 +104,7 @@
             align-items: center;
             padding: 3px;
             position: relative;
-            background-color: var(--bottom-team-name-bg, #1a2b3c);
+            background-color: var(--logo-bg, var(--bottom-team-name-bg, #1a2b3c));
             box-sizing: border-box; /* Чтобы padding включался в высоту */
         }
 
@@ -225,7 +225,7 @@
         .bottom-scoreboard .sets-blocks-area {
             display: flex;
             height: 100%;
-            background-color: var(--bottom-team-name-bg, #1a2b3c);
+            background-color: var(--bottom-secondary-score-bg, #5aa0c4);
         }
 
         .bottom-scoreboard .set-block {
@@ -237,7 +237,7 @@
             align-items: center;
             font-size: 27px;
             font-weight: bold;
-            background-color: var(--bottom-team-name-bg, #1a2b3c);
+            background-color: var(--bottom-secondary-score-bg, #5aa0c4);
         }
 
         .bottom-scoreboard .set-block.visible {
@@ -256,11 +256,11 @@
         }
 
         .bottom-scoreboard .set-block .home-set-score {
-            color: var(--bottom-secondary-score-bg, #5aa0c4);
+            color: var(--bottom-secondary-score-text, white);
         }
 
         .bottom-scoreboard .set-block .away-set-score {
-            color: var(--bottom-primary-score-bg, #d65a98);
+            color: var(--bottom-secondary-score-text, white);
         }
 
         .bottom-scoreboard .set-separator {
@@ -279,7 +279,7 @@
             align-items: center;
             padding: 3px; /* Уменьшено с 4px */
             position: relative;
-            background-color: var(--top-team-name-bg, #1a2b3c);
+            background-color: var(--logo-bg, var(--top-team-name-bg, #1a2b3c));
             box-sizing: border-box; /* Чтобы padding включался в высоту */
         }
 

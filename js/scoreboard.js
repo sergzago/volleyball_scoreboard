@@ -198,6 +198,13 @@ function applyTemplate(data) {
   // Устанавливаем полученный или дефолтный логотип
   $('.logo-img').attr('src', finalLogoSrc);
 
+    // Фон блока логотипа (если задан в шаблоне; иначе CSS-фолбэк — фон зон команд)
+  setCssVar('--logo-bg', templateData.logo_bg);
+
+  // Цвета лейбла custom_label (.top_label)
+  setCssVar('--label-bg', templateData.label_bg);
+  setCssVar('--label-text', templateData.label_text);
+
   // Устанавливаем цвета из шаблона
   setCssVar('--body-bg', templateData.body_bg);
   setCssVar('--top-team-name-bg', templateData.top_team_name_bg);
