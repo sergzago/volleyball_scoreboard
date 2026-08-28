@@ -134,6 +134,19 @@
       cursor: pointer;
       opacity: 1;
     }
+    /* Блок истории сетов под табло — кликабельный для выбора фона/цвета текста */
+    .scoreboard-container .set-history-block {
+      background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
+      color: var(--set-history-text, var(--top-team-name-text, #ffffff));
+      border-radius: 4px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-top: 6px;
+      white-space: nowrap;
+    }
     .logo-area {
       width: 64px;
       height: 64px;
@@ -944,6 +957,11 @@
                       </div>
                     </div>
                   </div>
+                </div>
+                <!-- История сетов (set-history-scoreboard1) — клик = выбор фона/цвета текста -->
+                <div class="set-history-block clickable-block" data-style-property="set_history_bg" data-block-name="История сетов">
+                  <span class="block-label">История сетов</span>
+                  1:0 &nbsp;&nbsp; 2:1 &nbsp;&nbsp; 0:2
                 </div>
               </div>
               </div>

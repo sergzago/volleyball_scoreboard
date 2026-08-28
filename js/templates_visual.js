@@ -32,6 +32,9 @@
     logo_base64:           { bg: null,                    text: null },
         logo_bg:               { bg: 'logo_bg',               text: null },
     label_bg:              { bg: 'label_bg',              text: 'label_text' },
+    label_text:            { bg: 'label_bg',              text: 'label_text' },
+    set_history_bg:        { bg: 'set_history_bg',        text: 'set_history_text' },
+    set_history_text:      { bg: 'set_history_bg',        text: 'set_history_text' },
     body_bg:               { bg: 'body_bg',               text: null },
     top_team_name_bg:      { bg: 'top_team_name_bg',      text: 'top_team_name_text' },
     top_primary_score_bg:  { bg: 'top_primary_score_bg',  text: 'top_primary_score_text' },
@@ -73,6 +76,21 @@
     const b = parseInt(hexcolor.substr(4, 2), 16);
     const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
     return (yiq >= 128) ? '#000000' : '#ffffff';
+  }
+
+  /**
+   * Преобразует css-цвет вида rgb(r,g,b) / rgba(r,g,b,a) в hex-код #rrggbb.
+   * Возвращает null, если преобразовать не удалось.
+   */
+  function rgbToHex(rgb) {
+    if (!rgb || typeof rgb !== 'string') return null;
+    var match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (!match) return null;
+    function toHex(v) {
+      var h = parseInt(v, 10).toString(16);
+      return h.length === 1 ? '0' + h : h;
+    }
+    return '#' + toHex(match[1]) + toHex(match[2]) + toHex(match[3]);
   }
 
   function showNotification(message, type) {
@@ -274,11 +292,13 @@
     // Если для логотипа открылась панель (не должно, но на всякий случай)
     if (!mapping) return;
 
-
-    if (!mapping) return;
-
-    var bgColor = currentData[mapping.bg] || '#ffffff';
-    var textColor = mapping.text ? (currentData[mapping.text] || '#000000') : '#000000';
+    // Базовые цвета из данных шаблона. Если значение не задано (например, для
+    // истории сетов до первого сохранения) — берём фактически отображаемый цвет
+    // блока, чтобы панель соответствовала тому, что видно на табло.
+    var computedBg = $block.length ? window.getComputedStyle($block[0]).backgroundColor : null;
+    var computedText = $block.length ? window.getComputedStyle($block[0]).color : null;
+    var bgColor = currentData[mapping.bg] || rgbToHex(computedBg) || '#ffffff';
+    var textColor = mapping.text ? (currentData[mapping.text] || rgbToHex(computedText) || '#000000') : '#000000';
 
     $('#panelTitle').text(blockName);
     $('#panelColorPicker').val(bgColor);

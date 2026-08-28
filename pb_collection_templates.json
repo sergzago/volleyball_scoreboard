@@ -9,6 +9,8 @@
         { "name": "logo_bg", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
     { "name": "label_bg", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
     { "name": "label_text", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
+    { "name": "set_history_bg", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
+    { "name": "set_history_text", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
     { "name": "top_team_name_bg", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
     { "name": "top_team_name_text", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },
     { "name": "top_primary_score_bg", "type": "text", "required": false, "unique": false, "options": { "min": null, "max": null, "pattern": "" } },

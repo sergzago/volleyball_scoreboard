@@ -1,20 +1,40 @@
-version: '3.8'
-
 services:
+#  pocketbase:
+#    image: ghcr.io/pocketbase/pocketbase:latest
+#    container_name: volleyball_pb
+#    restart: unless-stopped
+#    command: serve --http="0.0.0.0:8090" --origins="*"
+#    ports:
+#      - "8090:8090"
+#    volumes:
+#      - pb_data:/pb_data
+#    healthcheck:
+#      test: wget --no-verbose --tries=1 --spider http://localhost:8090/api/health || exit 1
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
   pocketbase:
-    image: ghcr.io/pocketbase/pocketbase:latest
-    container_name: volleyball_pb
-    restart: unless-stopped
-    command: serve --http="0.0.0.0:8090" --origins="*"
+    image: alpine:latest
+    container_name: pocketbase
     ports:
       - "8090:8090"
     volumes:
-      - pb_data:/pb_data
-    healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8090/api/health || exit 1
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./pb_data:/pb/pb_data
+      - ./pb_public:/pb/pb_public # Опционально для статики
+    environment:
+      - PB_VERSION=0.22.25 # Укажите нужную версию PocketBase
+    dirname: /pb
+    working_dir: /pb
+    command: >
+      sh -c "
+      if [ ! -f pocketbase ]; then
+        wget https://github.com{PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip &&
+        unzip pocketbase_${PB_VERSION}_linux_amd64.zip &&
+        rm pocketbase_${PB_VERSION}_linux_amd64.zip;
+      fi &&
+      ./pocketbase serve --http=0.0.0.0:8090
+      "
+    restart: unless-stopped
 
   server:
     build:

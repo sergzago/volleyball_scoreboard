@@ -233,6 +233,10 @@ function applyTemplate(data) {
   setCssVar('--setball-text', templateData.setball_text);
   setCssVar('--matchball-bg', templateData.matchball_bg);
   setCssVar('--matchball-text', templateData.matchball_text);
+
+  // Блок истории сетов под табло и блоки счёта по сетам на нижнем табло
+  setCssVar('--set-history-bg', templateData.set_history_bg);
+  setCssVar('--set-history-text', templateData.set_history_text);
 }
 
 // Подписка на изменения через DB интерфейс (вызывается после DB.init)

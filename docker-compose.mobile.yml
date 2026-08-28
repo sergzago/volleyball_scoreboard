@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Сервис PocketBase (аналогично вашему существующему docker-compose.yml)
   pocketbase:

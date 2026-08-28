@@ -225,7 +225,7 @@
         .bottom-scoreboard .sets-blocks-area {
             display: flex;
             height: 100%;
-            background-color: var(--bottom-secondary-score-bg, #5aa0c4);
+            background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
         }
 
         .bottom-scoreboard .set-block {
@@ -237,7 +237,7 @@
             align-items: center;
             font-size: 27px;
             font-weight: bold;
-            background-color: var(--bottom-secondary-score-bg, #5aa0c4);
+            background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
         }
 
         .bottom-scoreboard .set-block.visible {
@@ -256,11 +256,11 @@
         }
 
         .bottom-scoreboard .set-block .home-set-score {
-            color: var(--bottom-secondary-score-text, white);
+            color: var(--set-history-text, var(--top-team-name-text, white));
         }
 
         .bottom-scoreboard .set-block .away-set-score {
-            color: var(--bottom-secondary-score-text, white);
+            color: var(--set-history-text, var(--top-team-name-text, white));
         }
 
         .bottom-scoreboard .set-separator {
@@ -506,8 +506,8 @@
         /* Блок истории сетов под основным табло */
         .set-history-block {
             position: absolute;
-            background-color: var(--bottom-time-bg, #1a2b3c);
-            color: var(--bottom-time-text, white);
+            background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
+            color: var(--set-history-text, var(--top-team-name-text, white));
             border-radius: 4px;
             padding: 5px 12px;
             font-size: 11px;

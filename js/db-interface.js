@@ -1202,6 +1202,10 @@
     // Лейбл custom_label вверху табло (sb.html: .top_label)
     label_bg: '#595959',
     label_text: '#ffffff',
+    // Блок истории сетов под табло (sb.html: .set-history-block, #set-history-scoreboard1)
+    // По умолчанию фон и цвет шрифта совпадают с зоной команд (teams-area)
+    set_history_bg: '#1a2b3c',
+    set_history_text: '#ffffff',
     // Имя команды (sb.html: .teams-area background #1a2b3c, color white)
     top_team_name_bg: '#1a2b3c',
     top_team_name_text: '#ffffff',
@@ -1264,7 +1268,20 @@
         .then(function(record) {
           // Возвращаем простой объект, чтобы поля (в т.ч. name) были доступны
           // как обычные свойства, а не через метод Record.get()
-          return record ? utils.getPlainObject(record) : null;
+          if (!record) return null;
+          var data = utils.getPlainObject(record);
+          // PocketBase — строго-схемная БД. Если в коллекции templates не настроены
+          // новые поля (например, set_history_bg/set_history_text), сервер просто
+          // не вернёт их и не сохранит. Дозаполняем недостающие поля значениями
+          // по умолчанию, чтобы редактор и табло корректно работали даже до
+          // добавления этих полей в схему коллекции.
+          var defaults = JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_DATA));
+          Object.keys(defaults).forEach(function(key) {
+            if (data[key] === undefined || data[key] === null || data[key] === '') {
+              data[key] = defaults[key];
+            }
+          });
+          return data;
         })
         .catch(function() {
           return null;
