@@ -1239,6 +1239,27 @@
   };
 
   /**
+   * Дозаполняет недостающие/пустые поля шаблона значениями по умолчанию.
+   * PocketBase — строго-схемная БД: если в коллекции templates не настроены
+   * новые поля (например, set_history_bg/set_history_text) или в конкретной
+   * записи они пустые (только что добавленные поля в схему), сервер не вернёт
+   * их (или вернёт null/''). Чтобы редактор и табло корректно отображали цвета,
+   * заполняем такие поля дефолтными значениями.
+   * @param {Object} data - данные шаблона из БД
+   * @returns {Object} - данные с заполненными дефолтами
+   */
+  function fillTemplateDefaults(data) {
+    if (!data || typeof data !== 'object') return data;
+    var defaults = JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_DATA));
+    Object.keys(defaults).forEach(function(key) {
+      if (data[key] === undefined || data[key] === null || data[key] === '') {
+        data[key] = defaults[key];
+      }
+    });
+    return data;
+  }
+
+  /**
    * Поиск записи шаблона в PocketBase по кастомному полю template_id
    */
   function findTemplateRecord(pb, templateId) {
@@ -1269,19 +1290,7 @@
           // Возвращаем простой объект, чтобы поля (в т.ч. name) были доступны
           // как обычные свойства, а не через метод Record.get()
           if (!record) return null;
-          var data = utils.getPlainObject(record);
-          // PocketBase — строго-схемная БД. Если в коллекции templates не настроены
-          // новые поля (например, set_history_bg/set_history_text), сервер просто
-          // не вернёт их и не сохранит. Дозаполняем недостающие поля значениями
-          // по умолчанию, чтобы редактор и табло корректно работали даже до
-          // добавления этих полей в схему коллекции.
-          var defaults = JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_DATA));
-          Object.keys(defaults).forEach(function(key) {
-            if (data[key] === undefined || data[key] === null || data[key] === '') {
-              data[key] = defaults[key];
-            }
-          });
-          return data;
+          return fillTemplateDefaults(utils.getPlainObject(record));
         })
         .catch(function() {
           return null;
@@ -1321,7 +1330,7 @@
       findTemplateRecord(pb, templateId)
         .then(function(record) {
           if (record) {
-            onUpdate(utils.getPlainObject(record));
+            onUpdate(fillTemplateDefaults(utils.getPlainObject(record)));
           } else {
             onUpdate(null);
           }
@@ -1341,7 +1350,7 @@
                 ? record.get('template_id')
                 : record.template_id;
               if (recordTemplateId && recordTemplateId === templateId) {
-                onUpdate(utils.getPlainObject(record));
+                onUpdate(fillTemplateDefaults(utils.getPlainObject(record)));
               }
             }
           })
