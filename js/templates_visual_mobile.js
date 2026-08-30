@@ -209,6 +209,20 @@ window.TemplatesVisualMobile = (function() {
       el.style.backgroundColor = data.matchball_bg || '#d65a98';
       el.style.color = data.matchball_text || '#ffffff';
     });
+
+    // Название шаблона отображаем в цветах лейбла (label_bg / label_text)
+    updateTemplateLabelColors();
+  }
+
+  /**
+   * Окрашивает название шаблона (#templateLabel) в цвета лейбла табло.
+   * Вызывается при загрузке шаблона и при каждом изменении цветов в редакторе.
+   */
+  function updateTemplateLabelColors() {
+    var el = $('templateLabel');
+    if (!el) return;
+    el.style.backgroundColor = (currentData && currentData.label_bg) || '#5aa0c4';
+    el.style.color = (currentData && currentData.label_text) || '#ffffff';
   }
 
   // ============================================================================
@@ -226,8 +240,14 @@ window.TemplatesVisualMobile = (function() {
     for (var i = 0; i < templateList.length; i++) {
       var t = templateList[i];
       var active = (t.id === currentTemplateId) ? ' active' : '';
+      // Название шаблона в списке сразу отображаем в цветах его лейбла
+      var nameStyle = '';
+      if (t.label_bg || t.label_text) {
+        nameStyle = ' style="background-color:' + escapeHtml(t.label_bg || '#5aa0c4') + ';' +
+                    'color:' + escapeHtml(t.label_text || '#ffffff') + ';"';
+      }
       html += '<li class="' + active + '" data-id="' + escapeHtml(t.id) + '">';
-      html += '<span>' + escapeHtml(t.name) + '</span>';
+      html += '<span' + nameStyle + '>' + escapeHtml(t.name) + '</span>';
       html += '<button class="delete-btn" data-id="' + escapeHtml(t.id) + '" title="Удалить">&times;</button>';
       html += '</li>';
     }
@@ -508,6 +528,16 @@ window.TemplatesVisualMobile = (function() {
     var btnNew = $('btnNewTemplate');
     if (btnNew) {
       btnNew.addEventListener('click', function() { loadTemplate(null); });
+    }
+
+    // КЛИК ПО НАЗВАНИЮ ШАБЛОНА — выбор цвета лейбла (label_bg / label_text)
+    var tplLabel = $('templateLabel');
+    if (tplLabel) {
+      tplLabel.addEventListener('click', function(e) {
+        e.stopPropagation(); // не закрывать панель цвета обработчиком документа
+        var labelBlock = document.querySelector('.top_label.clickable-block');
+        if (labelBlock) openColorPanel(labelBlock);
+      });
     }
 
     // КЛИК ПО БЛОКУ ТАБЛО

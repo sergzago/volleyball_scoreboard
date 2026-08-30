@@ -53,7 +53,16 @@
       if (!data) return {};
       // PocketBase `data` is a Record object with a get() method.
       if (typeof data.get === 'function') {
-        var plainData = data.get();
+        var plainData = null;
+        try { plainData = data.get(); } catch (e) { plainData = null; }
+        // Некоторые версии SDK не поддерживают get() без аргумента —
+        // собираем объект перечислением собственных свойств записи
+        if (!plainData || typeof plainData !== 'object') {
+          plainData = {};
+          for (var k in data) {
+            if (data.hasOwnProperty(k) && typeof data[k] !== 'function') plainData[k] = data[k];
+          }
+        }
         // PocketBase system id shadows custom id field — use get('id') for custom game ID
         var customId = data.get('id');
         if (customId) plainData['id'] = customId;
@@ -704,24 +713,69 @@
         });
 
       // Подписываемся на все изменения коллекции, фильтруем по кастомному полю id
+      // ВАЖНО: системное поле id PocketBase затеняет кастомное поле 'id' в realtime-событии,
+      // поэтому сравниваем оба варианта, а при неоднозначности перепроверяем запросом к серверу.
+      // Без этого табло (sb.html / tablo.html) не получают обновления счёта из мобильного управления.
       pb.collection(DB_CONFIG.collections.VOLLEYBALL)
         .subscribe('*', function(e) {
           if (e.action === 'update' || e.action === 'create') {
             var record = e.record;
             if (!record) return;
-            var recordGameId = typeof record.get === 'function' ? record.get('id') : record.id;
-            if (recordGameId && recordGameId === gameId) {
-              onUpdate(utils.getPlainObject(record));
+            var recordGameId = null;
+            try {
+              recordGameId = typeof record.get === 'function' ? record.get('id') : record.id;
+            } catch (err) {
+              recordGameId = record.id;
             }
+            if (recordGameId === gameId || record.id === gameId) {
+              onUpdate(utils.getPlainObject(record));
+              return;
+            }
+            // Фолбэк: если кастомный 'id' в событии затенён системным, перепроверяем,
+            // является ли изменённая запись той самой игрой (по системному id записи игры)
+            findRecordByCustomId(pb, DB_CONFIG.collections.VOLLEYBALL, 'id', gameId)
+              .then(function(fresh) {
+                if (fresh && fresh.id === record.id) {
+                  onUpdate(utils.getPlainObject(fresh));
+                }
+              })
+              .catch(function() {});
           }
         })
         .catch(function(err) {
           if (onError) onError(err);
         });
 
-      // Функция отписки
+      // Страховочный опрос (2 сек): если SSE-соединение молча разорвалось
+      // (например, после обновления страницы другого клиента, при таймауте
+      // прокси или рассогласовании версий SDK/сервера), подписчик всё равно
+      // получит актуальные данные при их изменении. Дублирующие вызовы
+      // onUpdate безвредны — данные идентичны.
+      var lastPayload = null;
+      var pollTimer = setInterval(function() {
+        findRecordByCustomId(pb, DB_CONFIG.collections.VOLLEYBALL, 'id', gameId)
+          .then(function(record) {
+            if (!record) return;
+            var plain = utils.getPlainObject(record);
+            var serialized = JSON.stringify(plain);
+            if (serialized !== lastPayload) {
+              lastPayload = serialized;
+              onUpdate(plain);
+            }
+          })
+          .catch(function() {});
+      }, 2000);
+
+      // Функция отписки: снимаем SSE-подписку по topic '*' (ключ регистрации),
+      // кастомный ключ для совместимости и останавливаем страховочный опрос
       return function() {
-        pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe(subscriptionKey);
+        try {
+          pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe('*');
+        } catch (e) {}
+        try {
+          pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe(subscriptionKey);
+        } catch (e) {}
+        clearInterval(pollTimer);
       };
     },
 
@@ -1361,8 +1415,11 @@
         if (onError) onError(e);
       }
 
-      // Функция отписки
+      // Функция отписки — снимаем подписку по topic '*' (ключ регистрации)
       return function() {
+        try {
+          pb.collection(DB_CONFIG.collections.TEMPLATES).unsubscribe('*');
+        } catch (e) {}
         try {
           pb.collection(DB_CONFIG.collections.TEMPLATES).unsubscribe(subscriptionKey);
         } catch (e) {}

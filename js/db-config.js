@@ -51,11 +51,11 @@ var DB_CONFIG = {
     TEMPLATES: 'templates1'
   },
   pocketbaseCollections: {
-    VOLLEYBALL: 'volleyball',
-    MATCHES: 'matches',
+    VOLLEYBALL: 'volleyball1',
+    MATCHES: 'matches1',
     USERS: 'scoreusers',
     AUTH_LOG: 'auth_log',
-    TEMPLATES: 'templates'
+    TEMPLATES: 'templates1'
   },
 
   // Техническая коллекция для обычных пользователей приложения (не для бизнес-логики)

@@ -224,7 +224,12 @@ $(document).ready(function() {
           return;
         }
         $(".hidden").removeClass("hidden");
-        scoreboard_data = data;
+        // Merge instead of replace — PocketBase SSE may omit fields
+        // (как в мобильном интерфейсе: частичное событие не должно затирать состояние)
+        if (typeof data.get === 'function') data = DB.utils.getPlainObject(data);
+        Object.keys(data).forEach(function(key) {
+          scoreboard_data[key] = data[key];
+        });
 
         // Проверяем завершение матча ТОЛЬКО при первой загрузке (не при каждом обновлении)
         _subscribeCallCount++;
@@ -306,6 +311,10 @@ $(document).ready(function() {
     // Также блокируем при активном таймауте
     var isTimeoutActive = (parseInt(scoreboard_data['show'], 10) === 6);
     var scoreButtonsDisabled = pendingNewSet || matchFinished || isTimeoutActive;
+
+    // Во время таймаута блокируем кнопки показа табло: случайное нажатие
+    // сбрасывает show=6 и «выключает» таймаут, рассинхронизируя страницы
+    $(".show-select").prop('disabled', isTimeoutActive);
 
     // Блокировка кнопок в блоке "Счёт" (фолы) в середине сета
     var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
@@ -396,7 +405,12 @@ $(document).ready(function() {
     $('#home_score').html(scoreboard_data['home_score'])
     $('#home_fouls').html(beachMode ? ensureNumber(scoreboard_data['home_sets']) : scoreboard_data['home_fouls'])
     $('#period').html(scoreboard_data['current_period'])
-    $('#custom_label').val(scoreboard_data['custom_label'])
+    // Не перезаписываем поле, пока в нём идёт набор текста — иначе
+    // подписка/опрос затирает вводимое значение данными из БД
+    var $customLabel = $('#custom_label');
+    if (!$customLabel.is(':focus')) {
+      $customLabel.val(scoreboard_data['custom_label'] || '');
+    }
     updateSideLayout();
     renderSetHistoryCtl(scoreboard_data['set_history']);
       },
@@ -404,6 +418,8 @@ $(document).ready(function() {
         console.error('Error listening to scoreboard:', error);
       }
     );
+    // Запускаем страховочный опрос после подписки (как в mobile.js)
+    startCtlPolling();
   }).catch(function(err) {
     console.error('DB initialization failed:', err);
   });
@@ -421,12 +437,35 @@ function update_db(data){
   DB.scoreboard.update(local_game_id, data)
     .then(function(updatedDoc) {
       if (updatedDoc) {
-        // Обновляем локальные данные для консистентности
-        scoreboard_data = updatedDoc;
+        // Обновляем локальные данные для консистентности.
+        // ВАЖНО: конвертируем Record PocketBase в простой объект,
+        // иначе все обращения scoreboard_data['...'] вернут undefined (как в mobile.js)
+        scoreboard_data = DB.utils.getPlainObject(updatedDoc) || scoreboard_data;
       }
     }).catch(function(err) {
       console.error("Update failed:", err);
     });
+}
+
+// Страховочный опрос каждую секунду (как в мобильном интерфейсе):
+// гарантирует синхронизацию состояния, даже если realtime-событие потеряно
+var _ctlPollInterval = null;
+
+function startCtlPolling() {
+  if (_ctlPollInterval) clearInterval(_ctlPollInterval);
+  _ctlPollInterval = setInterval(function() {
+    if (!local_game_id) return;
+    DB.scoreboard.get(local_game_id).then(function(data) {
+      if (!data) return;
+      Object.keys(data).forEach(function(key) {
+        scoreboard_data[key] = data[key];
+      });
+    }).catch(function() {});
+  }, 1000);
+}
+
+function stopCtlPolling() {
+  if (_ctlPollInterval) { clearInterval(_ctlPollInterval); _ctlPollInterval = null; }
 }
 
 function saveMatchResult(setHistory, overallHome, overallAway){
@@ -1137,10 +1176,13 @@ $(document).ready(function(){
         $('#timeoutModal').addClass('dialog-hidden');
         $('#timeoutTimerDisplay').css('color', '#e74c3c');
 
-        // Отправляем обновление в БД для выключения таймаута
+        // Отправляем обновление в БД для выключения таймаута.
+        // Восстанавливаем режим показа, выбранный ДО таймаута (синхронно с мобильной версией)
+        var prevShow = parseInt(scoreboard_data['show_before_timeout'], 10);
         var update = {
-          show: 1,
-          custom_label: scoreboard_data['custom_label']
+          show: isNaN(prevShow) ? 1 : prevShow,
+          custom_label: scoreboard_data['custom_label'],
+          show_before_timeout: DB.deleteField()
         };
         update_db(update);
       }
@@ -1188,7 +1230,12 @@ $(document).ready(function(){
       var isAwayTimeoutActive = currentLabel === 'Таймаут ' + awayTeam;
 
       if((team === 'home' && isHomeTimeoutActive) || (team === 'away' && isAwayTimeoutActive)){
-        var update = { show: 1, custom_label: scoreboard_data['custom_label'] };
+        var prevShowOff = parseInt(scoreboard_data['show_before_timeout'], 10);
+        var update = {
+          show: isNaN(prevShowOff) ? 1 : prevShowOff,
+          custom_label: scoreboard_data['custom_label'],
+          show_before_timeout: DB.deleteField()
+        };
         update_db(update);
         hideTimeoutModal();
       }
@@ -1204,18 +1251,21 @@ $(document).ready(function(){
       teamName: teamName,
       timeoutLabel: timeoutLabel,
       timeoutKey: timeoutKey,
-      currentTimeouts: currentTimeouts
+      currentTimeouts: currentTimeouts,
+      showBefore: currentShow
     };
     $('#timeoutConfirmText').text('Начать таймаут (' + teamName + ')?');
     $('#timeoutConfirmModal').removeClass('dialog-hidden');
   });
 
-  $('#timeoutConfirmYes').click(function(){
+    $('#timeoutConfirmYes').click(function(){
     $('#timeoutConfirmModal').addClass('dialog-hidden');
     if (!pendingTimeout) return;
     var pt = pendingTimeout;
     pendingTimeout = null;
     var update = { show: 6, custom_label: pt.timeoutLabel };
+    // Запоминаем режим показа, выбранный до таймаута, чтобы восстановить его при завершении
+    update['show_before_timeout'] = (pt.showBefore === 6 ? 1 : pt.showBefore);
     update[pt.timeoutKey] = pt.currentTimeouts + 1;
     update_db(update);
     showTimeoutModal(pt.teamName);
@@ -1230,12 +1280,14 @@ $(document).ready(function(){
   $("#timeoutModalClose").click(function(){
     hideTimeoutModal();
 
-    // Отправляем обновление в БД для выключения таймаута
+    // Отправляем обновление в БД для выключения таймаута (с восстановлением режима показа)
     var currentShow = parseInt(scoreboard_data['show'], 10) || 0;
     if (currentShow === 6) {
+      var prevShowClose = parseInt(scoreboard_data['show_before_timeout'], 10);
       var update = {
-        show: 1,
-        custom_label: scoreboard_data['custom_label']
+        show: isNaN(prevShowClose) ? 1 : prevShowClose,
+        custom_label: scoreboard_data['custom_label'],
+        show_before_timeout: DB.deleteField()
       };
       update_db(update);
     }

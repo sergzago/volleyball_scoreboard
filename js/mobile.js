@@ -860,12 +860,43 @@
     var venueEl = document.getElementById('controlVenue');
     if (venueEl) venueEl.textContent = data['venue'] || '';
 
+    // Учёт имени пользователя, последним изменившего игру (приходит в данных подписки)
+    var lastEditedEl = document.getElementById('controlLastEdited');
+    if (lastEditedEl) {
+      var editorName = data['displayname'] || data['displayName'] || data['username'] || '';
+      var lastEditedTime = data['lastEdited'];
+      if (editorName) {
+        var timeStr = '';
+        if (lastEditedTime) {
+          try {
+            var d = new Date(typeof lastEditedTime === 'string' ? lastEditedTime : lastEditedTime.toDate ? lastEditedTime.toDate() : lastEditedTime);
+            if (!isNaN(d.getTime())) {
+              timeStr = ' в ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) +
+                        ' ' + ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+            }
+          } catch (e) { timeStr = ''; }
+        }
+        // Не подсвечиваем своё же имя как "другого пользователя"
+        var ownName = getCurrentUserInfo().displayname || getCurrentUserInfo().username || '';
+        lastEditedEl.textContent = ownName && ownName === editorName
+          ? 'Последнее изменение: вы' + timeStr
+          : 'Последнее изменение: ' + editorName + timeStr;
+      } else {
+        lastEditedEl.textContent = '';
+      }
+    }
+
     document.getElementById('mHomeScore').textContent = ensureNumber(data['home_score']);
     document.getElementById('mAwayScore').textContent = ensureNumber(data['away_score']);
     document.getElementById('mHomeFouls').textContent = beachMode ? ensureNumber(data['home_sets']) : data['home_fouls'];
     document.getElementById('mAwayFouls').textContent = beachMode ? ensureNumber(data['away_sets']) : data['away_fouls'];
     document.getElementById('mPeriod').textContent = data['current_period'];
-    document.getElementById('mCustomLabel').value = data['custom_label'] || '';
+    var mCustomLabelEl = document.getElementById('mCustomLabel');
+    // Не перезаписываем поле, пока в нём идёт набор текста — иначе
+    // страховочный опрос (1 сек) затирает вводимое значение данными из БД
+    if (mCustomLabelEl && document.activeElement !== mCustomLabelEl) {
+      mCustomLabelEl.value = data['custom_label'] || '';
+    }
 
     var homeSide = data['home_side'] || 'left';
     var homeOrder = homeSide === 'left' ? 1 : 2;
@@ -915,6 +946,10 @@
 
     var scoreButtonsDisabled = pendingNewSet || matchFinished || isTimeoutActive || setPending; // Обновлено
     document.querySelectorAll('.score-btn').forEach(function(btn) { btn.disabled = scoreButtonsDisabled; });
+
+    // Во время таймаута блокируем кнопки показа табло: случайное нажатие
+    // сбрасывает show=6 и «выключает» таймаут, рассинхронизируя страницы
+    document.querySelectorAll('.show-select').forEach(function(btn) { btn.disabled = isTimeoutActive; });
 
     var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
     document.querySelectorAll('.foul-btn').forEach(function(btn) { btn.disabled = foulButtonsDisabled; });
@@ -1142,7 +1177,13 @@
       if (timeoutRemainingSeconds <= 0) {
         stopTimeoutTimer();
         document.getElementById('mobileTimeoutModal').classList.add('hidden');
-        update_db({ show: 1, custom_label: mobileScoreboardData['custom_label'] });
+        // Восстанавливаем режим показа, выбранный ДО таймаута (синхронно с ctl.js)
+        var prevShow = parseInt(mobileScoreboardData['show_before_timeout'], 10);
+        update_db({
+          show: isNaN(prevShow) ? 1 : prevShow,
+          custom_label: mobileScoreboardData['custom_label'],
+          show_before_timeout: DB.deleteField()
+        });
       }
     }, 1000);
   }
@@ -1855,7 +1896,12 @@
           var isAwayTimeout = currentLabel === 'Таймаут ' + awayTeam;
 
           if ((team === 'home' && isHomeTimeout) || (team === 'away' && isAwayTimeout)) {
-            var update = { show: 1, custom_label: mobileScoreboardData['custom_label'] };
+            var prevShowOff = parseInt(mobileScoreboardData['show_before_timeout'], 10);
+            var update = {
+              show: isNaN(prevShowOff) ? 1 : prevShowOff,
+              custom_label: mobileScoreboardData['custom_label'],
+              show_before_timeout: DB.deleteField()
+            };
             update_db(update);
             hideTimeoutModal();
           }
@@ -1869,7 +1915,8 @@
           teamName: teamName,
           timeoutLabel: timeoutLabel,
           timeoutKey: timeoutKey,
-          currentTimeouts: currentTimeouts
+          currentTimeouts: currentTimeouts,
+          showBefore: currentShow
         };
         document.getElementById('mobileTimeoutConfirmText').textContent = 'Начать таймаут (' + teamName + ')?';
         document.getElementById('mobileTimeoutConfirmModal').classList.remove('hidden');
@@ -1882,6 +1929,8 @@
       var pt = pendingTimeout;
       pendingTimeout = null;
       var update = { show: 6, custom_label: pt.timeoutLabel };
+      // Запоминаем режим показа, выбранный до таймаута, чтобы восстановить его при завершении
+      update['show_before_timeout'] = (pt.showBefore === 6 ? 1 : pt.showBefore);
       update[pt.timeoutKey] = pt.currentTimeouts + 1;
       update_db(update);
       showTimeoutModal(pt.teamName);
@@ -1896,7 +1945,12 @@
       hideTimeoutModal();
       var currentShow = ensureNumber(mobileScoreboardData['show']);
       if (currentShow === 6) {
-        update_db({ show: 1, custom_label: mobileScoreboardData['custom_label'] });
+        var prevShowClose = parseInt(mobileScoreboardData['show_before_timeout'], 10);
+        update_db({
+          show: isNaN(prevShowClose) ? 1 : prevShowClose,
+          custom_label: mobileScoreboardData['custom_label'],
+          show_before_timeout: DB.deleteField()
+        });
       }
     });
 

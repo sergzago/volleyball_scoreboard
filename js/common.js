@@ -44,6 +44,10 @@ scoreboard_collection = {
             },
             get: function() {
                 return scoreboard_query.get(id);
+            },
+            update: function(data) {
+                // Используется в ctl.js (saveMatchResult) для записи last_match_id
+                return scoreboard_query.update(data, id);
             }
         };
     }

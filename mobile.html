@@ -88,6 +88,7 @@
       border-radius: 4px;
       font-size: 12px;
       font-weight: bold;
+      cursor: pointer; /* клик открывает выбор цвета лейбла */
       text-transform: uppercase;
       letter-spacing: 1px;
       max-width: 70%;
@@ -402,6 +403,16 @@
     .notification.success { background: #28a745; color: #fff; }
     .notification.error { background: #dc3545; color: #fff; }
 
+    /* Метка последнего редактирования (username) на вкладке "Управление" */
+    .last-edited-label {
+      display: block;
+      width: 100%;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      margin-top: 4px;
+      word-break: break-word;
+    }
+
     /* Исправление для длинных названий команд на вкладке "Управление" */
     #pageControl .team-name {
       word-wrap: break-word; /* Для старых браузеров */
@@ -636,6 +647,7 @@
         <div class="section-header">
           <h2>Управление</h2>
           <span class="venue-label" id="controlVenue"></span>
+          <span class="last-edited-label" id="controlLastEdited"></span>
         </div>
 
         <div id="controlContent" style="display:none;">
