@@ -243,6 +243,22 @@ $(document).ready(function() {
           }
         }
 
+        renderCtlUI();
+      },
+      function(error) {
+        console.error('Error listening to scoreboard:', error);
+      }
+    );
+    // Запускаем страховочный опрос после подписки (как в mobile.js)
+    startCtlPolling();
+  }).catch(function(err) {
+    console.error('DB initialization failed:', err);
+  });
+});
+
+// Рендер состояния игры в UI пульта. Вынесено из колбэка подписки,
+// чтобы переиспользовать в страховочном опросе при недоступном realtime.
+function renderCtlUI() {
       $('.away_team').html(scoreboard_data['away_team'])
       $('.home_team').html(scoreboard_data['home_team'])
       var disp=scoreboard_data['show'];
@@ -415,17 +431,7 @@ $(document).ready(function() {
     }
     updateSideLayout();
     renderSetHistoryCtl(scoreboard_data['set_history']);
-      },
-      function(error) {
-        console.error('Error listening to scoreboard:', error);
-      }
-    );
-    // Запускаем страховочный опрос после подписки (как в mobile.js)
-    startCtlPolling();
-  }).catch(function(err) {
-    console.error('DB initialization failed:', err);
-  });
-});
+}
 
 function update_db(data){
   // Добавляем информацию о пользователе, который редактирует
@@ -452,6 +458,7 @@ function update_db(data){
 // Страховочный опрос каждую секунду (как в мобильном интерфейсе):
 // гарантирует синхронизацию состояния, даже если realtime-событие потеряно
 var _ctlPollInterval = null;
+var _lastCtlPollPayload = null;
 
 function startCtlPolling() {
   if (_ctlPollInterval) clearInterval(_ctlPollInterval);
@@ -459,9 +466,15 @@ function startCtlPolling() {
     if (!local_game_id) return;
     DB.scoreboard.get(local_game_id).then(function(data) {
       if (!data) return;
+      // Перерисовываем UI только если данные реально изменились —
+      // экономит DOM-работу и сетевой трафик рендера каждую секунду
+      var serialized = JSON.stringify(data);
+      if (serialized === _lastCtlPollPayload) return;
+      _lastCtlPollPayload = serialized;
       Object.keys(data).forEach(function(key) {
         scoreboard_data[key] = data[key];
       });
+      renderCtlUI();
     }).catch(function() {});
   }, 1000);
 }

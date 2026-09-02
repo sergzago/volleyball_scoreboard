@@ -719,6 +719,7 @@
   // ===== SUBSCRIPTION =====
 
   var _pollInterval = null;
+  var _lastPollPayload = null;
 
   function startPolling() {
     if (_pollInterval) clearInterval(_pollInterval);
@@ -726,6 +727,11 @@
       if (!mobileGameConnected || !game_id) return;
       DB.scoreboard.get(game_id).then(function(data) {
         if (!data) return;
+        // Тяжёлая перерисовка UI только если данные реально изменились:
+        // опрос каждую секунду не должен гонять DOM-обновления впустую
+        var serialized = JSON.stringify(data);
+        if (serialized === _lastPollPayload) return;
+        _lastPollPayload = serialized;
         Object.keys(data).forEach(function(key) {
           mobileScoreboardData[key] = data[key];
         });

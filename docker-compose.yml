@@ -22,15 +22,18 @@ services:
       - ./pb_data:/pb/pb_data
       - ./pb_public:/pb/pb_public # Опционально для статики
     environment:
-      - PB_VERSION=0.22.25 # Укажите нужную версию PocketBase
+      # Версия должна соответствовать JS SDK (js/db-interface.js загружает
+      # pocketbase@0.26.8): формат realtime-подписок changed в PB 0.23+,
+      # на 0.22 realtime-подписка из SDK 0.26 не работает.
+      - PB_VERSION=0.26.1
     dirname: /pb
     working_dir: /pb
     command: >
       sh -c "
       if [ ! -f pocketbase ]; then
-        wget https://github.com{PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip &&
-        unzip pocketbase_${PB_VERSION}_linux_amd64.zip &&
-        rm pocketbase_${PB_VERSION}_linux_amd64.zip;
+        wget https://github.com/pocketbase/pocketbase/releases/download/v$$PB_VERSION/pocketbase_$${PB_VERSION}_linux_amd64.zip &&
+        unzip pocketbase_$${PB_VERSION}_linux_amd64.zip &&
+        rm pocketbase_$${PB_VERSION}_linux_amd64.zip;
       fi &&
       ./pocketbase serve --http=0.0.0.0:8090
       "

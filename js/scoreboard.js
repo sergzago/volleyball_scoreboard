@@ -239,6 +239,8 @@ function applyTemplate(data) {
   setCssVar('--set-history-text', templateData.set_history_text);
 }
 
+var _lastSbPayload = null; // сериализованные данные последнего обработанного события
+
 // Подписка на изменения через DB интерфейс (вызывается после DB.init)
 function startScoreboardSubscription(game_id) {
   console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
@@ -246,9 +248,21 @@ function startScoreboardSubscription(game_id) {
   game_id,
   function(data){
     console.log('sb/ctl: scoreboard data received, show:', data ? data.show : 'null');
+    if (!data) {
+      scoreboard_data = DEFAULT_SCOREBOARD_DATA;
+    } else {
+      // Ранний выход: дублирующие события (realtime + страховочный опрос)
+      // не должны перезапускать jQuery-анимации и перерисовку истории сетов
+      var serialized = null;
+      try { serialized = JSON.stringify(data); } catch (e) { serialized = null; }
+      if (serialized && serialized === _lastSbPayload) {
+        scoreboard_data = data;
+        return;
+      }
+      if (serialized) _lastSbPayload = serialized;
+      scoreboard_data = data;
+    }
     var pdata = scoreboard_data;
-    // Если данные не пришли — используем дефолтные
-    scoreboard_data = data || DEFAULT_SCOREBOARD_DATA;
 
     // --- Логика шаблонов ---
     // Шаблон теперь выбирается через поле template_id в данных игры.

@@ -641,10 +641,41 @@
   /**
    * Поиск записи в volleyball по полю id (кастомному, не системному).
    * PocketBase getOne/getFirstListItem используют системный id, а не кастомное поле.
+   *
+   * Оптимизация: после первого поиска соответствие
+   * «кастомный id → системный id записи» кэшируется, и все последующие
+   * чтения (страховочный опрос каждую секунду) идут через дешёвый
+   * getOne(системный id) вместо list-запроса с фильтром getFirstListItem.
    */
+  var _recordIdCache = {}; // 'коллекция:кастомный_id' -> системный id записи
+
   function findRecordByCustomId(pb, collectionName, customIdField, customId) {
-    return pb.collection(collectionName)
+    var collection = pb.collection(collectionName);
+    var cacheKey = collectionName + ':' + customId;
+    var cachedRecordId = _recordIdCache[cacheKey];
+
+    if (cachedRecordId) {
+      return collection.getOne(cachedRecordId).catch(function(err) {
+        // Запись могла быть удалена/пересоздана — сбрасываем кэш и ищем заново
+        delete _recordIdCache[cacheKey];
+        return collection
+          .getFirstListItem(customIdField + '="' + customId + '"')
+          .then(function(rec) {
+            _recordIdCache[cacheKey] = rec.id;
+            return rec;
+          })
+          .catch(function() {
+            return null;
+          });
+      });
+    }
+
+    return collection
       .getFirstListItem(customIdField + '="' + customId + '"')
+      .then(function(record) {
+        _recordIdCache[cacheKey] = record.id;
+        return record;
+      })
       .catch(function(err) {
         // getFirstListItem выбрасывает ошибку, если ничего не найдено
         return null;
@@ -746,6 +777,11 @@
           }
         })
         .catch(function(err) {
+          // Если realtime недоступен (404/400 — например, прокси без SSE),
+          // отписываемся, чтобы SDK не ретраил бесконечно: дальше доставляет опрос.
+          if (err && (err.status === 404 || err.status === 400)) {
+            try { pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe('*'); } catch (e) {}
+          }
           if (onError) onError(err);
         });
       }
@@ -1008,6 +1044,12 @@
             });
           })
           .catch(function(err) {
+            // Если realtime недоступен (404/400 — например, прокси без поддержки
+            // SSE), отписываемся, чтобы SDK не ретраил бесконечно: дальше данные
+            // доставляет страховочный опрос ниже.
+            if (err && (err.status === 404 || err.status === 400)) {
+              try { pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe('*'); } catch (e) {}
+            }
             if (onError) onError(err);
           });
       }
@@ -1407,7 +1449,7 @@
         try {
           pb.collection(DB_CONFIG.collections.TEMPLATES)
             .subscribe('*', function(e) {
-            if (e.action === 'update' || e.action === 'create') {
+              if (e.action === 'update' || e.action === 'create') {
               var record = e.record;
               if (!record) return;
               var recordTemplateId = typeof record.get === 'function'
@@ -1419,6 +1461,11 @@
             }
           })
           .catch(function(err) {
+            // Если realtime недоступен (404/400 — например, прокси без SSE),
+            // отписываемся, чтобы SDK не ретраил бесконечно.
+            if (err && (err.status === 404 || err.status === 400)) {
+              try { pb.collection(DB_CONFIG.collections.TEMPLATES).unsubscribe('*'); } catch (e) {}
+            }
             if (onError) onError(err);
           });
         } catch (e) {

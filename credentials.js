@@ -34,10 +34,10 @@ var CREDENTIALS = {
   // ============================================================================
   pocketbase: {
     url: 'https://zago.my.to/pb/',
-    // SSE-realtime подписка. На реверс-прокси без поддержки SSE (proxy_buffering off,
-    // HTTP/1.1) подписка POST /api/realtime падает с 404 — в этом случае установите
-    // realtime: false, приложение будет работать через страховочный опрос (2 сек).
-    realtime: false,
+    // SSE-realtime подписка. Требует поддержки SSE в реверс-прокси
+    // (см. REALTIME_SETUP.md). При проблемах установите realtime: false —
+    // приложение будет работать через страховочный опрос (1-2 сек).
+    realtime: true,
     // Администратор приложения (для управления пользователями, смена паролей)
     // appAdminEmail: 'aapp@volleyball.local',
     // appAdminPassword: 'iakWTB2IabF-r00',
