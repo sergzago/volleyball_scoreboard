@@ -716,8 +716,11 @@
       // ВАЖНО: системное поле id PocketBase затеняет кастомное поле 'id' в realtime-событии,
       // поэтому сравниваем оба варианта, а при неоднозначности перепроверяем запросом к серверу.
       // Без этого табло (sb.html / tablo.html) не получают обновления счёта из мобильного управления.
-      pb.collection(DB_CONFIG.collections.VOLLEYBALL)
-        .subscribe('*', function(e) {
+      // Если realtime отключён (DB_CONFIG.pocketbase.realtime === false, например прокси
+      // без поддержки SSE), пропускаем SSE-подписку — данные доставляет страховочный опрос ниже.
+      if (DB_CONFIG.pocketbase.realtime !== false) {
+        pb.collection(DB_CONFIG.collections.VOLLEYBALL)
+          .subscribe('*', function(e) {
           if (e.action === 'update' || e.action === 'create') {
             var record = e.record;
             if (!record) return;
@@ -745,6 +748,7 @@
         .catch(function(err) {
           if (onError) onError(err);
         });
+      }
 
       // Страховочный опрос (2 сек): если SSE-соединение молча разорвалось
       // (например, после обновления страницы другого клиента, при таймауте
@@ -991,19 +995,22 @@
       today.setHours(0, 0, 0, 0);
       var todayStr = toPbDate(today);
 
-      pb.collection(DB_CONFIG.collections.VOLLEYBALL)
-        .subscribe('*', function(e) {
-          // При любом изменении перечитываем все активные
-          pb.collection(DB_CONFIG.collections.VOLLEYBALL).getFullList({
-            filter: 'lastEdited >= "' + todayStr + '"',
-            sort: '-lastEdited'
-          }).then(function(results) {
-            onUpdate(results);
+      // SSE-подписка только если realtime включён (иначе — начальная загрузка ниже)
+      if (DB_CONFIG.pocketbase.realtime !== false) {
+        pb.collection(DB_CONFIG.collections.VOLLEYBALL)
+          .subscribe('*', function(e) {
+            // При любом изменении перечитываем все активные
+            pb.collection(DB_CONFIG.collections.VOLLEYBALL).getFullList({
+              filter: 'lastEdited >= "' + todayStr + '"',
+              sort: '-lastEdited'
+            }).then(function(results) {
+              onUpdate(results);
+            });
+          })
+          .catch(function(err) {
+            if (onError) onError(err);
           });
-        })
-        .catch(function(err) {
-          if (onError) onError(err);
-        });
+      }
 
       // Начальная загрузка
       pb.collection(DB_CONFIG.collections.VOLLEYBALL).getFullList({
@@ -1395,10 +1402,11 @@
           if (onError) onError(err);
         });
 
-      // Подписываемся на изменения коллекции templates
-      try {
-        pb.collection(DB_CONFIG.collections.TEMPLATES)
-          .subscribe('*', function(e) {
+      // Подписываемся на изменения коллекции templates (только если realtime включён)
+      if (DB_CONFIG.pocketbase.realtime !== false) {
+        try {
+          pb.collection(DB_CONFIG.collections.TEMPLATES)
+            .subscribe('*', function(e) {
             if (e.action === 'update' || e.action === 'create') {
               var record = e.record;
               if (!record) return;
@@ -1413,8 +1421,9 @@
           .catch(function(err) {
             if (onError) onError(err);
           });
-      } catch (e) {
-        if (onError) onError(e);
+        } catch (e) {
+          if (onError) onError(e);
+        }
       }
 
       // Функция отписки — снимаем подписку по topic '*' (ключ регистрации)
