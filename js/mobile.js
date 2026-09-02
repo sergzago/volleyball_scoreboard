@@ -2177,7 +2177,13 @@
     initProviderBadge();
     initLogo();
     initTabs();
-    initEventHandlers();
+    try {
+      initEventHandlers();
+    } catch (e) {
+      // Не даём одному отсутствующему элементу оборвать инициализацию
+      // (например, при рассинхронизации кэшированных mobile.js и mobile.html)
+      console.error('[Mobile] initEventHandlers failed:', e);
+    }
     initAuth();
 
     // Auto-fill game_id from URL

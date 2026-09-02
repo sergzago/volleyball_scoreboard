@@ -1,4 +1,4 @@
-const CACHE_NAME = 'volleyball-scoreboard-v8';
+const CACHE_NAME = 'volleyball-scoreboard-v9';
 const ASSETS = [
   '/mobile.html',
   '/css/mobile.css',
@@ -36,12 +36,21 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
+  // Кэшируем только GET-запросы по схемам http/https.
+  // Запросы со схемами chrome-extension:, blob:, data: и т.п. (например,
+  // от браузерных расширений) в Cache Store не поддерживаются и дают
+  // "Failed to execute 'put' on 'Cache'" — просто пропускаем их без перехвата.
+  var url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+    return; // не вызываем respondWith — браузер обработает запрос сам
+  }
+
   event.respondWith(
     fetch(event.request).then(function(response) {
       if (response && response.status === 200 && response.type === 'basic') {
         var clone = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
+          cache.put(event.request, clone).catch(function() {});
         });
       }
       return response;
