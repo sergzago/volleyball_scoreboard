@@ -1181,17 +1181,7 @@
       if (timeoutRemainingSeconds <= 0) {
         stopTimeoutTimer();
         document.getElementById('mobileTimeoutModal').classList.add('hidden');
-<<<<<<< HEAD
-        // Восстанавливаем режим показа, выбранный ДО таймаута (синхронно с ctl.js)
-        var prevShow = parseInt(mobileScoreboardData['show_before_timeout'], 10);
-        update_db({
-          show: isNaN(prevShow) ? 1 : prevShow,
-          custom_label: mobileScoreboardData['custom_label'],
-          show_before_timeout: DB.deleteField()
-        });
-=======
         update_db(endTimeoutUpdate());
->>>>>>> a6c3c60 (Fix timeout)
       }
     }, 1000);
   }
@@ -1914,17 +1904,7 @@
           var isAwayTimeout = currentLabel === 'Таймаут ' + awayTeam;
 
           if ((team === 'home' && isHomeTimeout) || (team === 'away' && isAwayTimeout)) {
-<<<<<<< HEAD
-            var prevShowOff = parseInt(mobileScoreboardData['show_before_timeout'], 10);
-            var update = {
-              show: isNaN(prevShowOff) ? 1 : prevShowOff,
-              custom_label: mobileScoreboardData['custom_label'],
-              show_before_timeout: DB.deleteField()
-            };
-            update_db(update);
-=======
             update_db(endTimeoutUpdate());
->>>>>>> a6c3c60 (Fix timeout)
             hideTimeoutModal();
           }
           return;
@@ -1937,8 +1917,7 @@
           teamName: teamName,
           timeoutLabel: timeoutLabel,
           timeoutKey: timeoutKey,
-          currentTimeouts: currentTimeouts,
-          showBefore: currentShow
+          currentTimeouts: currentTimeouts
         };
         document.getElementById('mobileTimeoutConfirmText').textContent = 'Начать таймаут (' + teamName + ')?';
         document.getElementById('mobileTimeoutConfirmModal').classList.remove('hidden');
@@ -1950,16 +1929,10 @@
       if (!pendingTimeout) return;
       var pt = pendingTimeout;
       pendingTimeout = null;
-<<<<<<< HEAD
-      var update = { show: 6, custom_label: pt.timeoutLabel };
-      // Запоминаем режим показа, выбранный до таймаута, чтобы восстановить его при завершении
-      update['show_before_timeout'] = (pt.showBefore === 6 ? 1 : pt.showBefore);
-=======
       // Запоминаем текущий режим отображения, чтобы восстановить его после таймаута
       var prevShow = ensureNumber(mobileScoreboardData['show']);
       if (!prevShow || prevShow === 6) prevShow = 1;
       var update = { show: 6, prev_show: prevShow, timeout_active: true, custom_label: pt.timeoutLabel };
->>>>>>> a6c3c60 (Fix timeout)
       update[pt.timeoutKey] = pt.currentTimeouts + 1;
       update_db(update);
       showTimeoutModal(pt.teamName);
@@ -1972,19 +1945,8 @@
 
     document.getElementById('mobileTimeoutClose').addEventListener('click', function() {
       hideTimeoutModal();
-<<<<<<< HEAD
-      var currentShow = ensureNumber(mobileScoreboardData['show']);
-      if (currentShow === 6) {
-        var prevShowClose = parseInt(mobileScoreboardData['show_before_timeout'], 10);
-        update_db({
-          show: isNaN(prevShowClose) ? 1 : prevShowClose,
-          custom_label: mobileScoreboardData['custom_label'],
-          show_before_timeout: DB.deleteField()
-        });
-=======
       if (mobileScoreboardData['timeout_active']) {
         update_db(endTimeoutUpdate());
->>>>>>> a6c3c60 (Fix timeout)
       }
     });
 

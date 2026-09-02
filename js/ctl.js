@@ -1178,20 +1178,8 @@ $(document).ready(function(){
         $('#timeoutModal').addClass('dialog-hidden');
         $('#timeoutTimerDisplay').css('color', '#e74c3c');
 
-<<<<<<< HEAD
-        // Отправляем обновление в БД для выключения таймаута.
-        // Восстанавливаем режим показа, выбранный ДО таймаута (синхронно с мобильной версией)
-        var prevShow = parseInt(scoreboard_data['show_before_timeout'], 10);
-        var update = {
-          show: isNaN(prevShow) ? 1 : prevShow,
-          custom_label: scoreboard_data['custom_label'],
-          show_before_timeout: DB.deleteField()
-        };
-        update_db(update);
-=======
         // Отправляем обновление в БД для выключения таймаута
         update_db(endTimeoutUpdate());
->>>>>>> a6c3c60 (Fix timeout)
       }
     }, 1000);
   }
@@ -1247,17 +1235,7 @@ $(document).ready(function(){
       var isAwayTimeoutActive = currentLabel === 'Таймаут ' + awayTeam;
 
       if((team === 'home' && isHomeTimeoutActive) || (team === 'away' && isAwayTimeoutActive)){
-<<<<<<< HEAD
-        var prevShowOff = parseInt(scoreboard_data['show_before_timeout'], 10);
-        var update = {
-          show: isNaN(prevShowOff) ? 1 : prevShowOff,
-          custom_label: scoreboard_data['custom_label'],
-          show_before_timeout: DB.deleteField()
-        };
-        update_db(update);
-=======
         update_db(endTimeoutUpdate());
->>>>>>> a6c3c60 (Fix timeout)
         hideTimeoutModal();
       }
       return;
@@ -1272,8 +1250,7 @@ $(document).ready(function(){
       teamName: teamName,
       timeoutLabel: timeoutLabel,
       timeoutKey: timeoutKey,
-      currentTimeouts: currentTimeouts,
-      showBefore: currentShow
+      currentTimeouts: currentTimeouts
     };
     $('#timeoutConfirmText').text('Начать таймаут (' + teamName + ')?');
     $('#timeoutConfirmModal').removeClass('dialog-hidden');
@@ -1284,16 +1261,10 @@ $(document).ready(function(){
     if (!pendingTimeout) return;
     var pt = pendingTimeout;
     pendingTimeout = null;
-<<<<<<< HEAD
-    var update = { show: 6, custom_label: pt.timeoutLabel };
-    // Запоминаем режим показа, выбранный до таймаута, чтобы восстановить его при завершении
-    update['show_before_timeout'] = (pt.showBefore === 6 ? 1 : pt.showBefore);
-=======
     // Запоминаем текущий режим отображения, чтобы восстановить его после таймаута
     var prevShow = parseInt(scoreboard_data['show'], 10) || 0;
     if (!prevShow || prevShow === 6) prevShow = 1;
     var update = { show: 6, prev_show: prevShow, timeout_active: true, custom_label: pt.timeoutLabel };
->>>>>>> a6c3c60 (Fix timeout)
     update[pt.timeoutKey] = pt.currentTimeouts + 1;
     update_db(update);
     showTimeoutModal(pt.teamName);
@@ -1308,22 +1279,9 @@ $(document).ready(function(){
   $("#timeoutModalClose").click(function(){
     hideTimeoutModal();
 
-<<<<<<< HEAD
-    // Отправляем обновление в БД для выключения таймаута (с восстановлением режима показа)
-    var currentShow = parseInt(scoreboard_data['show'], 10) || 0;
-    if (currentShow === 6) {
-      var prevShowClose = parseInt(scoreboard_data['show_before_timeout'], 10);
-      var update = {
-        show: isNaN(prevShowClose) ? 1 : prevShowClose,
-        custom_label: scoreboard_data['custom_label'],
-        show_before_timeout: DB.deleteField()
-      };
-      update_db(update);
-=======
     // Отправляем обновление в БД для выключения таймаута
     if (scoreboard_data['timeout_active']) {
       update_db(endTimeoutUpdate());
->>>>>>> a6c3c60 (Fix timeout)
     }
   });
 
