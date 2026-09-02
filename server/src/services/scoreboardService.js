@@ -422,7 +422,7 @@ class ScoreboardService {
     const invertTablo = !!data.invert_tablo;
 
     const resetData = {
-      show: 1, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0,
+      show: 1, timeout_active: false, prev_show: 1, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0,
       current_period: 1, custom_label: 'Табло',
       away_team: keepSettings ? data.away_team : 'Team2',
       away_color: keepSettings ? data.away_color : '#00ff00',

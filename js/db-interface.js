@@ -859,6 +859,8 @@
     reset: function(gameId, initialData, userInfo) {
       var resetData = Object.assign({}, initialData, {
         show: 1,
+        timeout_active: false,
+        prev_show: 1,
         home_score: 0,
         home_fouls: 0,
         away_score: 0,

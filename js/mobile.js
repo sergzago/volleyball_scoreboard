@@ -56,6 +56,8 @@
     unlimited_score: false,
     custom_mode: false,
     show: 1,
+    timeout_active: false,
+    prev_show: 1,
     custom_label: '',
     home_side: 'left',
     away_side: 'right',
@@ -935,7 +937,9 @@
 
     var pendingNewSet = !!data['pending_new_set'];
     var startOfSet = ensureNumber(data['home_score']) === 0 && ensureNumber(data['away_score']) === 0;
-    var isTimeoutActive = ensureNumber(data['show']) === 6;
+    // Признак активного таймаута — отдельное поле, не связанное с режимом отображения (show).
+    // Раньше show===6 означал и "верх+низ", и таймаут, из-за чего выбор "Верх+низ" блокировал счёт.
+    var isTimeoutActive = !!data['timeout_active'];
     
     // Highlight active show button
     var currentShow = ensureNumber(data['show']);
@@ -1177,6 +1181,7 @@
       if (timeoutRemainingSeconds <= 0) {
         stopTimeoutTimer();
         document.getElementById('mobileTimeoutModal').classList.add('hidden');
+<<<<<<< HEAD
         // Восстанавливаем режим показа, выбранный ДО таймаута (синхронно с ctl.js)
         var prevShow = parseInt(mobileScoreboardData['show_before_timeout'], 10);
         update_db({
@@ -1184,6 +1189,9 @@
           custom_label: mobileScoreboardData['custom_label'],
           show_before_timeout: DB.deleteField()
         });
+=======
+        update_db(endTimeoutUpdate());
+>>>>>>> a6c3c60 (Fix timeout)
       }
     }, 1000);
   }
@@ -1196,6 +1204,16 @@
   function hideTimeoutModal() {
     stopTimeoutTimer();
     document.getElementById('mobileTimeoutModal').classList.add('hidden');
+  }
+
+  /**
+   * Завершение таймаута: снимаем флаг timeout_active и восстанавливаем
+   * режим отображения (show), который был до начала таймаута.
+   */
+  function endTimeoutUpdate() {
+    var prev = ensureNumber(mobileScoreboardData['prev_show']);
+    if (!prev || prev === 6) prev = 1;
+    return { timeout_active: false, show: prev, custom_label: mobileScoreboardData['custom_label'] };
   }
 
   // ===== GAME LOGIC =====
@@ -1888,7 +1906,7 @@
         var timeoutKey = team + '_timeouts';
         var currentTimeouts = ensureNumber(mobileScoreboardData[timeoutKey]);
 
-        if (currentShow === 6) {
+        if (mobileScoreboardData['timeout_active']) {
           var currentLabel = mobileScoreboardData['custom_label'] || '';
           var homeTeam = mobileScoreboardData['home_team'] || '';
           var awayTeam = mobileScoreboardData['away_team'] || '';
@@ -1896,6 +1914,7 @@
           var isAwayTimeout = currentLabel === 'Таймаут ' + awayTeam;
 
           if ((team === 'home' && isHomeTimeout) || (team === 'away' && isAwayTimeout)) {
+<<<<<<< HEAD
             var prevShowOff = parseInt(mobileScoreboardData['show_before_timeout'], 10);
             var update = {
               show: isNaN(prevShowOff) ? 1 : prevShowOff,
@@ -1903,6 +1922,9 @@
               show_before_timeout: DB.deleteField()
             };
             update_db(update);
+=======
+            update_db(endTimeoutUpdate());
+>>>>>>> a6c3c60 (Fix timeout)
             hideTimeoutModal();
           }
           return;
@@ -1928,9 +1950,16 @@
       if (!pendingTimeout) return;
       var pt = pendingTimeout;
       pendingTimeout = null;
+<<<<<<< HEAD
       var update = { show: 6, custom_label: pt.timeoutLabel };
       // Запоминаем режим показа, выбранный до таймаута, чтобы восстановить его при завершении
       update['show_before_timeout'] = (pt.showBefore === 6 ? 1 : pt.showBefore);
+=======
+      // Запоминаем текущий режим отображения, чтобы восстановить его после таймаута
+      var prevShow = ensureNumber(mobileScoreboardData['show']);
+      if (!prevShow || prevShow === 6) prevShow = 1;
+      var update = { show: 6, prev_show: prevShow, timeout_active: true, custom_label: pt.timeoutLabel };
+>>>>>>> a6c3c60 (Fix timeout)
       update[pt.timeoutKey] = pt.currentTimeouts + 1;
       update_db(update);
       showTimeoutModal(pt.teamName);
@@ -1943,6 +1972,7 @@
 
     document.getElementById('mobileTimeoutClose').addEventListener('click', function() {
       hideTimeoutModal();
+<<<<<<< HEAD
       var currentShow = ensureNumber(mobileScoreboardData['show']);
       if (currentShow === 6) {
         var prevShowClose = parseInt(mobileScoreboardData['show_before_timeout'], 10);
@@ -1951,6 +1981,10 @@
           custom_label: mobileScoreboardData['custom_label'],
           show_before_timeout: DB.deleteField()
         });
+=======
+      if (mobileScoreboardData['timeout_active']) {
+        update_db(endTimeoutUpdate());
+>>>>>>> a6c3c60 (Fix timeout)
       }
     });
 
@@ -2020,7 +2054,7 @@
       var userInfo = getCurrentUserInfo();
 
       var resetData = {
-        show: 1, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0, current_period: 1,
+        show: 1, timeout_active: false, prev_show: 1, home_score: 0, home_fouls: 0, away_score: 0, away_fouls: 0, current_period: 1,
         custom_label: "Таймаут",
         away_team: document.getElementById('mobileAwayTeam').value,
         away_color: document.getElementById('mobileAwayColor').value,

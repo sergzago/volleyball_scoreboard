@@ -796,6 +796,21 @@
         "type": "number"
       },
       {
+        "id": "bool1847182103",
+        "name": "timeout_active",
+        "required": false,
+        "system": false,
+        "type": "bool"
+      },
+      {
+        "id": "number839833857",
+        "name": "prev_show",
+        "onlyInt": false,
+        "required": false,
+        "system": false,
+        "type": "number"
+      },
+      {
         "autogeneratePattern": "",
         "hidden": false,
         "id": "text3450513537",
