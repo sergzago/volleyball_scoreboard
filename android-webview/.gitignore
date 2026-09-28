@@ -1,0 +1,17 @@
+# Сборка
+.gradle/
+build/
+app/build/
+captures/
+.cxx/
+
+# Локальные настройки машины (путь к Android SDK)
+local.properties
+
+# IDE
+*.iml
+.idea/
+
+# Release-подпись: не публиковать (кто владеет ключом — тот ставит обновления)
+*.keystore
+keystore.properties

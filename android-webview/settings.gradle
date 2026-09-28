@@ -1,0 +1,25 @@
+// =============================================================================
+// Volleyball Scoreboard — Android WebView-обёртка
+// =============================================================================
+// Проект нужен, чтобы мобильная веб-версия (mobile.html) работала на Android
+// как обычное приложение: Activity с WebView + нативная кнопка «Настройки»
+// в правом верхнем углу, где задаётся адрес стартовой страницы.
+// =============================================================================
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'VolleyballWebView'
+include ':app'

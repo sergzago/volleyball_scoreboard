@@ -1,0 +1,77 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Реквизиты release-подписи. Файл не коммитится (см. .gitignore):
+// без него release-сборка получается unsigned и не устанавливается.
+def keystorePropertiesFile = file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+android {
+    namespace 'com.volleyball.scoreboard.webview'
+    compileSdk 35
+
+    defaultConfig {
+        // Идентификатор пакета (личность приложения). Не путать с namespace
+        // выше: Java-пакет исходников остаётся com.volleyball.scoreboard.webview.
+        applicationId 'com.sbmobile'
+        // Android 8.0+: нужен для adaptive-иконок без PNG и актуального WebView.
+        minSdk 26
+        // 34 — система сама отступает контент от системных панелей, поэтому
+        // шапка веб-страницы и кнопка «Настройки» не залезают под статус-бар.
+        // Для targetSdk 35 придётся включать edge-to-edge и учитывать insets.
+        targetSdk 34
+        versionCode 3
+        versionName '1.0.3'
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Подписанный release-APK; без keystore.properties — unsigned.
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : null
+        }
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+    }
+
+    // Имя выходного APK: vbscore.apk вместо app-debug.apk (отладочная и
+    // release-сборки лежат в разных каталогах, имя не конфликтует).
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = 'vbscore.apk'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}

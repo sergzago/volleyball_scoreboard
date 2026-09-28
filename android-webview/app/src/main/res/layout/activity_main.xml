@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Экран приложения: WebView на весь экран + нативная кнопка «Настройки»
+  в правом верхнем углу (адрес стартовой страницы), полоса загрузки и
+  экран ошибки с кнопкой «Повторить».
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/window_background">
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="top"
+        android:max="100"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/errorView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/window_background"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/errorText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/error_text"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/retryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/retry" />
+    </LinearLayout>
+
+    <!-- Кнопка «Настройки»: правый верхний угол, компактная иконка-шестерёнка
+         на полупрозрачном фоне (30dp, отступ 4dp) — минимально перекрывает
+         содержимое WebView. -->
+    <ImageButton
+        android:id="@+id/settingsButton"
+        android:layout_width="@dimen/settings_button_size"
+        android:layout_height="@dimen/settings_button_size"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="@dimen/settings_button_margin"
+        android:layout_marginEnd="@dimen/settings_button_margin"
+        android:background="@drawable/settings_button_background"
+        android:clickable="true"
+        android:contentDescription="@string/settings"
+        android:elevation="4dp"
+        android:focusable="true"
+        android:padding="@dimen/settings_button_icon_padding"
+        android:src="@drawable/ic_settings" />
+</FrameLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Кнопка «Настройки»: отступ от краёв экрана (к нему добавляются
+         системные insets, см. keepSettingsButtonBelowStatusBar()), размер
+         кнопки и отступ иконки внутри неё. Уменьшено (40→30dp, 8→4dp),
+         чтобы плашка меньше перекрывала содержимое WebView. -->
+    <dimen name="settings_button_margin">4dp</dimen>
+    <dimen name="settings_button_size">30dp</dimen>
+    <dimen name="settings_button_icon_padding">6dp</dimen>
+</resources>

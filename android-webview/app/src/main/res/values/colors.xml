@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Фон окна и экрана ошибки — как theme-color мобильной версии (#0f0f23). -->
+    <color name="window_background">#0F0F23</color>
+    <color name="error_text">#E6E6E6</color>
+
+    <!-- Кнопка «Настройки» -->
+    <color name="settings_button_text">#FFFFFF</color>
+    <color name="settings_button_solid">#CC111133</color>
+    <color name="settings_button_stroke">#66FFFFFF</color>
+    <color name="settings_button_ripple">#40FFFFFF</color>
+
+    <!-- Иконка приложения -->
+    <color name="ic_launcher_background">#0F0F23</color>
+</resources>
