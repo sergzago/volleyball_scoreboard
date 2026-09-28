@@ -405,10 +405,8 @@
       btn.textContent = 'Войти';
       setupMockDB();
       showApp('test', 'user');
-      // В тестовом (демо) режиме кнопка «Подключиться» доступна:
-      // подключение идёт к мок-БД с демо-данными
-      document.getElementById('connectGameBtn').disabled = false;
-      document.getElementById('connectGameBtn').title = '';
+      // В демо-режиме кнопка неактивна
+      document.getElementById('connectGameBtn').disabled = true;
       loadGamesList();
       return;
     }
@@ -514,8 +512,6 @@
       },
       scoreboard: {
         get: function(gameId) { return Promise.resolve(_mockData); },
-        // Пустой список игр — кнопка «Подключиться» работает с произвольным Game ID
-        queryAll: function() { return Promise.resolve([]); },
         subscribe: function() { return function() {}; },
         update: function(gameId, data) {
           Object.keys(data).forEach(function(k) {
