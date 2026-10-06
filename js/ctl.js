@@ -39,6 +39,30 @@ function getCurrentUserInfo() {
   return _currentUserInfo || {};
 }
 
+// Проверка прав администратора для поля "Зал"
+function isCurrentUserAdmin() {
+  try {
+    return typeof AuthModule !== 'undefined' &&
+           typeof AuthModule.getCurrentRole === 'function' &&
+           AuthModule.getCurrentRole() === 'admin';
+  } catch (e) {
+    return false;
+  }
+}
+
+// Применяет разрешение на редактирование поля "Зал" (только администратор)
+function applyVenuePermission() {
+  var isAdmin = isCurrentUserAdmin();
+  $('#in_venue').prop('disabled', !isAdmin);
+  if (isAdmin) {
+    $('#in_venue').removeAttr('title');
+  } else {
+    $('#in_venue').attr('title', 'Доступно только администраторам');
+  }
+  var note = document.getElementById('ctlVenueNote');
+  if (note) note.style.display = isAdmin ? 'none' : '';
+}
+
 // ========================================================================
 // ШАБЛОН ОФОРМЛЕНИЯ
 // ========================================================================
@@ -213,6 +237,8 @@ $(document).ready(function() {
     if (isAuth) {
       _currentUserInfo = AuthModule.getCurrentUser();
     }
+    // Повторно применяем права на поле "Зал" после определения роли
+    applyVenuePermission();
   });
   DB.init().then(function() {
     // Подписка на изменения через DB интерфейс, используя локальный game_id
@@ -416,6 +442,8 @@ function renderCtlUI() {
       update_db({venue: ''});
     }
     $('#in_venue').val(scoreboard_data['venue'] || '');
+    // Поле "Зал" — только для администраторов
+    applyVenuePermission();
     $('#col_home_team').val(scoreboard_data['home_color'])
     $('#col_away_team').val(scoreboard_data['away_color'])
     $('#col_home_team_hex').val(scoreboard_data['home_color'] || '#ff0000')
@@ -1305,7 +1333,8 @@ $(document).ready(function(){
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
       tournament_name: $("#in_tournament").val() || "НВЛ",
-      venue: $("#in_venue").val() || "",
+      // Поле "Зал": для не-администраторов сохраняем текущее значение из БД
+      venue: isCurrentUserAdmin() ? ($("#in_venue").val() || "") : (scoreboard_data['venue'] || "")
     };
     console.log(update);
     update_db(update);
@@ -1376,7 +1405,8 @@ $(document).ready(function(){
       home_team: $("#in_home_team").val(),
       home_color: $("#col_home_team").val(),
       tournament_name: $("#in_tournament").val(),
-      venue: $("#in_venue").val() || "",
+      // Поле "Зал": для не-администраторов сохраняем текущее значение из БД
+      venue: isCurrentUserAdmin() ? ($("#in_venue").val() || "") : (scoreboard_data['venue'] || ""),
       home_sets:0,
       away_sets:0,
       home_timeouts:0,

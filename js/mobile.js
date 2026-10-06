@@ -163,6 +163,14 @@
     return _currentUserInfo || {};
   }
 
+  // Проверка прав администратора для поля "Зал"
+  function isCurrentUserAdmin() {
+    // В демо-режиме считаем пользователя администратором,
+    // чтобы можно было протестировать все функции управления
+    if (DEMO_MODE) return true;
+    return _userRole === 'admin';
+  }
+
   function update_db(data) {
     var userInfo = getCurrentUserInfo();
     if (userInfo.username) {
@@ -842,7 +850,14 @@
 
   function updateTeamsUI(data) {
     document.getElementById('mobileTournament').value = data['tournament_name'] || 'НВЛ';
-    document.getElementById('mobileVenue').value = data['venue'] || '';
+    var venueEl = document.getElementById('mobileVenue');
+    venueEl.value = data['venue'] || '';
+    // Поле "Зал" доступно для редактирования только администраторам
+    var isAdmin = isCurrentUserAdmin();
+    venueEl.disabled = !isAdmin;
+    venueEl.title = isAdmin ? '' : 'Доступно только администраторам';
+    var venueNote = document.getElementById('mobileVenueNote');
+    if (venueNote) venueNote.style.display = isAdmin ? 'none' : '';
     document.getElementById('mobileHomeTeam').value = data['home_team'] || '';
     document.getElementById('mobileAwayTeam').value = data['away_team'] || '';
     document.getElementById('mobileHomeColor').value = data['home_color'] || '#ff0000';
@@ -1734,7 +1749,10 @@
         home_team: document.getElementById('mobileHomeTeam').value,
         home_color: document.getElementById('mobileHomeColor').value,
         tournament_name: document.getElementById('mobileTournament').value || 'НВЛ',
-        venue: document.getElementById('mobileVenue').value || ''
+        // Поле "Зал": для не-администраторов сохраняем текущее значение из БД
+        venue: isCurrentUserAdmin()
+          ? (document.getElementById('mobileVenue').value || '')
+          : (mobileScoreboardData['venue'] || '')
       };
       if (!_recordExists) update.show = 1;
       update_db(update);
@@ -2033,7 +2051,10 @@
         home_team: document.getElementById('mobileHomeTeam').value,
         home_color: document.getElementById('mobileHomeColor').value,
         tournament_name: document.getElementById('mobileTournament').value,
-        venue: document.getElementById('mobileVenue').value || '',
+        // Поле "Зал": для не-администраторов сохраняем текущее значение из БД
+        venue: isCurrentUserAdmin()
+          ? (document.getElementById('mobileVenue').value || '')
+          : (mobileScoreboardData['venue'] || ''),
         home_sets: 0, away_sets: 0, home_timeouts: 0, away_timeouts: 0,
         beach_mode: beachEnabled, beach_current_set: 1, beach_switch_message: '',
         beach_match_finished: false, period_count: beachEnabled ? 3 : 5, set_history: [],

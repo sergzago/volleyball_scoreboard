@@ -318,7 +318,8 @@
               </div>
               <div class="panel-body">
                 <label for="in_venue">Зал:</label>
-                <input id="in_venue" placeholder="">
+                <input id="in_venue" placeholder="" disabled title="Доступно только администраторам">
+                <div class="venue-admin-note" id="ctlVenueNote" style="display:none;font-size:12px;color:#999;margin-top:4px;">🔒 Изменение доступно только администраторам</div>
               </div>
               <div class="panel-body">
                 <input id="in_home_team" value="Team1">

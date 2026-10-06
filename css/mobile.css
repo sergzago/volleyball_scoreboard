@@ -298,6 +298,20 @@ html, body {
   color: var(--text-muted);
 }
 
+/* Заблокированные поля (например, "Зал" для не-администраторов) */
+.form-control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.venue-admin-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .color-input-wrap {
   display: flex;
   align-items: center;
