@@ -4,3 +4,6 @@ node_modules/*
 serviceAccountKey.json
 server/serviceAccountKey.json
 password.json
+android-webview/app/keystore.properties..
+android-webview/app/release.keystore..
+android-webview/app/pepk_out.zip
