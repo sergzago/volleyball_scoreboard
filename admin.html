@@ -904,7 +904,7 @@
                             <button class="btn btn-primary btn-sm" onclick="openEditModal('${user.docId}')" ${isCurrentUser ? 'disabled' : ''}>
                                 ${isCurrentUser ? 'Текущий' : '✏️'}
                             </button>
-                            ${!isCurrentUser ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${user.docId}', '@${escapeHtml(username)}')">🗑️</button>` : ''}
+                            ${!isCurrentUser ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${user.docId}', '@${escapeHtml(username)}', '${escapeHtml(username)}')">🗑️</button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -922,9 +922,22 @@
             const password = document.getElementById('newPassword').value;
             const displayName = document.getElementById('newDisplayName').value.trim();
             const role = document.getElementById('newRole').value;
+            const submitBtn = document.getElementById('addUserForm').querySelector('button[type="submit"]');
+            const submitBtnText = submitBtn.textContent;
+
+            if (!username || !password) {
+                showAlert('Заполните имя пользователя и пароль', 'error');
+                return;
+            }
+
+            // Индикация процесса: при долгом запросе (или зависшем SDK с переходом на REST)
+            // кнопка показывает состояние, а не «ничего не происходит»
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Создание...';
 
             try {
                 // Создаём пользователя через DB
+                // (Firebase SDK с автоматическим fallback на Firestore REST API)
                 await DB.auth.createUser(
                     username.toLowerCase(),
                     password,
@@ -947,16 +960,21 @@
             } catch (error) {
                 console.error('Create user error:', error);
                 let errorMsg = error.message || 'Ошибка создания пользователя';
-                
+
                 if (error.code === 'auth/email-already-in-use') {
                     errorMsg = 'Пользователь с таким именем уже существует';
                 } else if (error.code === 'auth/weak-password') {
                     errorMsg = 'Слишком слабый пароль. Минимум 8 символов';
                 } else if (error.code === 'auth/invalid-email') {
                     errorMsg = 'Неверное имя пользователя';
+                } else if (error.code === 'permission-denied' || /permission.?denied/i.test(errorMsg)) {
+                    errorMsg = 'Доступ запрещён правилами Firestore. Проверьте правила безопасности коллекции users.';
                 }
-                
+
                 showAlert(errorMsg, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = submitBtnText;
             }
         });
 
@@ -1058,17 +1076,20 @@
         });
 
         // Удаление пользователя
-        async function deleteUser(docId, username) {
-            if (!confirm(`Вы уверены, что хотите удалить пользователя ${username}?`)) {
+        async function deleteUser(docId, usernameLabel, username) {
+            if (!confirm(`Вы уверены, что хотите удалить пользователя ${usernameLabel}?`)) {
                 return;
             }
 
             try {
-                // Удаляем пользователя через DB
-                await DB.auth.deleteUser(docId);
+                // Удаляем пользователя через DB по его username.
+                // ВАЖНО: для PocketBase docId — это системный id записи, а не username,
+                // поэтому в БД передаём именно username (раньше передавался docId,
+                // из-за чего удаление падало с ошибкой «запись не найдена»).
+                await DB.auth.deleteUser(username || docId);
 
                 showAlert(
-                    `Пользователь "${username}" удалён.`,
+                    `Пользователь "${usernameLabel}" удалён.`,
                     'success'
                 );
 

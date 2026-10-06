@@ -268,6 +268,73 @@
   }
 
   // ============================================================================
+  // POCKETBASE SERVICE CLIENT (отдельный клиент для сервисных операций)
+  // ============================================================================
+  //
+  // Создание/удаление пользователей выполняется от имени app_users (сервисный аккаунт).
+  // Для этого используется ОТДЕЛЬНЫЙ экземпляр PocketBase, а НЕ общий client:
+  // иначе authWithPassword() перезаписал бы authStore и токен в localStorage общего
+  // клиента, из-за чего текущий пользователь подменялся бы на app@volleyball.local
+  // (баг: «при добавлении пользователя меняется текущий пользователь»).
+  var _servicePbClient = null;
+  var _servicePbClientPromise = null;
+  var POCKETBASE_AUTH_KEY = 'pocketbase_auth';
+
+  function getPocketBaseServiceClient() {
+    if (_servicePbClient) return Promise.resolve(_servicePbClient);
+    if (typeof PocketBase === 'undefined') {
+      return Promise.reject(new Error('PocketBase SDK не загружен. Вызовите DB.init() перед использованием.'));
+    }
+    if (_servicePbClientPromise) return _servicePbClientPromise;
+
+    _servicePbClientPromise = new Promise(function(resolve, reject) {
+      var serviceClient = new PocketBase(DB_CONFIG.pocketbase.url);
+      // Отключаем автоматическую отмену запросов (если метод доступен)
+      if (typeof serviceClient.autoCancellation === 'function') {
+        serviceClient.autoCancellation(false);
+      }
+
+      // PocketBase LocalAuthStore всех клиентов пишет токен в один и тот же ключ
+      // localStorage ('pocketbase_auth'), поэтому ДО сервисной авторизации сохраняем
+      // токен текущего пользователя, а СРАЗУ после — восстанавливаем. Иначе после
+      // перезагрузки страницы текущим пользователем окажется app@volleyball.local.
+      var savedAuth = null;
+      try { savedAuth = localStorage.getItem(POCKETBASE_AUTH_KEY); } catch (e) {}
+
+      serviceClient.collection('app_users').authWithPassword(
+        DB_CONFIG.pocketbase.user_email,
+        DB_CONFIG.pocketbase.user_password
+      ).then(function() {
+        // Восстанавливаем токен реального пользователя в localStorage.
+        // Сервисный клиент держит свой токен в памяти (serviceClient.authStore),
+        // API-запросы продолжат работать с ним, а общий клиент и localStorage
+        // остаются при текущем пользователе.
+        try {
+          if (savedAuth) {
+            localStorage.setItem(POCKETBASE_AUTH_KEY, savedAuth);
+          } else {
+            localStorage.removeItem(POCKETBASE_AUTH_KEY);
+          }
+        } catch (e) {}
+        _servicePbClient = serviceClient;
+        resolve(serviceClient);
+      }).catch(function(err) {
+        // Восстанавливаем и при ошибке
+        try {
+          if (savedAuth) {
+            localStorage.setItem(POCKETBASE_AUTH_KEY, savedAuth);
+          } else {
+            localStorage.removeItem(POCKETBASE_AUTH_KEY);
+          }
+        } catch (e) {}
+        _servicePbClientPromise = null;
+        reject(err);
+      });
+    });
+    return _servicePbClientPromise;
+  }
+
+  // ============================================================================
   // DYNAMIC SCRIPT LOADER
   // ============================================================================
 
@@ -353,6 +420,129 @@
       } catch (e) {
         reject(e);
       }
+    });
+  }
+
+  // ============================================================================
+  // FIRESTORE REST FALLBACK (для создания/удаления пользователей)
+  // Используется, когда Firebase Web SDK (WebChannel/gRPC-web) не отвечает —
+  // например, при блокировке соединения сетью/фаерволом.
+  // REST API работает поверх обычного HTTPS и в таких сетях стабилен,
+  // при этом те же правила безопасности Firestore применяются автоматически.
+  // ============================================================================
+
+  // Таймаут ожидания ответа SDK перед переключением на REST
+  var SDK_OP_TIMEOUT_MS = 6000;
+
+  function getFirebaseProjectId() {
+    return (DB_CONFIG.firebase && DB_CONFIG.firebase.projectId) || '';
+  }
+
+  function getFirebaseApiKey() {
+    return (DB_CONFIG.firebase && DB_CONFIG.firebase.apiKey) || '';
+  }
+
+  function restFirestoreDocUrl(collection, docId) {
+    var pid = getFirebaseProjectId();
+    var key = getFirebaseApiKey();
+    if (!pid || !key) return null;
+    return 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(pid) +
+      '/databases/(default)/documents/' + encodeURIComponent(collection) + '/' + encodeURIComponent(docId) +
+      '?key=' + encodeURIComponent(key);
+  }
+
+  function restFetch(url, options, timeoutMs) {
+    return new Promise(function(resolve, reject) {
+      var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = controller ? setTimeout(function() { controller.abort(); }, timeoutMs || 10000) : null;
+      var opts = options || {};
+      if (controller) opts.signal = controller.signal;
+      fetch(url, opts).then(function(resp) {
+        if (timer) clearTimeout(timer);
+        resp.text().then(function(text) {
+          resolve({ status: resp.status, ok: resp.ok, body: text });
+        });
+      }).catch(function(err) {
+        if (timer) clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  function createFirestoreUserViaRest(docId, data) {
+    var docUrl = restFirestoreDocUrl(DB_CONFIG.collections.USERS, docId);
+    if (!docUrl) {
+      return Promise.reject(new Error('Не задан Firebase projectId/apiKey — REST fallback недоступен'));
+    }
+    return restFetch(docUrl, { method: 'GET' }, 8000).then(function(getRes) {
+      if (getRes.ok) {
+        var existsError = new Error('Пользователь с таким именем уже существует');
+        existsError.code = 'auth/email-already-in-use';
+        throw existsError;
+      }
+      if (getRes.status !== 404) {
+        throw new Error('REST проверка существования: HTTP ' + getRes.status + ' ' + getRes.body.slice(0, 200));
+      }
+      var fields = {};
+      Object.keys(data).forEach(function(k) {
+        var v = data[k];
+        if (k === 'createdAt') {
+          fields[k] = { timestampValue: new Date(v).toISOString() };
+        } else {
+          fields[k] = { stringValue: String(v == null ? '' : v) };
+        }
+      });
+      var masks = Object.keys(fields)
+        .map(function(k) { return 'updateMask.fieldPaths=' + encodeURIComponent(k); })
+        .join('&');
+      return restFetch(docUrl + '&' + masks, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: fields })
+      }, 15000).then(function(patchRes) {
+        if (!patchRes.ok) {
+          var err = new Error('REST create: HTTP ' + patchRes.status + ' ' + patchRes.body.slice(0, 300));
+          if (patchRes.status === 403) err.code = 'permission-denied';
+          throw err;
+        }
+        return { username: docId, role: data.role || 'user' };
+      });
+    });
+  }
+
+  function deleteFirestoreUserViaRest(docId) {
+    var docUrl = restFirestoreDocUrl(DB_CONFIG.collections.USERS, docId);
+    if (!docUrl) {
+      return Promise.reject(new Error('Не задан Firebase projectId/apiKey — REST fallback недоступен'));
+    }
+    return restFetch(docUrl, { method: 'DELETE' }, 10000).then(function(res) {
+      if (res.ok || res.status === 404) return; // 404 — уже удалён, считаем успехом
+      var err = new Error('REST delete: HTTP ' + res.status + ' ' + res.body.slice(0, 300));
+      if (res.status === 403) err.code = 'permission-denied';
+      throw err;
+    });
+  }
+
+  function raceWithTimeoutFallback(sdkPromise, timeoutMs, fallbackFactory) {
+    return new Promise(function(resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function() {
+        if (settled) return;
+        settled = true;
+        console.warn('[DB] Firebase SDK не ответил за ' + timeoutMs + 'мс, переключаюсь на REST');
+        fallbackFactory().then(resolve, reject);
+      }, timeoutMs);
+      sdkPromise.then(function(result) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
+      }, function(error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      });
     });
   }
 
@@ -529,30 +719,62 @@
       var email = username.toLowerCase() + '@volleyball.local';
 
       if (provider === 'firebase') {
+        var uname = String(username).toLowerCase();
         var salt = generateSalt();
+
+        // Хеш вычисляем заранее — он нужен и SDK-пути, и REST-fallback,
+        // а время хеширования не должно влиять на таймаут сети.
         return hashPassword(password, salt).then(function(hashedPassword) {
-          return firebase.firestore().collection(DB_CONFIG.collections.USERS).doc(username.toLowerCase()).set({
+          var baseData = {
             email: email,
-            username: username.toLowerCase(),
+            username: uname,
             password: hashedPassword,
             displayname: displayName,
-            role: role || 'user',
+            // Дублируем в displayName (как в server/scripts/create-admin-full.js),
+            // чтобы серверный /api/auth/login и админ-панель корректно показывали имя
+            displayName: displayName,
+            role: role || 'user'
+          };
+
+          // Если Firebase SDK не загрузился (CDN недоступен) — сразу REST
+          if (typeof firebase === 'undefined' || !firebase.firestore) {
+            return createFirestoreUserViaRest(uname, Object.assign({}, baseData, { createdAt: new Date() }));
+          }
+
+          // Сначала проверяем, что пользователь ещё не существует:
+          // иначе set() молча перезапишет существующего пользователя
+          // (включая его пароль) вместо ошибки «уже существует».
+          var usersCollectionRef = firebase.firestore().collection(DB_CONFIG.collections.USERS);
+          var userDocRef = usersCollectionRef.doc(uname);
+          var sdkData = Object.assign({}, baseData, {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
-        }).then(function() {
-          return { username: username.toLowerCase(), role: role || 'user' };
+
+          var sdkPromise = userDocRef.get().then(function(doc) {
+            if (doc.exists) {
+              var existsError = new Error('Пользователь с таким именем уже существует');
+              existsError.code = 'auth/email-already-in-use';
+              throw existsError;
+            }
+            return userDocRef.set(sdkData);
+          }).then(function() {
+            return { username: uname, role: baseData.role };
+          });
+
+          // Если SDK зависает (WebChannel не отвечает) — переключаемся на Firestore REST
+          return raceWithTimeoutFallback(sdkPromise, SDK_OP_TIMEOUT_MS, function() {
+            return createFirestoreUserViaRest(uname, Object.assign({}, baseData, { createdAt: new Date() }));
+          });
         });
       }
 
-      // PocketBase — создаём пользователя в настраиваемой коллекции
-      var pb = getPocketBaseClient();
+      // PocketBase — создаём пользователя через ОТДЕЛЬНЫЙ сервисный клиент (app_users).
+      // ВАЖНО: нельзя использовать общий getPocketBaseClient(), т.к. authWithPassword()
+      // перезапишет authStore и токен в localStorage — текущий пользователь подменится
+      // на сервисный app@volleyball.local.
       var usersCollection = DB_CONFIG.collections.USERS;
-      // Авторизуемся как обычный пользователь приложения
-      return pb.collection('app_users').authWithPassword(
-        DB_CONFIG.pocketbase.user_email,
-        DB_CONFIG.pocketbase.user_password
-      ).then(function() {
-          return pb.collection(usersCollection).create({
+      return getPocketBaseServiceClient().then(function(servicePb) {
+          return servicePb.collection(usersCollection).create({
             username: username.toLowerCase(),
             email: email,
             password: password,
@@ -569,22 +791,40 @@
      */
     deleteUser: function(username) {
       if (provider === 'firebase') {
+        var uname = String(username).toLowerCase();
+        // Если Firebase SDK не загрузился (CDN недоступен) — сразу REST
+        if (typeof firebase === 'undefined' || !firebase.firestore) {
+          return deleteFirestoreUserViaRest(uname);
+        }
         var usersCollection = DB_CONFIG.collections.USERS;
-        return firebase.firestore().collection(usersCollection).doc(username.toLowerCase()).delete();
+        var sdkPromise = firebase.firestore().collection(usersCollection).doc(uname).delete();
+        // Если SDK зависает (WebChannel не отвечает) — переключаемся на Firestore REST
+        return raceWithTimeoutFallback(sdkPromise, SDK_OP_TIMEOUT_MS, function() {
+          return deleteFirestoreUserViaRest(uname);
+        });
       }
 
-      // PocketBase — удаляем пользователя из настраиваемой коллекции
-      var pb = getPocketBaseClient();
+      // PocketBase — удаляем пользователя через ОТДЕЛЬНЫЙ сервисный клиент (app_users),
+      // чтобы не перезаписывать authStore и токен текущего пользователя.
       var usersCollection = DB_CONFIG.collections.USERS;
-      // Авторизуемся как обычный пользователь приложения
-      return pb.collection('app_users').authWithPassword(
-        DB_CONFIG.pocketbase.user_email,
-        DB_CONFIG.pocketbase.user_password
-      ).then(function() {
-          return pb.collection(usersCollection).getFirstListItem('username="' + username.toLowerCase() + '"');
-        })
-        .then(function(record) {
-          return pb.collection(usersCollection).delete(record.id);
+      var identifier = String(username);
+      return getPocketBaseServiceClient().then(function(servicePb) {
+          var collection = servicePb.collection(usersCollection);
+          // Идентификатор может быть username ИЛИ системным id записи
+          // (некоторые вызывающие передают user.docId — системный id).
+          return collection
+            .getFirstListItem('username="' + identifier.toLowerCase() + '"')
+            .catch(function(err) {
+              // По username ничего не найдено (404) — пробуем как системный id
+              if (err && err.status === 404) {
+                return collection.getOne(identifier);
+              }
+              throw err;
+            })
+            .then(function(record) {
+              if (!record) return null;
+              return collection.delete(record.id);
+            });
         });
     },
 

@@ -5,7 +5,7 @@
     "viewRule": "",
     "createRule": "",
     "updateRule": "",
-    "deleteRule": "id = @request.auth.id",
+    "deleteRule": "@request.auth.id != \"\"",
     "name": "scoreusers",
     "type": "auth",
     "fields": [
