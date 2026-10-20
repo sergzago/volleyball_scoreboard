@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Мультитабло</title>
+    <link href="css/css.css" rel="stylesheet">
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="vb-config.js"></script>
+    <script src="credentials.js"></script>
+    <script src="js/db-config.js"></script>
+    <script src="js/db-interface.js"></script>
+    <script src="js/common.js"></script>
+    <style>
+      /* =====================================================================
+         Стили табло — точная копия блока стилей из tablo.html.
+         Ими рисуются мини-табло внутри плиток (макет 100vw x 100vh,
+         масштабируемый transform: scale) — миниатюра совпадает с настоящим
+         табло, включая тему, шрифт и медиазапросы.
+         ВАЖНО: при изменении стилей в tablo.html обновите и этот блок.
+         ===================================================================== */
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: var(--body-bg, #ffffff);
+        color: var(--top-team-name-text, #000);
+        font-family: 'Rubik Mono One', sans-serif;
+        overflow: hidden;
+        transition: background 0.3s, color 0.3s;
+      }
+
+      /* Тёмная тема */
+      body.dark-theme {
+        background: #000000;
+        color: #ff0000;
+      }
+      body.dark-theme .tablo-general-score {
+        color: #cc0000;
+      }
+      body.dark-theme .set-history {
+        background-color: #000;
+        color: #ff0000;
+      }
+
+      /* Принудительные стили для светлой темы (бело-черная) */
+      body:not(.dark-theme) {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      body:not(.dark-theme) .tablo-general-score,
+      body:not(.dark-theme) .set-history {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+
+      /* Кнопки переключения темы и полноэкранного режима —
+         вертикальная колонка справа вверху (тема сверху, полный экран под ней),
+         чтобы длинное название команды их не перекрывало */
+      #theme-toggle,
+      #fullscreen-toggle {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        z-index: 9999;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.35);
+        color: rgba(0, 0, 0, 0.75);
+        border: 1.5px solid rgba(0, 0, 0, 0.35);
+        border-radius: 50%;
+        font-size: 16px;
+        text-align: center;
+        padding: 0;
+        opacity: 0.55;
+        box-shadow: none;
+        backdrop-filter: blur(2px);
+        transition: opacity 0.3s, transform 0.15s;
+      }
+      #theme-toggle svg,
+      #fullscreen-toggle svg {
+        display: block;
+        margin: auto;
+      }
+      #fullscreen-toggle {
+        top: 52px; /* под кнопкой темы (10px + 32px + 10px отступ) */
+      }
+      #theme-toggle:hover,
+      #fullscreen-toggle:hover,
+      #fullscreen-toggle.active {
+        opacity: 1;
+        transform: scale(1.06);
+        background: rgba(255, 255, 255, 0.6);
+      }
+      body.dark-theme #theme-toggle,
+      body.dark-theme #fullscreen-toggle {
+        background: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.9);
+        border: 1.5px solid rgba(255, 255, 255, 0.5);
+        box-shadow: none;
+      }
+      body.dark-theme #theme-toggle:hover,
+      body.dark-theme #fullscreen-toggle:hover,
+      body.dark-theme #fullscreen-toggle.active {
+        background: rgba(255, 255, 255, 0.38);
+        opacity: 1;
+      }
+      .tablo-screen {
+        min-height: 100vh;
+        min-height: 100dvh;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: clamp(2px, 1.5vh, 20px) clamp(8px, 3vw, 60px);
+        box-sizing: border-box;
+        overflow: hidden;
+        gap: clamp(2px, 1.5vh, 16px);
+      }
+      .tablo-teams {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        /* Симметричные отступы: справа — место под вертикальную колонку
+           кнопок (тема + полный экран), чтобы длинное название их не
+           перекрывало; слева — равный компенсирующий отступ. Без него
+           контент строки смещался влево на 24px, и названия команд со
+           счётом по сетам расходились по центру с большим счётом
+           (и в обычном режиме, и в режиме таймаута). */
+        padding-left: 48px;
+        padding-right: 48px;
+        text-align: center;
+        /* Базовый размер строки команд; JS (fitTeamNames) только УМЕНЬШАЕТ
+           его через --teams-scale. Счёт по сетам не зависит от масштаба. */
+        --teams-base-size: clamp(16px, 4.5vw, 40px);
+        --teams-scale: 1;
+        font-size: calc(var(--teams-base-size) * var(--teams-scale));
+        text-transform: uppercase;
+        letter-spacing: clamp(1px, 0.5vw, 4px);
+        margin-bottom: 0; /* Убран отступ снизу */
+        margin-top: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(6px, 2vw, 60px);
+        flex-wrap: nowrap;
+        min-width: 0;
+      }
+      .tablo-left-team,
+      .tablo-right-team {
+        flex: 1 1 0;
+        min-width: 0;
+        /* Строго одна строка без переносов; сильно длинное название
+           обрезается справа с многоточием */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        line-height: 1.1;
+      }
+      
+      .tablo-general-score {
+        font-size: clamp(16px, 4vw, 32px);
+        font-weight: bold;
+        /* Та же высота строки, что у названий (1.1): при align-items: flex-start
+           верх счёта совпадает с верхом названий команд */
+        line-height: 1.1;
+        color: var(--top-secondary-score-text, #000);
+        margin: 0 clamp(6px, 2vw, 30px);
+        white-space: nowrap;
+        flex: none;
+      }
+      .tablo-score {
+        /* Отступы в em: цифры растянуты через scaleY(2), трансформ не влияет
+           на layout — половина прироста высоты (0.5em) визуально уходит
+           вверх и вниз от центра, отступы это компенсируют */
+        margin-top: 0.65em;
+        margin-bottom: 0.6em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Двоеточие — строгий центр строки: половины счёта занимают равные
+           доли ширины, цифры прижаты к центру (к двоеточию) */
+        gap: 0;
+        width: 100%;
+        max-width: 100%;
+        font-size: min(30vw, 36vh, 380px);
+        line-height: 1;
+        white-space: nowrap;
+        letter-spacing: -0.05em;
+        padding: 0 clamp(4px, 2vw, 30px);
+        box-sizing: border-box;
+        min-width: 0;
+      }
+      .tablo-score .home_score,
+      .tablo-score .away_score {
+        /* Равные половины: разрядность одной стороны не сдвигает центр.
+           Порядок визуальный задаёт updateTabloSides через order (1/3);
+           выравнивание привязано к нему же, а не к классу.
+           order:1 (слева) — растёт влево, order:3 (справа) — вправо */
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+      }
+      /* До первой инициализации updateTabloSides (порядок из разметки:
+         away слева, home справа) */
+      .tablo-score .away_score {
+        text-align: right;
+        padding-right: 0.06em;
+      }
+      .tablo-score .home_score {
+        text-align: left;
+        padding-left: 0.06em;
+        padding-right: 0;
+      }
+      /* После инициализации визуальный порядок задаёт order (1 слева, 3 справа).
+         Эти правила идут последними — при равной специфичности побеждают. */
+      .tablo-score > [style*="order: 1"],
+      .tablo-score > [style*="order:1"] {
+        text-align: right;
+        padding-right: 0.06em;
+        padding-left: 0;
+      }
+      .tablo-score > [style*="order: 3"],
+      .tablo-score > [style*="order:3"] {
+        text-align: left;
+        padding-left: 0.06em;
+        padding-right: 0;
+      }
+
+      .set-history {
+        display: none;
+        background-color: var(--bottom-time-bg, #fff);
+        color: var(--bottom-time-text, #000);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-radius: 4px;
+        padding: 4px 10px;
+        font-size: clamp(12px, 3.5vw, 36px);
+        min-height: 20px;
+        text-align: center;
+        margin-top: 0;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-wrap: anywhere;
+      }
+      .set-history-bottom {
+        position: relative;
+        width: 100%;
+        bottom: auto;
+      }
+      .tablo-score span {
+        display: inline-block;
+        transform: scaleY(2);
+        transform-origin: center;
+      }
+      /* Разделитель счёта компактнее цифр, строго по центру */
+      .tablo-score .score-separator {
+        flex: none;
+        font-size: 0.6em;
+        transform: scaleY(1.4);
+        margin: 0;
+      }
+
+      /* Адаптив: узкие экраны (телефоны) */
+      @media (max-width: 600px) {
+        .tablo-screen {
+          justify-content: flex-start;
+          padding-top: clamp(2px, 1vh, 10px);
+          gap: clamp(2px, 1.5vh, 12px);
+        }
+        .tablo-teams {
+          margin-top: 0;
+          /* Названия не сжимаются под давлением счёта */
+          flex: none;
+        }
+        .tablo-score {
+          font-size: min(36vw, 30vh);
+          /* scaleY(1.6) выносит верх цифр на 0.3em над строкой — компенсируем */
+          margin-top: 0.4em;
+          margin-bottom: 0.2em;
+        }
+        .tablo-score span {
+          transform: scaleY(1.6);
+        }
+      }
+
+      /* Адаптив: альбомная ориентация / низкие экраны (телефон повёрнут) */
+      @media (max-height: 500px) {
+        #theme-toggle,
+        #fullscreen-toggle {
+          width: 28px;
+          height: 28px;
+          font-size: 14px;
+        }
+        #fullscreen-toggle {
+          top: 44px; /* 8px + 28px + 8px отступ */
+        }
+        .tablo-screen {
+          justify-content: flex-start;
+          gap: 0;
+          padding-top: 0;
+          padding-bottom: 0;
+          padding-left: clamp(4px, 2vw, 20px);
+          padding-right: clamp(4px, 2vw, 20px);
+        }
+        .tablo-teams {
+          --teams-base-size: clamp(12px, 3vw, 24px);
+          /* Симметричные отступы — строка остаётся отцентрованной */
+          padding-left: 40px;
+          padding-right: 40px;
+        }
+        .tablo-general-score {
+          font-size: clamp(12px, 3vw, 22px);
+        }
+        .tablo-score {
+          /* Цифры не должны наезжать на названия: scaleY визуально выносит
+             верх цифр над строкой на (scaleY-1)/2 от font-size, поэтому
+             размер ограничиваем высотой экрана и добавляем верхний отступ */
+          font-size: min(28vw, 38vh);
+          margin-top: 0.45em;
+          margin-bottom: 0;
+        }
+        .tablo-score span {
+          transform: scaleY(1.25);
+        }
+        .set-history {
+          margin-top: 0;
+          font-size: clamp(10px, 3vh, 18px);
+        }
+      }
+      /* =====================================================================
+         Режим таймаута (timeout_active === true)
+         Верхние 2/3 экрана — надпись «Таймаут <НАЗВАНИЕ КОМАНДЫ>»,
+         оставшаяся треть — названия команд и уменьшенный счёт партии.
+         ===================================================================== */
+      .tablo-timeout {
+        /* По умолчанию блок не участвует в раскладке */
+        display: none;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        text-transform: uppercase;
+        line-height: 1.05;
+        /* Длинная строка переносится, а не обрезается */
+        font-size: min(10vw, 16vh, 190px);
+        letter-spacing: clamp(1px, 0.4vw, 8px);
+        padding: 0 clamp(8px, 3vw, 60px);
+      }
+      .tablo-timeout-text {
+        display: block;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+      /* Обёртка «названия + счёт + история»: в обычном режиме занимает
+         всё свободное место (раскладка не меняется), при таймауте —
+         оставшуюся треть экрана. gap наследуется от .tablo-screen,
+         чтобы отступы между блоками остались прежними и в медиазапросах. */
+      .tablo-main {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        min-height: 0;
+        flex: 1 1 auto;
+        gap: inherit;
+      }
+
+      /* Таймаут включён: надпись — 2/3 высоты, контент — оставшаяся треть */
+      .tablo-screen.timeout-active .tablo-timeout {
+        display: flex;
+        flex: 2 1 0;
+        min-height: 0;
+      }
+      .tablo-screen.timeout-active .tablo-main {
+        flex: 1 1 0;
+        min-height: 0;
+      }
+      /* Счёт партии уменьшается и размещается в оставшейся трети.
+         Отступы в em остаются пропорциональны размеру цифр, поэтому
+         визуальный вылет scaleY(2) по-прежнему компенсируется. */
+      .tablo-screen.timeout-active .tablo-score {
+        font-size: min(16vw, 9vh, 170px);
+        margin-top: 0.55em;
+        margin-bottom: 0.5em;
+      }
+      /* Названия команд и счёт по сетам — компактнее, чтобы поместиться
+         в оставшейся трети вместе с историей сетов */
+      .tablo-screen.timeout-active .tablo-teams {
+        --teams-base-size: clamp(14px, 2.6vw, 28px);
+      }
+      .tablo-screen.timeout-active .tablo-general-score {
+        font-size: clamp(12px, 2.4vw, 24px);
+      }
+      .tablo-screen.timeout-active .set-history {
+        font-size: clamp(10px, 2.4vh, 22px);
+        padding: 2px 8px;
+        min-height: 0;
+        /* Не сжимается под давлением: место под неё освобождает счёт */
+        flex: 0 0 auto;
+      }
+
+      /* =====================================================================
+         Мультитабло: шапка, сетка плиток, режим большого табло.
+         Стили табло выше не изменяем — новые правила идут после них.
+         ===================================================================== */
+      :root {
+        --mt-gap: 8px;
+        --mt-header-h: clamp(34px, 5vh, 46px);
+        --mt-chrome-bg: #f0f0f0;
+        --mt-chrome-border: #d0d0d0;
+        --mt-chrome-fg: #1a1a1a;
+        --mt-chrome-muted: #777777;
+        --mt-tile-bg: #ffffff;
+        --mt-tile-border: #cccccc;
+        --mt-accent: #225378;
+      }
+      body.dark-theme {
+        --mt-chrome-bg: #141414;
+        --mt-chrome-border: #4d0000;
+        --mt-chrome-fg: #ff4d4d;
+        --mt-chrome-muted: #b04343;
+        --mt-tile-bg: #000000;
+        --mt-tile-border: #4d0000;
+        --mt-accent: #ff3b3b;
+      }
+      /* Страница — колонка: шапка сверху, сетка на всё остальное.
+         html/body уже имеют height:100%; overflow:hidden (стили табло). */
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ---------- Шапка ---------- */
+      #mt-header {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: var(--mt-header-h);
+        padding: 0 10px 0 12px;
+        box-sizing: border-box;
+        background: var(--mt-chrome-bg);
+        color: var(--mt-chrome-fg);
+        border-bottom: 1px solid var(--mt-chrome-border);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .mt-title {
+        font-size: clamp(13px, 2vh, 18px);
+        font-weight: bold;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+      }
+      /* Логотип в шапке: src подменяет loadLogo() на данные из LOGO_FILE_NAME */
+      .mt-logo {
+        height: clamp(16px, 2.6vh, 26px);
+        width: auto;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+      .mt-status {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: right;
+        color: var(--mt-chrome-muted);
+        font-size: clamp(10px, 1.6vh, 13px);
+      }
+      /* Кнопки темы и полного экрана — по мотивам кнопок tablo.html */
+      .mt-btn {
+        flex: none;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.35);
+        color: rgba(0, 0, 0, 0.75);
+        border: 1.5px solid rgba(0, 0, 0, 0.35);
+        border-radius: 50%;
+        opacity: 0.7;
+        backdrop-filter: blur(2px);
+        transition: opacity 0.2s, transform 0.15s;
+      }
+      .mt-btn svg {
+        display: block;
+        margin: auto;
+      }
+      .mt-btn:hover,
+      .mt-btn.active {
+        opacity: 1;
+        transform: scale(1.06);
+      }
+      body.dark-theme .mt-btn {
+        background: rgba(255, 255, 255, 0.22);
+        color: rgba(255, 255, 255, 0.9);
+        border-color: rgba(255, 255, 255, 0.5);
+      }
+
+      /* ---------- Сетка мини-табло ---------- */
+      #mt-grid {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--mt-gap);
+        padding: var(--mt-gap);
+        box-sizing: border-box;
+        /* Ровно три строки заполняют экран (~9 табло); лишние прокручиваются */
+        grid-auto-rows: calc((100vh - var(--mt-header-h) - 4 * var(--mt-gap)) / 3);
+        grid-auto-rows: calc((100dvh - var(--mt-header-h) - 4 * var(--mt-gap)) / 3);
+        align-content: start;
+        scrollbar-width: thin;
+        scrollbar-color: var(--mt-tile-border) transparent;
+      }
+      #mt-grid::-webkit-scrollbar { width: 10px; }
+      #mt-grid::-webkit-scrollbar-track { background: transparent; }
+      #mt-grid::-webkit-scrollbar-thumb {
+        background: var(--mt-tile-border);
+        border-radius: 5px;
+      }
+      @media (max-width: 1000px) {
+        #mt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 560px) {
+        #mt-grid { grid-template-columns: minmax(0, 1fr); }
+      }
+
+      /* ---------- Плитка (мини-табло) ---------- */
+      .mt-tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        cursor: pointer;
+        background: var(--mt-tile-bg);
+        border: 1.5px solid var(--mt-tile-border);
+        border-radius: 6px;
+        transition: border-color 0.15s, transform 0.15s;
+      }
+      .mt-tile:hover,
+      .mt-tile:focus-visible {
+        border-color: var(--mt-accent);
+        transform: translateY(-1px);
+        outline: none;
+      }
+      .mt-tile-head {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: var(--mt-chrome-bg);
+        border-bottom: 1px solid var(--mt-chrome-border);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: clamp(10px, 1.5vh, 14px);
+        color: var(--mt-chrome-fg);
+        user-select: none;
+      }
+      .mt-tile-venue {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: bold;
+      }
+      .mt-tile-venue.no-venue {
+        font-weight: normal;
+        font-style: italic;
+        color: var(--mt-chrome-muted);
+      }
+      .mt-tile-id {
+        flex: none;
+        max-width: 42%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        direction: rtl;
+        color: var(--mt-chrome-muted);
+        font-size: 0.85em;
+      }
+      .mt-tile-finished {
+        flex: none;
+        padding: 1px 6px;
+        border-radius: 8px;
+        background: #1e7e34;
+        color: #ffffff;
+        font-size: 0.8em;
+      }
+      .mt-tile-screen {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .mt-tile-fit {
+        position: relative;
+        flex: none;
+        overflow: hidden;
+      }
+      .mt-tile-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        transform-origin: 0 0;
+        /* Шрифт табло задаём явно: у body мультитабло свой шрифт интерфейса */
+        font-family: 'Rubik Mono One', sans-serif;
+      }
+
+      /* ---------- Сообщения (загрузка / нет игр / ошибка) ---------- */
+      #mt-message {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        min-height: 40vh;
+        padding: 20px;
+        box-sizing: border-box;
+        text-align: center;
+        color: var(--mt-chrome-muted);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: clamp(14px, 2vh, 18px);
+      }
+      #mt-message[hidden] { display: none; }
+      .mt-retry-btn {
+        padding: 8px 20px;
+        cursor: pointer;
+        background: var(--mt-accent);
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      /* ---------- Режим большого табло ---------- */
+      #mt-detail {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: none;
+        background: #000000;
+      }
+      #mt-detail.open { display: block; }
+      #mt-detail-frame {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #000000;
+      }
+      /* Панель поверх большого табло: возврат + полный экран мультитабло.
+         z-index выше iframe — остаётся видимой и в полноэкранном режиме
+         (fullscreen переключается на уровне документа мультитабло, а не
+         iframe, иначе полноэкранный iframe перекрывает кнопку возврата) */
+      #mt-detail-toolbar {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      /* Кнопка полного экрана — в правом верхнем углу, рядом с кнопкой
+         смены темы (её рисует сам tablo.html внутри iframe: right 8px,
+         ширина 32px). Поэтому отступ от правого края = 8 + 32 + 8 = 48px.
+         Кнопка — отдельный элемент (не внутри тулбара), чтобы
+         позиционировалась от #mt-detail, а не от панели слева. */
+      #mt-detail-fs {
+        position: absolute;
+        top: 8px;
+        right: 48px;
+        z-index: 3;
+      }
+      /* Кнопка возврата на мультитабло — по стилю кнопок tablo.html */
+      #mt-back {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 14px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.35);
+        color: rgba(0, 0, 0, 0.8);
+        border: 1.5px solid rgba(0, 0, 0, 0.35);
+        border-radius: 16px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        opacity: 0.6;
+        backdrop-filter: blur(2px);
+        transition: opacity 0.2s, transform 0.15s;
+      }
+      #mt-back:hover {
+        opacity: 1;
+        transform: scale(1.04);
+      }
+      #mt-detail-loader {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #111111;
+        color: #eeeeee;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Шапка: заголовок, статус и кнопки темы/полного экрана -->
+    <div id="mt-header">
+      <span class="mt-title"><img class="mt-logo" id="mt-logo" src="logo_nvl.png" alt="Логотип">Мультитабло</span>
+      <span id="mt-status" class="mt-status">Загрузка…</span>
+      <button id="mt-theme" class="mt-btn" title="Переключить тему" aria-label="Переключить тему"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5z"/></svg></button>
+      <button id="mt-fullscreen" class="mt-btn" title="Полноэкранный режим" aria-label="Полноэкранный режим"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+
+    <!-- Сетка мини-табло; плитки создаёт скрипт -->
+    <div id="mt-grid">
+      <div id="mt-message">
+        <span id="mt-message-text">Загрузка игр…</span>
+        <button id="mt-retry" class="mt-retry-btn" type="button" hidden>Повторить</button>
+      </div>
+    </div>
+
+    <!-- Большое табло выбранной игры: настоящий tablo.html в iframe -->
+    <div id="mt-detail" aria-hidden="true">
+      <div id="mt-detail-loader">Загрузка табло…</div>
+      <!-- Без allowfullscreen: содержимое iframe не должно уходить в полноэкранный
+           режим отдельно от мультитабло (тогда браузер перекрывает весь
+           родительский документ и кнопка возврата «Мультитабло» исчезает).
+           Основная защита — в самом tablo.html: встроенный документ (iframe)
+           скрывает свою кнопку fullscreen и не запрашивает полный экран
+           (проверка window.self !== window.top работает и для cross-origin,
+           и для file://). Дополнительно ниже родитель прячет кнопку в iframe
+           и выходит из полноэкранного режима, если iframe всё же его занял.
+           Полноэкранный режим переключают кнопки мультитабло. -->
+      <iframe id="mt-detail-frame" title="Табло игры"></iframe>
+      <div id="mt-detail-toolbar">
+        <button id="mt-back" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Мультитабло</button>
+      </div>
+      <!-- Кнопка полного экрана — справа вверху, рядом с кнопкой смены темы
+           (которую рисует сам tablo.html внутри iframe). Вынесена из панели
+           возврата, чтобы не прижиматься к кнопке «Мультитабло» слева. -->
+      <button id="mt-detail-fs" class="mt-btn" title="Полноэкранный режим" aria-label="Полноэкранный режим"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+    <script>
+      (function () {
+        'use strict';
+
+        // ==================================================================
+        // Тема. Используется тот же ключ localStorage, что и в tablo.html,
+        // — большое табло в iframe открывается в той же теме.
+        // ==================================================================
+        function applyThemeFromStorage() {
+          $('body').toggleClass('dark-theme', localStorage.getItem('tablo-theme') === 'dark');
+        }
+
+        // ==================================================================
+        // Полноэкранный режим (Fullscreen API) — по аналогии с tablo.html
+        // ==================================================================
+        function getFullscreenElement() {
+          return document.fullscreenElement || document.webkitFullscreenElement
+            || document.mozFullScreenElement || document.msFullscreenElement || null;
+        }
+
+        // Кнопки полного экрана: в шапке (сетка) и на панели большого табло.
+        // Fullscreen переключается на уровне документа мультитабло, поэтому
+        // кнопка возврата остаётся видимой; кнопка fullscreen внутри
+        // tablo.html (iframe) скрыта — см. обработчик load iframe
+        var FS_BTN_SELECTOR = '#mt-fullscreen, #mt-detail-fs';
+
+        function updateFullscreenButton() {
+          var fsEl = getFullscreenElement();
+          // Страховка: если полноэкранным оказался сам iframe (вложенный
+          // fullscreen, запущенный из tablo.html), выходим — его содержимое
+          // перекрывает кнопку возврата «Мультитабло»
+          if (fsEl && fsEl.id === 'mt-detail-frame') {
+            var fsExit = document.exitFullscreen || document.webkitExitFullscreen
+              || document.mozCancelFullScreen || document.msExitFullscreen;
+            if (fsExit) {
+              try {
+                var fsRes = fsExit.call(document);
+                if (fsRes && typeof fsRes.catch === 'function') fsRes.catch(function () {});
+              } catch (e) {}
+            }
+            fsEl = getFullscreenElement();
+          }
+          var isFull = !!fsEl;
+          $(FS_BTN_SELECTOR)
+            .toggleClass('active', isFull)
+            .attr('title', isFull ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим');
+        }
+
+        function initFullscreenToggle() {
+          var root = document.documentElement;
+          var apiAvailable = !!(root.requestFullscreen || root.webkitRequestFullscreen
+            || root.mozRequestFullScreen || root.msRequestFullscreen);
+          // В iframe без allowfullscreen fullscreenEnabled === false — прячем кнопку
+          // (например, если родитель загрузил документ в sandbox-фрейме).
+          var allowed = document.fullscreenEnabled;
+          if (allowed === undefined) allowed = document.webkitFullscreenEnabled;
+          if (allowed === undefined) allowed = document.mozFullScreenEnabled;
+          if (!apiAvailable || allowed === false) {
+            $(FS_BTN_SELECTOR).hide();
+            return;
+          }
+
+          $(FS_BTN_SELECTOR).on('click', function () {
+            var result;
+            if (!getFullscreenElement()) {
+              var request = root.requestFullscreen || root.webkitRequestFullscreen
+                || root.mozRequestFullScreen || root.msRequestFullscreen;
+              if (!request) return;
+              result = request.call(root);
+            } else {
+              var exit = document.exitFullscreen || document.webkitExitFullscreen
+                || document.mozCancelFullScreen || document.msExitFullscreen;
+              if (!exit) return;
+              result = exit.call(document);
+            }
+            // Отклонённый промис (нет разрешения/встраивание) не должен давать
+            // unhandled rejection
+            if (result && typeof result.catch === 'function') result.catch(function () {});
+          });
+
+          ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+            .forEach(function (eventName) {
+              document.addEventListener(eventName, updateFullscreenButton);
+            });
+          updateFullscreenButton();
+        }
+
+        // ==================================================================
+        // Вспомогательные функции
+        // ==================================================================
+
+        /**
+         * Приводит запись игры (Firebase — plain object, PocketBase — Record)
+         * к простому объекту с перечисляемыми полями.
+         */
+        function plainGame(g) {
+          if (!g) return null;
+          if (typeof g.get === 'function') {
+            var out = {};
+            for (var k in g) {
+              if (Object.prototype.hasOwnProperty.call(g, k) && typeof g[k] !== 'function') {
+                out[k] = g[k];
+              }
+            }
+            var cid = null;
+            try { cid = g.get('id'); } catch (e) {}
+            if (cid) out.id = cid;
+            return out;
+          }
+          return g;
+        }
+
+        function fmtTime(d) {
+          function pad(n) { return (n < 10 ? '0' : '') + n; }
+          return pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+
+        function pluralGames(n) {
+          var n10 = n % 10, n100 = n % 100;
+          if (n10 === 1 && n100 !== 11) return 'игра';
+          if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return 'игры';
+          return 'игр';
+        }
+
+        // ==================================================================
+        // Мини-табло.
+        // Каждая плитка содержит макет табло (те же классы, что в tablo.html)
+        // размером 100vw x 100vh, масштабированный под размер плитки:
+        // получается точная миниатюра полноэкранного табло.
+        // ==================================================================
+        var TILE_HTML =
+          '<div class="mt-tile-head">' +
+            '<span class="mt-tile-venue"></span>' +
+            '<span class="mt-tile-finished" hidden>завершён</span>' +
+            '<span class="mt-tile-id"></span>' +
+          '</div>' +
+          '<div class="mt-tile-screen">' +
+            '<div class="mt-tile-fit">' +
+              '<div class="mt-tile-canvas">' +
+                '<div class="tablo-screen">' +
+                  '<div class="tablo-timeout" aria-hidden="true">' +
+                    '<span class="tablo-timeout-text">Таймаут</span>' +
+                  '</div>' +
+                  '<div class="tablo-main">' +
+                    '<div class="tablo-teams">' +
+                      '<span class="tablo-left-team">HOME</span>' +
+                      '<span class="tablo-general-score">' +
+                        '<span class="home_sets">0</span>' +
+                        '<span class="tablo-separator">:</span>' +
+                        '<span class="away_sets">0</span>' +
+                      '</span>' +
+                      '<span class="tablo-right-team">AWAY</span>' +
+                    '</div>' +
+                    '<div class="tablo-score">' +
+                      '<span class="away_score">0</span>' +
+                      '<span class="tablo-separator score-separator">:</span>' +
+                      '<span class="home_score">0</span>' +
+                    '</div>' +
+                    '<div class="set-history set-history-bottom">&nbsp;</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+
+        // ==================================================================
+        // Состояние
+        // ==================================================================
+        var tiles = {};      // id -> элемент плитки
+        var lastJson = {};   // id -> JSON данных (пропуск перерисовки без изменений)
+        var lastOrder = [];  // порядок id сверху вниз
+        var dataMode = null; // 'active' — активные за сегодня, 'all' — все игры
+        var lastUpdate = null;
+        var dataStarted = false;
+        var currentGameId = null;
+        var detailPushed = false;
+        var suppressPopstate = false; // гасит popstate от history.back() в backToGrid()
+
+        // ==================================================================
+        // Масштабирование макета табло под размер плитки
+        // ==================================================================
+
+        /** Scale = min(ширина плитки / 100vw, высота / 100vh), по центру плитки */
+        function fitTileCanvas(tile) {
+          var screen = tile.querySelector('.mt-tile-screen');
+          var fit = tile.querySelector('.mt-tile-fit');
+          var canvas = tile.querySelector('.mt-tile-canvas');
+          if (!screen || !fit || !canvas) return;
+          var vw = window.innerWidth, vh = window.innerHeight;
+          var w = screen.clientWidth, h = screen.clientHeight;
+          if (!vw || !vh || !w || !h) return;
+          var scale = Math.min(w / vw, h / vh);
+          fit.style.width = Math.round(vw * scale) + 'px';
+          fit.style.height = Math.round(vh * scale) + 'px';
+          canvas.style.transform = 'scale(' + scale + ')';
+        }
+
+        function fitAllCanvases() {
+          $('.mt-tile').each(function () { fitTileCanvas(this); });
+        }
+
+        /**
+         * Автоподбор размера названий команд — аналог fitTeamNames из
+         * tablo.html, но в границах одной плитки: уменьшаем --teams-scale,
+         * пока названия не перестают обрезаться.
+         */
+        function fitTileTeamNames(tile) {
+          var container = tile.querySelector('.tablo-teams');
+          if (!container) return;
+          var leftTeam = container.querySelector('.tablo-left-team');
+          var rightTeam = container.querySelector('.tablo-right-team');
+          if (!leftTeam || !rightTeam) return;
+          container.style.setProperty('--teams-scale', '1');
+          var scale = 1;
+          var minScale = 0.4;
+          var step = 0.05;
+          // Название обрезано, если scrollWidth больше clientWidth
+          function isOverflow() {
+            return (leftTeam.scrollWidth > leftTeam.clientWidth + 1) ||
+                   (rightTeam.scrollWidth > rightTeam.clientWidth + 1);
+          }
+          var guard = 0;
+          while (isOverflow() && scale > minScale && guard < 20) {
+            scale = Math.max(minScale, +(scale - step).toFixed(2));
+            container.style.setProperty('--teams-scale', String(scale));
+            guard++;
+          }
+        }
+
+        // ==================================================================
+        // Отрисовка одного мини-табло по данным игры.
+        // Логика сторон/счёта/истории повторяет js/scoreboard.js
+        // (updateTabloSides, updateGeneralScoreFromHistory, renderSetHistory)
+        // и updateTabloTimeoutDisplay из tablo.html.
+        // ==================================================================
+        function renderTile(tile, d) {
+          // XOR: домашняя команда слева, если home физически слева
+          // И табло не инвертировано (как в updateTabloSides)
+          var homeSide = d['home_side'] || 'left';
+          var invertTablo = !!d['invert_tablo'];
+          var homeIsLeft = (homeSide === 'left') !== invertTablo;
+
+          var homeTeam = d['home_team'] || 'HOME';
+          var awayTeam = d['away_team'] || 'AWAY';
+
+          // Названия команд: левый/правый слоты
+          tile.querySelector('.tablo-left-team').textContent = homeIsLeft ? homeTeam : awayTeam;
+          tile.querySelector('.tablo-right-team').textContent = homeIsLeft ? awayTeam : homeTeam;
+
+          // Счёт партии: визуальный порядок задаётся через order (как в
+          // updateTabloSides); выравнивание — CSS по [style*="order: N"]
+          var scoreEl = tile.querySelector('.tablo-score');
+          var homeScoreEl = scoreEl.querySelector('.home_score');
+          var awayScoreEl = scoreEl.querySelector('.away_score');
+          homeScoreEl.textContent = (d['home_score'] != null) ? d['home_score'] : 0;
+          awayScoreEl.textContent = (d['away_score'] != null) ? d['away_score'] : 0;
+          homeScoreEl.style.order = homeIsLeft ? 1 : 3;
+          awayScoreEl.style.order = homeIsLeft ? 3 : 1;
+          scoreEl.querySelector('.score-separator').style.order = 2;
+
+          // Счёт по сетам и история — из set_history
+          var history = Array.isArray(d['set_history']) ? d['set_history'] : [];
+          var homeSets = 0, awaySets = 0;
+          var parts = [];
+          for (var i = 0; i < history.length; i++) {
+            var entry = history[i] || {};
+            var h = parseInt(entry.home, 10);
+            var a = parseInt(entry.away, 10);
+            var hs = (entry.home != null) ? entry.home : '-';
+            var as = (entry.away != null) ? entry.away : '-';
+            if (!isNaN(h) && !isNaN(a)) {
+              if (h > a) homeSets++;
+              else if (a > h) awaySets++;
+            }
+            // Порядок в истории — как на табло: слева команда, стоящая слева
+            parts.push(homeIsLeft ? (hs + ':' + as) : (as + ':' + hs));
+          }
+          // Как в updateGeneralScoreFromHistory: если home справа, значения
+          // подменяются, чтобы левое число соответствовало левой команде
+          tile.querySelector('.home_sets').textContent = homeIsLeft ? homeSets : awaySets;
+          tile.querySelector('.away_sets').textContent = homeIsLeft ? awaySets : homeSets;
+
+          var historyText = parts.join(' ');
+          var historyEl = tile.querySelector('.set-history-bottom');
+          if (historyText) {
+            historyEl.textContent = historyText;
+            historyEl.style.display = 'block';
+          } else {
+            historyEl.textContent = '';
+            historyEl.style.display = 'none';
+          }
+
+          // Таймаут — по схеме updateTabloTimeoutDisplay из tablo.html
+          var timeoutActive = !!d['timeout_active'];
+          if (timeoutActive) {
+            var label = String(d['custom_label'] || '').trim();
+            if (!label || label.toLowerCase().indexOf('таймаут') !== 0) {
+              label = 'Таймаут';
+            }
+            tile.querySelector('.tablo-timeout-text').textContent = label;
+          }
+          var screenEl = tile.querySelector('.tablo-screen');
+          screenEl.classList.toggle('timeout-active', timeoutActive);
+          tile.querySelector('.tablo-timeout').setAttribute('aria-hidden', timeoutActive ? 'false' : 'true');
+
+          // Шапка плитки: название зала + статус + id игры
+          var venue = String(d['venue'] || '').trim();
+          var venueEl = tile.querySelector('.mt-tile-venue');
+          venueEl.textContent = venue || 'Зал не указан';
+          venueEl.classList.toggle('no-venue', !venue);
+          venueEl.title = venue || 'Зал не указан';
+          var idEl = tile.querySelector('.mt-tile-id');
+          idEl.textContent = String(d['id'] || '');
+          idEl.title = String(d['id'] || '');
+          var finished = !!d['classic_match_finished'] || !!d['beach_match_finished'];
+          tile.querySelector('.mt-tile-finished').hidden = !finished;
+
+          // Подгонка названий — только когда они изменились
+          var namesKey = homeTeam + '\u0000' + awayTeam + '\u0000' + homeIsLeft;
+          if (tile._mtNamesKey !== namesKey) {
+            tile._mtNamesKey = namesKey;
+            fitTileTeamNames(tile);
+          }
+        }
+
+        // ==================================================================
+        // Управление сеткой
+        // ==================================================================
+        function createTile(id) {
+          var tile = document.createElement('div');
+          tile.className = 'mt-tile';
+          tile.setAttribute('data-game', id);
+          tile.setAttribute('role', 'button');
+          tile.setAttribute('tabindex', '0');
+          tile.innerHTML = TILE_HTML;
+          tile.addEventListener('click', function () { openDetail(id, true); });
+          tile.addEventListener('keydown', function (e) {
+            if (e.repeat) return; // зажатая клавиша не должна открывать табло повторно
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+              e.preventDefault();
+              openDetail(id, true);
+            }
+          });
+          // Пересчёт масштаба при изменении размера плитки
+          if (window.ResizeObserver) {
+            var ro = new ResizeObserver(function () { fitTileCanvas(tile); });
+            ro.observe(tile.querySelector('.mt-tile-screen'));
+          }
+          fitTileCanvas(tile);
+          return tile;
+        }
+
+        function updateStatus(count) {
+          var text;
+          if (count > 0) {
+            text = count + ' ' + pluralGames(count) +
+              (dataMode === 'all' ? ' · все игры (нет активных за сегодня)' : ' · активные игры за сегодня') +
+              (lastUpdate ? (' · обновлено ' + fmtTime(lastUpdate)) : '');
+          } else {
+            text = 'Нет игр' + (lastUpdate ? (' · обновлено ' + fmtTime(lastUpdate)) : '');
+          }
+          $('#mt-status').text(text);
+        }
+
+        function showMessage(text, withRetry) {
+          $('#mt-message-text').text(text);
+          $('#mt-retry').prop('hidden', !withRetry);
+          $('#mt-message').prop('hidden', false);
+        }
+
+        function hideMessage() {
+          $('#mt-message').prop('hidden', true);
+        }
+
+        function applyGames(rawList) {
+          var list = [];
+          (rawList || []).forEach(function (g) {
+            var plain = plainGame(g);
+            if (plain && plain.id) list.push(plain);
+          });
+          // Стабильная сортировка: по залу (пустой — в конец), затем по id.
+          // Порядок не скачет при обновлении счёта в реальном времени.
+          list.sort(function (a, b) {
+            var va = String(a.venue || '').trim().toLowerCase();
+            var vb = String(b.venue || '').trim().toLowerCase();
+            if (va !== vb) {
+              if (!va) return 1;
+              if (!vb) return -1;
+              return va < vb ? -1 : 1;
+            }
+            var ia = String(a.id), ib = String(b.id);
+            return ia < ib ? -1 : (ia > ib ? 1 : 0);
+          });
+
+          var grid = document.getElementById('mt-grid');
+          var newOrder = list.map(function (g) { return String(g.id); });
+          var orderChanged = newOrder.join('\n') !== lastOrder.join('\n');
+          var seen = {};
+
+          list.forEach(function (g) {
+            var id = String(g.id);
+            seen[id] = true;
+            var tile = tiles[id];
+            var created = false;
+            if (!tile) {
+              tile = createTile(id);
+              tiles[id] = tile;
+              created = true;
+            }
+            // Перевставка элементов задаёт порядок сверху вниз
+            if (orderChanged) grid.appendChild(tile);
+            var json = null;
+            try { json = JSON.stringify(g); } catch (e) {}
+            if (created || json !== lastJson[id]) {
+              lastJson[id] = json;
+              renderTile(tile, g);
+            }
+          });
+
+          // Удаляем плитки исчезнувших игр
+          Object.keys(tiles).forEach(function (id) {
+            if (!seen[id]) {
+              if (tiles[id].parentNode) tiles[id].parentNode.removeChild(tiles[id]);
+              delete tiles[id];
+              delete lastJson[id];
+            }
+          });
+
+          lastOrder = newOrder;
+          updateStatus(list.length);
+          if (list.length > 0) {
+            hideMessage();
+          } else {
+            showMessage(dataMode === 'all' ? 'Нет игр' : 'Загрузка игр…', false);
+          }
+        }
+
+        // ==================================================================
+        // Данные: активные (сегодняшние) игры + подписка на изменения.
+        // Если активных за сегодня нет — показываем все игры (queryAll).
+        // ==================================================================
+        function refreshGames() {
+          return DB.scoreboard.queryActive().then(function (active) {
+            lastUpdate = new Date();
+            if (active && active.length) {
+              dataMode = 'active';
+              applyGames(active);
+              return;
+            }
+            return DB.scoreboard.queryAll().then(function (all) {
+              dataMode = 'all';
+              applyGames(all || []);
+            });
+          }).catch(function (err) {
+            console.error('multitablo: ошибка обновления списка игр', err);
+            if (!lastOrder.length) {
+              showMessage('Не удалось загрузить игры. Проверьте подключение к БД.', true);
+              $('#mt-status').text('Ошибка загрузки');
+            }
+          });
+        }
+
+        function startData() {
+          if (dataStarted) return;
+          dataStarted = true;
+          DB.init().then(function () {
+            // Первичная загрузка + опрос (страховка, если realtime отключён)
+            refreshGames();
+            setInterval(refreshGames, 15000);
+            // Реальное время: одна подписка на все активные игры
+            if (typeof DB.scoreboard.subscribeActive === 'function') {
+              try {
+                DB.scoreboard.subscribeActive(function (list) {
+                  lastUpdate = new Date();
+                  if (list && list.length) {
+                    dataMode = 'active';
+                    applyGames(list);
+                  }
+                }, function (err) {
+                  console.warn('multitablo: subscribeActive error', err);
+                });
+              } catch (e) {
+                console.warn('multitablo: subscribeActive failed', e);
+              }
+            }
+          }).catch(function (err) {
+            dataStarted = false;
+            console.error('multitablo: DB init failed', err);
+            showMessage('Не удалось подключиться к БД.', true);
+            $('#mt-status').text('Ошибка подключения');
+          });
+        }
+
+        // ==================================================================
+        // Большое табло: tablo.html выбранной игры в iframe.
+        // URL получает параметр ?game=..., поэтому работают «назад»
+        // в браузере и прямые ссылки multitablo.html?game=...
+        // ==================================================================
+        function openDetail(id, pushState) {
+          if (!id) return;
+          currentGameId = id;
+          $('#mt-detail-loader').show();
+          $('#mt-detail-frame').attr('src', 'tablo.html?game=' + encodeURIComponent(id));
+          $('#mt-detail').addClass('open').attr('aria-hidden', 'false');
+          if (pushState) {
+            try {
+              history.pushState({ game: id }, '', '?game=' + encodeURIComponent(id));
+              detailPushed = true;
+            } catch (e) {}
+          }
+          $('#mt-back').focus();
+        }
+
+        function closeDetail() {
+          if (!currentGameId) return;
+          currentGameId = null;
+          detailPushed = false;
+          $('#mt-detail').removeClass('open').attr('aria-hidden', 'true');
+          // about:blank останавливает подписки и опрос внутри iframe
+          $('#mt-detail-frame').attr('src', 'about:blank');
+          // Тему могли переключить внутри tablo.html — синхронизируем сетку
+          applyThemeFromStorage();
+        }
+
+        /**
+         * Кнопка «Мультитабло».
+         * ВАЖНО: оверлей закрывается СИНХРОННО при нажатии и не ждёт
+         * асинхронного popstate. Раньше push-ветка вызывала только
+         * history.back() и полагалась на popstate: при загруженном
+         * main thread (9 мини-табло + загрузка iframe) событие
+         * задерживалось, первое нажатие оставляло пустой тёмный экран,
+         * а сетка возвращалась со второго нажатия (второе уже попадало
+         * в синхронную ветку закрытия). История чистится ПОСЛЕ закрытия,
+         * а её popstate гасится флагом suppressPopstate.
+         */
+        function backToGrid() {
+          if (!currentGameId) return;
+          var pushed = detailPushed;
+          closeDetail(); // синхронно: сбрасывает currentGameId и detailPushed
+          if (pushed) {
+            suppressPopstate = true;
+            try {
+              history.back(); // URL вернётся к записи без ?game=
+            } catch (e) {
+              suppressPopstate = false;
+            }
+          } else {
+            try { history.replaceState(null, '', location.pathname); } catch (e) {}
+          }
+        }
+
+        window.addEventListener('popstate', function (e) {
+          // popstate от нашего history.back() в backToGrid(): экран уже
+          // закрыт синхронно — событие только синхронизирует URL
+          if (suppressPopstate) {
+            suppressPopstate = false;
+            // На всякий случай убираем ?game= из URL, если попали на запись с ним
+            if (typeof getParameterByName === 'function' && getParameterByName('game')) {
+              try { history.replaceState(null, '', location.pathname); } catch (err) {}
+            }
+            return;
+          }
+          var g = e.state && e.state.game;
+          if (g) {
+            // «Вперёд» в браузере: не перезагружаем iframe, если эта же игра уже открыта
+            if (g !== currentGameId) openDetail(g, false);
+          } else {
+            closeDetail(); // «Назад» в браузере
+          }
+        });
+
+        // ==================================================================
+        // Инициализация
+        // ==================================================================
+        $(document).ready(function () {
+          applyThemeFromStorage();
+
+          // Логотип из настройки LOGO_FILE_NAME (js/db-config.js) — та же
+          // схема, что в mobile.html: logo_nvl.png как запасной вариант,
+          // loadLogo() подменяет src на данные из logo_base64.txt
+          if (typeof loadLogo === 'function') {
+            loadLogo(function (base64) {
+              if (!base64) return;
+              $('#mt-logo').attr('src', base64);
+            });
+          }
+
+          // Переключение темы — как в tablo.html (общий ключ localStorage)
+          $('#mt-theme').on('click', function () {
+            $('body').toggleClass('dark-theme');
+            var isDark = $('body').hasClass('dark-theme');
+            localStorage.setItem('tablo-theme', isDark ? 'dark' : 'light');
+          });
+
+          initFullscreenToggle();
+
+          $('#mt-back').on('click', backToGrid);
+
+          $(document).on('keydown', function (e) {
+            if (e.key === 'Escape' && currentGameId) {
+              backToGrid();
+            }
+          });
+
+          $('#mt-retry').on('click', function () { startData(); });
+
+          // Табло в iframe загрузилось — прячем загрузчик и синхронизируем тему
+          $('#mt-detail-frame').on('load', function () {
+            $('#mt-detail-loader').hide();
+            try {
+              var fdoc = this.contentDocument || (this.contentWindow && this.contentWindow.document);
+              if (fdoc && fdoc.body) {
+                fdoc.body.classList.toggle('dark-theme', localStorage.getItem('tablo-theme') === 'dark');
+              }
+              // Кнопку полного экрана tablo.html прячем (страховка: основной
+              // запрет — отсутствующий allowfullscreen у iframe, из-за которого
+              // tablo.html сам скрывает кнопку по document.fullscreenEnabled).
+              // Если iframe всё же уйдёт в полноэкранный режим своим документом,
+              // браузер перекроет кнопку возврата — поэтому сразу из него
+              // выходим (на случай браузеров, игнорирующих allowfullscreen)
+              if (fdoc && fdoc.head && !fdoc.getElementById('mt-hide-tablo-fs')) {
+                var hideFs = fdoc.createElement('style');
+                hideFs.id = 'mt-hide-tablo-fs';
+                hideFs.textContent = '#fullscreen-toggle { display: none !important; }';
+                fdoc.head.appendChild(hideFs);
+              }
+              if (fdoc && !fdoc._mtFsGuard) {
+                fdoc._mtFsGuard = true;
+                var exitFrameFs = function () {
+                  var fe = fdoc.fullscreenElement || fdoc.webkitFullscreenElement;
+                  if (!fe) return;
+                  var exitFs = fdoc.exitFullscreen || fdoc.webkitExitFullscreen;
+                  if (!exitFs) return;
+                  try {
+                    var res = exitFs.call(fdoc);
+                    if (res && typeof res.catch === 'function') res.catch(function () {});
+                  } catch (err) {}
+                };
+                fdoc.addEventListener('fullscreenchange', exitFrameFs);
+                fdoc.addEventListener('webkitfullscreenchange', exitFrameFs);
+                exitFrameFs();
+              }
+            } catch (e) {}
+          });
+
+          // Пересчёт масштаба при изменении размера окна (смена числа колонок
+          // по медиазапросам, полноэкранный режим и т.п.).
+          // ResizeObserver на плитках покрывает остальные случаи.
+          $(window).on('resize', fitAllCanvases);
+
+          // После загрузки шрифта названия команд могут изменить ширину —
+          // пересчитываем подгонку
+          if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+            document.fonts.ready.then(function () {
+              Object.keys(tiles).forEach(function (id) {
+                tiles[id]._mtNamesKey = null;
+                fitTileTeamNames(tiles[id]);
+              });
+            });
+          }
+
+          // Прямая ссылка multitablo.html?game=... сразу открывает большое табло
+          var initialGame = typeof getParameterByName === 'function' ? getParameterByName('game') : null;
+          if (initialGame) {
+            try { history.replaceState({ game: initialGame }, '', location.search); } catch (e) {}
+            openDetail(initialGame, false);
+          }
+
+          startData();
+        });
+      })();
+    </script>
+  </body>
+</html>

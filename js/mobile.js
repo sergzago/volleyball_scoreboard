@@ -1066,7 +1066,7 @@
 
     var base = BASE_URL;
     document.getElementById('linkScoreboard').href = base + 'sb.html?game=' + gid;
-    document.getElementById('linkScoreboardOld').href = base + 'scoreboard.html?game=' + gid;
+    document.getElementById('linkMultitablo').href = base + 'multitablo.html';
     document.getElementById('linkControl').href = base + 'ctl.html?game=' + gid;
     document.getElementById('linkTablo').href = base + 'tablo.html?game=' + gid;
     document.getElementById('linkResults').href = base + 'results.html';
