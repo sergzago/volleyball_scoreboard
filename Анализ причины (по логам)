@@ -1,0 +1,9 @@
+Анализ причины (по логам)
+js/scoreboard.js, startScoreboardSubscription: переменная _unsubscribe объявлена (стр. 2), но никогда не используется. Каждый вызов (каждое открытие tablo.html из мультитабло в iframe) создаёт новую PocketBase-подписку subscribe('*') — SSE на всю коллекцию volleyball1 — и новый 2-секундный страховочный опрос (setInterval). Старые никогда не отменяются. После 3–4 открытий табло соединений к прокси PocketBase (zago.my.to/pb) становится слишком много — связь рвётся/висит.
+js/db-interface.js: возвращаемая функция отписки вызывает unsubscribe('*'), который в PocketBase SDK 0.26.8 — это unsubscribeByPrefix(collectionId), т.е. сносит все подписки коллекции на клиенте сразу.
+sw.js: в .catch() возвращается caches.match(event.request), который равен undefined, если ресурса нет в кэше → event.respondWith(undefined) → TypeError: Failed to convert value to 'Response', SW перестаёт обслуживать запросы (это и есть последняя строка логов).
+Решение:
+
+scoreboard.js — отписка от предыдущей перед новой подпиской, защита от дубляжа одной игры, хранение _unsubscribe, onError, очистка при pagehide/beforeunload (закрытие iframe-табло из мультитабло).
+db-interface.js — одна общая SSE-подписка '*' на страницу с подсчётом ссылок и раздачей событий по gameId; отписка одного не ломает realtime остальных.
+sw.js — catch всегда возвращает валидный Response (кеш или 503-заглушка), никогда undefined.

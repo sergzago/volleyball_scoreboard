@@ -240,13 +240,39 @@ function applyTemplate(data) {
 }
 
 var _lastSbPayload = null; // сериализованные данные последнего обработанного события
+var _unsubscribe = null;   // функция отписки текущей scoreboard-подписки
+var _subscribedGameId = null; // game_id текущей подписки
 
 // Подписка на изменения через DB интерфейс (вызывается после DB.init)
+// Перед созданием новой подписки всегда снимает предыдущую, чтобы не накапливать
+// SSE-соединения и 2-секундные страховочные опросы (важно для мультитабло,
+// которое многократно открывает табло tablo.html в iframe).
 function startScoreboardSubscription(game_id) {
+  if (!game_id) game_id = 'test1';
+
+  // Уже подписаны на эту игру — повторный вызов не создаёт дубля подписки
+  if (_unsubscribe && _subscribedGameId === game_id) {
+    console.log('sb/ctl: подписка уже активна для game_id:', game_id);
+    return;
+  }
+
+  // Снимаем предыдущую подписку, если она была
+  if (_unsubscribe) {
+    try {
+      _unsubscribe();
+    } catch (e) {
+      console.warn('sb/ctl: ошибка при отписке предыдущей подписки', e);
+    }
+    _unsubscribe = null;
+    _subscribedGameId = null;
+  }
+
   console.log('sb/ctl: startScoreboardSubscription called, game_id:', game_id);
-  DB.scoreboard.subscribe(
-  game_id,
-  function(data){
+  _subscribedGameId = game_id;
+
+  _unsubscribe = DB.scoreboard.subscribe(
+    game_id,
+    function(data){
     console.log('sb/ctl: scoreboard data received, show:', data ? data.show : 'null');
     if (!data) {
       scoreboard_data = DEFAULT_SCOREBOARD_DATA;
@@ -374,6 +400,20 @@ function startScoreboardSubscription(game_id) {
       updateTabloTimeoutDisplay(scoreboard_data);
     }
   });
+
+  // Освобождаем SSE-соединение и страховочный опрос при выгрузке страницы,
+  // закрытии вкладки или iframe-табло (мультитабло закрывает detail-фрейм
+  // через about:blank). Без этого подписки накапливаются при повторных
+  // открытиях табло, и через 3–4 вызова связь с БД рвётся/висит.
+  function cleanupScoreboardSubscription() {
+    if (_unsubscribe) {
+      try { _unsubscribe(); } catch (e) {}
+      _unsubscribe = null;
+      _subscribedGameId = null;
+    }
+  }
+  window.addEventListener('pagehide', cleanupScoreboardSubscription);
+  window.addEventListener('beforeunload', cleanupScoreboardSubscription);
 }
 
 /**

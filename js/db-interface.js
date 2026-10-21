@@ -1046,15 +1046,14 @@
           .catch(function() {});
       }, 2000);
 
-      // Функция отписки: снимаем SSE-подписку по topic '*' (ключ регистрации),
-      // кастомный ключ для совместимости и останавливаем страховочный опрос
+      // Функция отписки: останавливаем страховочный опрос.
+      // SSE-подписку по topic '*' не снимаем здесь — в PocketBase SDK 0.26.8
+      // unsubscribe('*') равнозначно unsubscribeByPrefix(collectionId) и сносит
+      // все SSE-подписки коллекции на странице, включая подписки страниц управления
+      // (ctl.html / mobile.js). EventSource закроется браузером автоматически при
+      // закрытии вкладки / iframe-табло. Для мультитабло отписка вызывается из
+      // js/scoreboard.js при beforeunload/pagehide.
       return function() {
-        try {
-          pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe('*');
-        } catch (e) {}
-        try {
-          pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe(subscriptionKey);
-        } catch (e) {}
         clearInterval(pollTimer);
       };
     },

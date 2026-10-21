@@ -55,7 +55,13 @@ self.addEventListener('fetch', function(event) {
       }
       return response;
     }).catch(function() {
-      return caches.match(event.request);
+      // Если сети нет и ресурса нет в кэше, caches.match() вернёт undefined,
+      // и respondWith() упадёт с TypeError: Failed to convert value to 'Response'.
+      // Всегда возвращаем валидный Response, чтобы сервис-воркер не выходил из строя.
+      return caches.match(event.request) || new Response(
+        '<html><body>Временно недоступно: нет сети и нет кэша.</body></html>',
+        { status: 503, statusText: 'Service Unavailable', headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      );
     })
   );
 });
