@@ -1302,7 +1302,10 @@
       });
 
       return function() {
-        pb.collection(DB_CONFIG.collections.VOLLEYBALL).unsubscribe('*');
+        // unsubscribe('*') в PocketBase SDK 0.26.8 равнозначно
+        // unsubscribeByPrefix(collectionId) и сносит все SSE-подписки
+        // коллекции на странице. Не вызываем его здесь, чтобы не ломать
+        // подписки страниц управления (ctl.html / mobile.js).
       };
     },
 
