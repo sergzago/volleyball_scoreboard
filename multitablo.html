@@ -14,10 +14,13 @@
     <script src="js/common.js"></script>
     <style>
       /* =====================================================================
-         Стили табло — точная копия блока стилей из tablo.html.
-         Ими рисуются мини-табло внутри плиток (макет 100vw x 100vh,
-         масштабируемый transform: scale) — миниатюра совпадает с настоящим
-         табло, включая тему, шрифт и медиазапросы.
+         Стили табло — копия блока стилей из tablo.html.
+         Ими рисуются мини-табло внутри плиток. Отличие от tablo.html:
+         размеры заданы контейнерными единицами (cqw/cqh) и
+         контейнерными запросами (@container), поэтому мини-табло
+         подстраивается под размер СВОЕЙ плитки, а не под размер окна
+         браузера: это позволяет показывать много табло одновременно
+         и оставаться читаемыми на телефонах и планшетах.
          ВАЖНО: при изменении стилей в tablo.html обновите и этот блок.
          ===================================================================== */
       html, body {
@@ -108,17 +111,16 @@
         opacity: 1;
       }
       .tablo-screen {
-        min-height: 100vh;
-        min-height: 100dvh;
+        min-height: 100cqh;
         width: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
-        padding: clamp(2px, 1.5vh, 20px) clamp(8px, 3vw, 60px);
+        padding: clamp(1px, 1.5cqh, 20px) clamp(4px, 3cqw, 60px);
         box-sizing: border-box;
         overflow: hidden;
-        gap: clamp(2px, 1.5vh, 16px);
+        gap: clamp(1px, 1.5cqh, 16px);
       }
       .tablo-teams {
         width: 100%;
@@ -130,22 +132,22 @@
            контент строки смещался влево на 24px, и названия команд со
            счётом по сетам расходились по центру с большим счётом
            (и в обычном режиме, и в режиме таймаута). */
-        padding-left: 48px;
-        padding-right: 48px;
+        padding-left: clamp(8px, 6cqw, 48px);
+        padding-right: clamp(8px, 6cqw, 48px);
         text-align: center;
         /* Базовый размер строки команд; JS (fitTeamNames) только УМЕНЬШАЕТ
            его через --teams-scale. Счёт по сетам не зависит от масштаба. */
-        --teams-base-size: clamp(16px, 4.5vw, 40px);
+        --teams-base-size: clamp(10px, 4.5cqw, 40px);
         --teams-scale: 1;
         font-size: calc(var(--teams-base-size) * var(--teams-scale));
         text-transform: uppercase;
-        letter-spacing: clamp(1px, 0.5vw, 4px);
+        letter-spacing: clamp(1px, 0.5cqw, 4px);
         margin-bottom: 0; /* Убран отступ снизу */
         margin-top: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: clamp(6px, 2vw, 60px);
+        gap: clamp(4px, 2cqw, 60px);
         flex-wrap: nowrap;
         min-width: 0;
       }
@@ -163,13 +165,13 @@
       }
       
       .tablo-general-score {
-        font-size: clamp(16px, 4vw, 32px);
+        font-size: clamp(10px, 4cqw, 32px);
         font-weight: bold;
         /* Та же высота строки, что у названий (1.1): при align-items: flex-start
            верх счёта совпадает с верхом названий команд */
         line-height: 1.1;
         color: var(--top-secondary-score-text, #000);
-        margin: 0 clamp(6px, 2vw, 30px);
+        margin: 0 clamp(4px, 2cqw, 30px);
         white-space: nowrap;
         flex: none;
       }
@@ -187,11 +189,11 @@
         gap: 0;
         width: 100%;
         max-width: 100%;
-        font-size: min(30vw, 36vh, 380px);
+        font-size: min(30cqw, 36cqh, 380px);
         line-height: 1;
         white-space: nowrap;
         letter-spacing: -0.05em;
-        padding: 0 clamp(4px, 2vw, 30px);
+        padding: 0 clamp(2px, 2cqw, 30px);
         box-sizing: border-box;
         min-width: 0;
       }
@@ -239,7 +241,7 @@
         text-transform: uppercase;
         border-radius: 4px;
         padding: 4px 10px;
-        font-size: clamp(12px, 3.5vw, 36px);
+        font-size: clamp(8px, 3.5cqw, 36px);
         min-height: 20px;
         text-align: center;
         margin-top: 0;
@@ -266,12 +268,12 @@
         margin: 0;
       }
 
-      /* Адаптив: узкие экраны (телефоны) */
-      @media (max-width: 600px) {
+      /* Адаптив по размеру плитки (контейнерные запросы): узкие плитки */
+      @container tablo (max-width: 600px) {
         .tablo-screen {
           justify-content: flex-start;
-          padding-top: clamp(2px, 1vh, 10px);
-          gap: clamp(2px, 1.5vh, 12px);
+          padding-top: clamp(1px, 1cqh, 10px);
+          gap: clamp(1px, 1.5cqh, 12px);
         }
         .tablo-teams {
           margin-top: 0;
@@ -279,7 +281,7 @@
           flex: none;
         }
         .tablo-score {
-          font-size: min(36vw, 30vh);
+          font-size: min(36cqw, 30cqh);
           /* scaleY(1.6) выносит верх цифр на 0.3em над строкой — компенсируем */
           margin-top: 0.4em;
           margin-bottom: 0.2em;
@@ -289,39 +291,30 @@
         }
       }
 
-      /* Адаптив: альбомная ориентация / низкие экраны (телефон повёрнут) */
-      @media (max-height: 500px) {
-        #theme-toggle,
-        #fullscreen-toggle {
-          width: 28px;
-          height: 28px;
-          font-size: 14px;
-        }
-        #fullscreen-toggle {
-          top: 44px; /* 8px + 28px + 8px отступ */
-        }
+      /* Адаптив: низкие плитки (альбомная ориентация / телефон повёрнут) */
+      @container tablo (max-height: 500px) {
         .tablo-screen {
           justify-content: flex-start;
           gap: 0;
           padding-top: 0;
           padding-bottom: 0;
-          padding-left: clamp(4px, 2vw, 20px);
-          padding-right: clamp(4px, 2vw, 20px);
+          padding-left: clamp(2px, 2cqw, 20px);
+          padding-right: clamp(2px, 2cqw, 20px);
         }
         .tablo-teams {
-          --teams-base-size: clamp(12px, 3vw, 24px);
+          --teams-base-size: clamp(8px, 3cqw, 24px);
           /* Симметричные отступы — строка остаётся отцентрованной */
-          padding-left: 40px;
-          padding-right: 40px;
+          padding-left: clamp(6px, 5cqw, 40px);
+          padding-right: clamp(6px, 5cqw, 40px);
         }
         .tablo-general-score {
-          font-size: clamp(12px, 3vw, 22px);
+          font-size: clamp(8px, 3cqw, 22px);
         }
         .tablo-score {
           /* Цифры не должны наезжать на названия: scaleY визуально выносит
              верх цифр над строкой на (scaleY-1)/2 от font-size, поэтому
              размер ограничиваем высотой экрана и добавляем верхний отступ */
-          font-size: min(28vw, 38vh);
+          font-size: min(28cqw, 38cqh);
           margin-top: 0.45em;
           margin-bottom: 0;
         }
@@ -330,7 +323,15 @@
         }
         .set-history {
           margin-top: 0;
-          font-size: clamp(10px, 3vh, 18px);
+          font-size: clamp(7px, 3cqh, 18px);
+        }
+      }
+      /* Адаптив: очень низкие плитки (много табло одновременно).
+         В режиме таймаута треть экрана не вмещает историю сетов —
+         скрываем её, чтобы содержимое не выходило за край плитки. */
+      @container tablo (max-height: 130px) {
+        .tablo-screen.timeout-active .set-history {
+          display: none !important;
         }
       }
       /* =====================================================================
@@ -350,9 +351,9 @@
         text-transform: uppercase;
         line-height: 1.05;
         /* Длинная строка переносится, а не обрезается */
-        font-size: min(10vw, 16vh, 190px);
-        letter-spacing: clamp(1px, 0.4vw, 8px);
-        padding: 0 clamp(8px, 3vw, 60px);
+        font-size: min(10cqw, 16cqh, 190px);
+        letter-spacing: clamp(1px, 0.4cqw, 8px);
+        padding: 0 clamp(4px, 3cqw, 60px);
       }
       .tablo-timeout-text {
         display: block;
@@ -388,26 +389,41 @@
       }
       /* Счёт партии уменьшается и размещается в оставшейся трети.
          Отступы в em остаются пропорциональны размеру цифр, поэтому
-         визуальный вылет scaleY(2) по-прежнему компенсируется. */
+         визуальный вылет scaleY(2) по-прежнему компенсируется.
+         Размер ограничен долей высоты экрана: блок main занимает треть
+         экрана, поэтому счёт не должен выдавить историю сетов
+         за нижний край плитки. */
       .tablo-screen.timeout-active .tablo-score {
-        font-size: min(16vw, 9vh, 170px);
-        margin-top: 0.55em;
-        margin-bottom: 0.5em;
+        font-size: min(16cqw, 6.5cqh, 170px);
+        margin-top: 0.35em;
+        margin-bottom: 0.3em;
+        /* Может сжиматься — не выдавливает остальные блоки */
+        flex: 0 1 auto;
+        min-height: 0;
       }
-      /* Названия команд и счёт по сетам — компактнее, чтобы поместиться
+      /* Названия команд и счёт по сетам — компактнее, чтобы поместились
          в оставшейся трети вместе с историей сетов */
       .tablo-screen.timeout-active .tablo-teams {
-        --teams-base-size: clamp(14px, 2.6vw, 28px);
+        --teams-base-size: clamp(8px, 2.4cqw, 28px);
+        /* Может сжиматься — не выдавливает историю сетов */
+        flex: 0 1 auto;
       }
       .tablo-screen.timeout-active .tablo-general-score {
-        font-size: clamp(12px, 2.4vw, 24px);
+        font-size: clamp(8px, 2.4cqw, 24px);
       }
       .tablo-screen.timeout-active .set-history {
-        font-size: clamp(10px, 2.4vh, 22px);
-        padding: 2px 8px;
+        font-size: clamp(6px, 2cqh, 22px);
+        padding: 1px 6px;
         min-height: 0;
-        /* Не сжимается под давлением: место под неё освобождает счёт */
-        flex: 0 0 auto;
+        /* Может сжиматься: в очень низких плитках история ужимается,
+           а не выходит за нижний край */
+        flex: 0 1 auto;
+        overflow: hidden;
+      }
+      /* В режиме таймаута содержимое третьей части экрана не должно
+         выходить за пределы плитки даже при очень малых размерах */
+      .tablo-screen.timeout-active .tablo-main {
+        overflow: hidden;
       }
 
       /* =====================================================================
@@ -417,6 +433,11 @@
       :root {
         --mt-gap: 8px;
         --mt-header-h: clamp(34px, 5vh, 46px);
+        /* Число колонок и высота ряда плиток вычисляет скрипт (layoutGrid)
+           под текущее количество игр и размер окна. Значения по умолчанию
+           — на случай до первого расчёта. */
+        --mt-cols: 3;
+        --mt-row-h: 240px;
         --mt-chrome-bg: #f0f0f0;
         --mt-chrome-border: #d0d0d0;
         --mt-chrome-fg: #1a1a1a;
@@ -478,9 +499,20 @@
         color: var(--mt-chrome-muted);
         font-size: clamp(10px, 1.6vh, 13px);
       }
-      /* Кнопки темы и полного экрана — по мотивам кнопок tablo.html */
-      .mt-btn {
+      /* ---------- Кнопки: тема, полный экран, возврат ----------
+         Все кнопки интерфейса (тема, полный экран, возврат к мультитабло)
+         имеют ОДИН И ТОТ ЖЕ стиль: круг 32x32 с полупрозрачным фоном,
+         обводкой 1.5px и иконкой по центру. Визуальная часть совпадает
+         с кнопками tablo.html (#theme-toggle, #fullscreen-toggle) —
+         поэтому кнопка темы внутри большого табло (она рисуется самим
+         tablo.html в iframe) выглядит так же, как кнопки мультитабло.
+         ВАЖНО: при изменении стилей кнопок в tablo.html обновите и этот блок. */
+      .mt-btn,
+      #mt-back {
         flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         width: 32px;
         height: 32px;
         padding: 0;
@@ -489,39 +521,54 @@
         color: rgba(0, 0, 0, 0.75);
         border: 1.5px solid rgba(0, 0, 0, 0.35);
         border-radius: 50%;
-        opacity: 0.7;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 16px;
+        text-align: center;
+        opacity: 0.55;
+        box-shadow: none;
         backdrop-filter: blur(2px);
-        transition: opacity 0.2s, transform 0.15s;
+        transition: opacity 0.3s, transform 0.15s;
       }
-      .mt-btn svg {
+      .mt-btn svg,
+      #mt-back svg {
         display: block;
         margin: auto;
       }
       .mt-btn:hover,
-      .mt-btn.active {
+      .mt-btn.active,
+      #mt-back:hover {
         opacity: 1;
         transform: scale(1.06);
+        background: rgba(255, 255, 255, 0.6);
       }
-      body.dark-theme .mt-btn {
+      body.dark-theme .mt-btn,
+      body.dark-theme #mt-back {
         background: rgba(255, 255, 255, 0.22);
         color: rgba(255, 255, 255, 0.9);
         border-color: rgba(255, 255, 255, 0.5);
       }
+      body.dark-theme .mt-btn:hover,
+      body.dark-theme .mt-btn.active,
+      body.dark-theme #mt-back:hover {
+        background: rgba(255, 255, 255, 0.38);
+        opacity: 1;
+      }
 
       /* ---------- Сетка мини-табло ---------- */
+      /* Число колонок/строк и высота плитки вычисляются скриптом
+         (layoutGrid) под текущее число игр и размер окна:
+         все активные табло помещаются на экран без прокрутки. */
       #mt-grid {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(var(--mt-cols, 3), minmax(0, 1fr));
         gap: var(--mt-gap);
         padding: var(--mt-gap);
         box-sizing: border-box;
-        /* Ровно три строки заполняют экран (~9 табло); лишние прокручиваются */
-        grid-auto-rows: calc((100vh - var(--mt-header-h) - 4 * var(--mt-gap)) / 3);
-        grid-auto-rows: calc((100dvh - var(--mt-header-h) - 4 * var(--mt-gap)) / 3);
+        grid-auto-rows: var(--mt-row-h, auto);
         align-content: start;
         scrollbar-width: thin;
         scrollbar-color: var(--mt-tile-border) transparent;
@@ -532,12 +579,7 @@
         background: var(--mt-tile-border);
         border-radius: 5px;
       }
-      @media (max-width: 1000px) {
-        #mt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      }
-      @media (max-width: 560px) {
-        #mt-grid { grid-template-columns: minmax(0, 1fr); }
-      }
+      /* Число колонок задаётся скриптом (--mt-cols) — медиазапросов нет */
 
       /* ---------- Плитка (мини-табло) ---------- */
       .mt-tile {
@@ -607,24 +649,23 @@
         position: relative;
         flex: 1 1 auto;
         min-height: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         overflow: hidden;
+        /* Контейнер запросов: размеры шрифтов/отступов мини-табло
+           считаются от размера плитки, а не от окна браузера */
+        container-type: size;
+        container-name: tablo;
       }
       .mt-tile-fit {
-        position: relative;
-        flex: none;
+        position: absolute;
+        inset: 0;
         overflow: hidden;
       }
       .mt-tile-canvas {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
+        inset: 0;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
-        transform-origin: 0 0;
         /* Шрифт табло задаём явно: у body мультитабло свой шрифт интерфейса */
         font-family: 'Rubik Mono One', sans-serif;
       }
@@ -685,38 +726,24 @@
         align-items: center;
         gap: 8px;
       }
-      /* Кнопка полного экрана — в правом верхнем углу, рядом с кнопкой
-         смены темы (её рисует сам tablo.html внутри iframe: right 8px,
-         ширина 32px). Поэтому отступ от правого края = 8 + 32 + 8 = 48px.
+      /* Кнопка полного экрана мультитабло — справа внизу от кнопки смены
+         темы, которую рисует сам tablo.html внутри iframe (right 8px,
+         top 8px, 32x32). Позиция полностью совпадает с кнопкой
+         полного экрана в tablo.html (top 52px = 8 + 32 + 12, right 8px),
+         поэтому большое табло выглядит как обычное табло.
          Кнопка — отдельный элемент (не внутри тулбара), чтобы
          позиционировалась от #mt-detail, а не от панели слева. */
       #mt-detail-fs {
         position: absolute;
-        top: 8px;
-        right: 48px;
+        top: 52px;
+        right: 8px;
         z-index: 3;
       }
-      /* Кнопка возврата на мультитабло — по стилю кнопок tablo.html */
+      /* Кнопка возврата на мультитабло — стиль задаётся общим правилом
+         .mt-btn, #mt-back (круг 32x32, как у кнопок темы и полного экрана).
+         Здесь только позиционирование: панель тулбара стоит слева вверху. */
       #mt-back {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        height: 32px;
-        padding: 0 14px;
-        cursor: pointer;
-        background: rgba(255, 255, 255, 0.35);
-        color: rgba(0, 0, 0, 0.8);
-        border: 1.5px solid rgba(0, 0, 0, 0.35);
-        border-radius: 16px;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 13px;
-        opacity: 0.6;
-        backdrop-filter: blur(2px);
-        transition: opacity 0.2s, transform 0.15s;
-      }
-      #mt-back:hover {
-        opacity: 1;
-        transform: scale(1.04);
+        display: inline-flex;
       }
       #mt-detail-loader {
         position: absolute;
@@ -763,7 +790,10 @@
            Полноэкранный режим переключают кнопки мультитабло. -->
       <iframe id="mt-detail-frame" title="Табло игры"></iframe>
       <div id="mt-detail-toolbar">
-        <button id="mt-back" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Мультитабло</button>
+        <!-- Кнопка возврата — такой же круглый стиль, как у кнопок темы и
+             полного экрана (только иконка-стрелка: текст убран, чтобы
+             кнопка оставалась такой же узкой, как остальные). -->
+        <button id="mt-back" type="button" title="Мультитабло" aria-label="Вернуться к мультитабло"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
       </div>
       <!-- Кнопка полного экрана — справа вверху, рядом с кнопкой смены темы
            (которую рисует сам tablo.html внутри iframe). Вынесена из панели
@@ -780,6 +810,21 @@
         // ==================================================================
         function applyThemeFromStorage() {
           $('body').toggleClass('dark-theme', localStorage.getItem('tablo-theme') === 'dark');
+        }
+
+        /**
+         * Переносит тему мультитабло в большое табло (iframe с tablo.html).
+         * Вызывается при переключении темы в шапке мультитабло.
+         */
+        function syncThemeToFrame() {
+          var isDark = localStorage.getItem('tablo-theme') === 'dark';
+          try {
+            var frame = document.getElementById('mt-detail-frame');
+            var fdoc = frame && (frame.contentDocument || (frame.contentWindow && frame.contentWindow.document));
+            if (fdoc && fdoc.body) {
+              fdoc.body.classList.toggle('dark-theme', isDark);
+            }
+          } catch (e) {}
         }
 
         // ==================================================================
@@ -896,9 +941,10 @@
 
         // ==================================================================
         // Мини-табло.
-        // Каждая плитка содержит макет табло (те же классы, что в tablo.html)
-        // размером 100vw x 100vh, масштабированный под размер плитки:
-        // получается точная миниатюра полноэкранного табло.
+        // Каждая плитка содержит макет табло (те же классы, что в tablo.html).
+        // Размеры заданы контейнерными единицами (cqw/cqh) относительно
+        // контейнера .mt-tile-screen, поэтому мини-табло подстраивается
+        // под размер своей плитки, а не под размер окна браузера.
         // ==================================================================
         var TILE_HTML =
           '<div class="mt-tile-head">' +
@@ -949,26 +995,95 @@
         var suppressPopstate = false; // гасит popstate от history.back() в backToGrid()
 
         // ==================================================================
-        // Масштабирование макета табло под размер плитки
+        // Раскладка сетки: число колонок/строк и высота плитки
+        // под текущее количество игр и размер окна.
+        // Цель — показать все активные табло на экране без прокрутки,
+        // подбирая число колонок так, чтобы плитка оставалась
+        // пропорциональной (близкой к 16:9) и читаемой.
         // ==================================================================
 
-        /** Scale = min(ширина плитки / 100vw, высота / 100vh), по центру плитки */
-        function fitTileCanvas(tile) {
-          var screen = tile.querySelector('.mt-tile-screen');
-          var fit = tile.querySelector('.mt-tile-fit');
-          var canvas = tile.querySelector('.mt-tile-canvas');
-          if (!screen || !fit || !canvas) return;
-          var vw = window.innerWidth, vh = window.innerHeight;
-          var w = screen.clientWidth, h = screen.clientHeight;
-          if (!vw || !vh || !w || !h) return;
-          var scale = Math.min(w / vw, h / vh);
-          fit.style.width = Math.round(vw * scale) + 'px';
-          fit.style.height = Math.round(vh * scale) + 'px';
-          canvas.style.transform = 'scale(' + scale + ')';
+        var TILE_ASPECT = 16 / 9;    // желаемая пропорция плитки (ширина/высота)
+        var MAX_TALLNESS = 1.35;     // плитка не должна быть выше ширины / 1.35
+        var MIN_ROW_H = 90;          // минимальная высота плитки, ниже — нечитаемо
+        var MIN_TILE_W = 180;        // минимальная ширина плитки
+
+        /** Максимальное число колонок для текущей ширины окна */
+        function maxColumnsForWidth(w) {
+          if (w >= 1600) return 4;   // широкий десктоп
+          if (w >= 1100) return 3;   // обычный десктоп / нетбук
+          if (w >= 700) return 2;    // планшет
+          return 1;                  // телефон
         }
 
+        /**
+         * Пересчитывает раскладку сетки под count игр.
+         *
+         * Для каждого возможного числа колонок считаем размеры плитки
+         * (ширина из доступного места, высота — по пропорции, но не выше
+         * допустимой «вытянутости») и оцениваем вариант:
+         *   - основная оценка — площадь плитки (её читаемость);
+         *   - штраф — отклонение пропорции от 16:9.
+         * Побеждает вариант с лучшей оценкой.
+         */
+        function layoutGrid(count) {
+          var grid = document.getElementById('mt-grid');
+          if (!grid) return;
+          if (!count || count < 1) {
+            grid.style.setProperty('--mt-cols', '1');
+            grid.style.setProperty('--mt-row-h', 'auto');
+            return;
+          }
+          // Отступы сетки берём из CSS (--mt-gap), чтобы правка стилей
+          // не рассинхронизировалась с расчётом раскладки
+          var gap = parseFloat(getComputedStyle(grid).getPropertyValue('--mt-gap')) || 8;
+          var w = grid.clientWidth || window.innerWidth;
+          var h = grid.clientHeight || window.innerHeight;
+          if (!w || !h) return;
+          // clientWidth/clientHeight включают внутренние отступы (--mt-gap)
+          var availW = Math.max(0, w - 2 * gap);         // место под колонки
+          var availH = Math.max(0, h - 2 * gap);         // место под ряды
+          var maxCols = Math.min(maxColumnsForWidth(w), count);
+
+          var best = null;      // лучший вариант с читаемой высотой
+          var fallback = null;  // запасной вариант (высота ниже минимума)
+          for (var cols = 1; cols <= maxCols; cols++) {
+            var rows = Math.ceil(count / cols);
+            var colW = (availW - (cols - 1) * gap) / cols;
+            if (colW < MIN_TILE_W && cols > 1) continue;
+            if (colW <= 0) continue;
+            // Высота: заполняем доступное место, но не делаем плитку
+            // непропорционально высокой
+            var rowH = Math.min((availH - (rows - 1) * gap) / rows,
+                                colW / MAX_TALLNESS);
+            if (rowH <= 0) continue;
+            var aspect = colW / rowH;
+            // Оценка: чем больше площадь плитки, тем лучше; штраф за
+            // отклонение пропорции от желаемой 16:9
+            var score = (colW * rowH) * Math.exp(-1.2 * Math.abs(Math.log(aspect / TILE_ASPECT)));
+            var cand = { cols: cols, rowH: rowH, score: score };
+            if (!fallback || score > fallback.score) fallback = cand;
+            // Слишком низкие плитки нечитаемы — такие варианты годятся
+            // только как запасные (с прокруткой)
+            if (rowH < MIN_ROW_H) continue;
+            if (!best || score > best.score) best = cand;
+          }
+          // Если ни один вариант не помещается целиком — берём запасной
+          // (самый просторный), лишние ряды прокручиваются
+          var chosen = best || fallback;
+          if (!chosen) {
+            // Крайний случай: показываем по одной колонке
+            grid.style.setProperty('--mt-cols', '1');
+            grid.style.setProperty('--mt-row-h', MIN_ROW_H + 'px');
+            return;
+          }
+          grid.style.setProperty('--mt-cols', String(chosen.cols));
+          grid.style.setProperty('--mt-row-h',
+            Math.max(MIN_ROW_H, Math.floor(chosen.rowH)) + 'px');
+        }
+
+        /** Пересчёт раскладки при изменении размера окна */
         function fitAllCanvases() {
-          $('.mt-tile').each(function () { fitTileCanvas(this); });
+          layoutGrid(Object.keys(tiles).length);
         }
 
         /**
@@ -1113,12 +1228,17 @@
               openDetail(id, true);
             }
           });
-          // Пересчёт масштаба при изменении размера плитки
+          // Размер макета табло задан контейнерными единицами (cqw/cqh) —
+          // он автоматически подстраивается под размер плитки.
+          // Но подгонка названий команд (--teams-scale) зависит от
+          // фактической ширины текста, поэтому пересчитываем её при
+          // изменении размера плитки.
           if (window.ResizeObserver) {
-            var ro = new ResizeObserver(function () { fitTileCanvas(tile); });
+            var ro = new ResizeObserver(function () {
+              fitTileTeamNames(tile);
+            });
             ro.observe(tile.querySelector('.mt-tile-screen'));
           }
-          fitTileCanvas(tile);
           return tile;
         }
 
@@ -1199,6 +1319,7 @@
           });
 
           lastOrder = newOrder;
+          layoutGrid(list.length);
           updateStatus(list.length);
           if (list.length > 0) {
             hideMessage();
@@ -1362,6 +1483,8 @@
             $('body').toggleClass('dark-theme');
             var isDark = $('body').hasClass('dark-theme');
             localStorage.setItem('tablo-theme', isDark ? 'dark' : 'light');
+            // Тема мультитабло применяется и к открытому большому табло
+            syncThemeToFrame();
           });
 
           initFullscreenToggle();
@@ -1412,12 +1535,28 @@
                 fdoc.addEventListener('webkitfullscreenchange', exitFrameFs);
                 exitFrameFs();
               }
+              // Обратная синхронизация темы: кнопка «Режим» (смена темы)
+              // рисуется самим tablo.html внутри iframe. При её нажатии
+              // тема меняется в iframe — переносим её в мультитабло,
+              // чтобы кнопки возврата/полного экрана выглядели так же,
+              // как кнопка режима (одинаковый стиль в обеих темах).
+              // Источник истины — класс dark-theme на теле iframe.
+              if (fdoc && fdoc.body && !fdoc._mtThemeGuard) {
+                fdoc._mtThemeGuard = true;
+                if (window.MutationObserver) {
+                  var bodyObserver = new MutationObserver(function () {
+                    var isDark = fdoc.body.classList.contains('dark-theme');
+                    localStorage.setItem('tablo-theme', isDark ? 'dark' : 'light');
+                    $('body').toggleClass('dark-theme', isDark);
+                  });
+                  bodyObserver.observe(fdoc.body, { attributes: true, attributeFilter: ['class'] });
+                }
+              }
             } catch (e) {}
           });
 
-          // Пересчёт масштаба при изменении размера окна (смена числа колонок
-          // по медиазапросам, полноэкранный режим и т.п.).
-          // ResizeObserver на плитках покрывает остальные случаи.
+          // Пересчёт раскладки сетки при изменении размера окна
+          // (число колонок и высота плитки зависят от габаритов окна).
           $(window).on('resize', fitAllCanvases);
 
           // После загрузки шрифта названия команд могут изменить ширину —
