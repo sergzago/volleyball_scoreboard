@@ -993,6 +993,11 @@
         var currentGameId = null;
         var detailPushed = false;
         var suppressPopstate = false; // гасит popstate от history.back() в backToGrid()
+        // Ресурсы iframe-табло (очищаются при закрытии, чтобы не накапливаться
+        // при повторных открытиях — иначе через 3–5 открытий мультитабло зависает)
+        var mtFrameObserver = null;   // MutationObserver тела iframe-табло
+        var mtFrameExitFs = null;     // обработчик fullscreenchange для iframe
+        var mtFrameDoc = null;        // документ iframe для очистки обработчиков
 
         // ==================================================================
         // Раскладка сетки: число колонок/строк и высота плитки
@@ -1238,6 +1243,7 @@
               fitTileTeamNames(tile);
             });
             ro.observe(tile.querySelector('.mt-tile-screen'));
+            tile._mtResizeObserver = ro; // храним, чтобы отключить при удалении плитки
           }
           return tile;
         }
@@ -1312,7 +1318,14 @@
           // Удаляем плитки исчезнувших игр
           Object.keys(tiles).forEach(function (id) {
             if (!seen[id]) {
-              if (tiles[id].parentNode) tiles[id].parentNode.removeChild(tiles[id]);
+              var tile = tiles[id];
+              // Отключаем ResizeObserver перед удалением из DOM — иначе
+              // наблюдение продолжается и удерживает ссылку на удалённый элемент
+              if (tile._mtResizeObserver) {
+                try { tile._mtResizeObserver.disconnect(); } catch (e) {}
+                tile._mtResizeObserver = null;
+              }
+              if (tile.parentNode) tile.parentNode.removeChild(tile);
               delete tiles[id];
               delete lastJson[id];
             }
@@ -1393,6 +1406,23 @@
           if (!id) return;
           currentGameId = id;
           $('#mt-detail-loader').show();
+          // Освобождаем ресурсы предыдущего iframe перед загрузкой нового табло,
+          // чтобы наблюдатели и обработчики не накапливались при быстрых
+          // переключениях между играми.
+          if (mtFrameObserver) {
+            try { mtFrameObserver.disconnect(); } catch (e) {}
+            mtFrameObserver = null;
+          }
+          if (mtFrameExitFs && mtFrameDoc) {
+            try { mtFrameDoc.removeEventListener('fullscreenchange', mtFrameExitFs); } catch (e) {}
+            try { mtFrameDoc.removeEventListener('webkitfullscreenchange', mtFrameExitFs); } catch (e) {}
+            mtFrameExitFs = null;
+          }
+          if (mtFrameDoc) {
+            mtFrameDoc._mtFsGuard = false;
+            mtFrameDoc._mtThemeGuard = false;
+            mtFrameDoc = null;
+          }
           $('#mt-detail-frame').attr('src', 'tablo.html?game=' + encodeURIComponent(id));
           $('#mt-detail').addClass('open').attr('aria-hidden', 'false');
           if (pushState) {
@@ -1409,6 +1439,25 @@
           currentGameId = null;
           detailPushed = false;
           $('#mt-detail').removeClass('open').attr('aria-hidden', 'true');
+          // Освобождаем ресурсы iframe перед переключением на about:blank.
+          // Без этого MutationObserver, fullscreenchange-обработчики и
+          // ссылки на документ предыдущего табло остаются в памяти и
+          // накапливаются при каждом открытии — через 3–5 открытий мультитабло
+          // начинает зависать.
+          if (mtFrameObserver) {
+            try { mtFrameObserver.disconnect(); } catch (e) {}
+            mtFrameObserver = null;
+          }
+          if (mtFrameExitFs && mtFrameDoc) {
+            try { mtFrameDoc.removeEventListener('fullscreenchange', mtFrameExitFs); } catch (e) {}
+            try { mtFrameDoc.removeEventListener('webkitfullscreenchange', mtFrameExitFs); } catch (e) {}
+            mtFrameExitFs = null;
+          }
+          if (mtFrameDoc) {
+            mtFrameDoc._mtFsGuard = false;
+            mtFrameDoc._mtThemeGuard = false;
+            mtFrameDoc = null;
+          }
           // about:blank останавливает подписки и опрос внутри iframe
           $('#mt-detail-frame').attr('src', 'about:blank');
           // Тему могли переключить внутри tablo.html — синхронизируем сетку
@@ -1521,7 +1570,7 @@
               }
               if (fdoc && !fdoc._mtFsGuard) {
                 fdoc._mtFsGuard = true;
-                var exitFrameFs = function () {
+                mtFrameExitFs = function () {
                   var fe = fdoc.fullscreenElement || fdoc.webkitFullscreenElement;
                   if (!fe) return;
                   var exitFs = fdoc.exitFullscreen || fdoc.webkitExitFullscreen;
@@ -1531,10 +1580,11 @@
                     if (res && typeof res.catch === 'function') res.catch(function () {});
                   } catch (err) {}
                 };
-                fdoc.addEventListener('fullscreenchange', exitFrameFs);
-                fdoc.addEventListener('webkitfullscreenchange', exitFrameFs);
-                exitFrameFs();
+                fdoc.addEventListener('fullscreenchange', mtFrameExitFs);
+                fdoc.addEventListener('webkitfullscreenchange', mtFrameExitFs);
+                mtFrameExitFs();
               }
+              mtFrameDoc = fdoc;
               // Обратная синхронизация темы: кнопка «Режим» (смена темы)
               // рисуется самим tablo.html внутри iframe. При её нажатии
               // тема меняется в iframe — переносим её в мультитабло,
@@ -1544,12 +1594,12 @@
               if (fdoc && fdoc.body && !fdoc._mtThemeGuard) {
                 fdoc._mtThemeGuard = true;
                 if (window.MutationObserver) {
-                  var bodyObserver = new MutationObserver(function () {
+                  mtFrameObserver = new MutationObserver(function () {
                     var isDark = fdoc.body.classList.contains('dark-theme');
                     localStorage.setItem('tablo-theme', isDark ? 'dark' : 'light');
                     $('body').toggleClass('dark-theme', isDark);
                   });
-                  bodyObserver.observe(fdoc.body, { attributes: true, attributeFilter: ['class'] });
+                  mtFrameObserver.observe(fdoc.body, { attributes: true, attributeFilter: ['class'] });
                 }
               }
             } catch (e) {}
