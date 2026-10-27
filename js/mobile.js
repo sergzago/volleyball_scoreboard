@@ -1365,6 +1365,8 @@
 
       if (matchFinished || currentSet >= BEACH_MAX_SETS) {
         update['beach_match_finished'] = true;
+        update['pending_new_set'] = false;
+        update['next_beach_set'] = null;
         update['home_score'] = homeScore;
         update['away_score'] = awayScore;
         update['current_period'] = currentSet;
@@ -1426,6 +1428,9 @@
         update2['away_timeouts'] = 0;
       } else {
         update2['classic_tiebreak_switch_done'] = true;
+        // Сбрасываем отложенные поля при завершении матча, чтобы не застрять в состоянии ожидания
+        update2['pending_new_set'] = false;
+        update2['next_period'] = null;
       }
       update2['home_score'] = team === 'home' ? homeScore : awayScore;
       update2['away_score'] = team === 'home' ? awayScore : homeScore;

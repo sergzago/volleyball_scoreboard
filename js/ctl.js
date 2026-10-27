@@ -986,6 +986,9 @@ function applyClassicSetWin(team, teamScore, opponentScore, baseUpdate){
     update['away_timeouts'] = 0;
   }else{
     update['classic_tiebreak_switch_done']=true;
+    // Сбрасываем отложенные поля при завершении матча, чтобы не застрять в состоянии ожидания
+    update['pending_new_set'] = null;
+    update['next_period'] = null;
   }
   // После выигрыша сета оставляем текущий (финальный) счёт видимым.
   // Сброс очков в новый сет происходит по нажатию кнопки "Новый сет".
