@@ -27,7 +27,7 @@ const COLLECTIONS = {
     viewRule: '',
     createRule: '',
     updateRule: '',
-    deleteRule: 'role = "admin"',
+    deleteRule: '',
     schema: [
       { name: 'id', type: 'text', required: false, unique: true },
       { name: 'home_team', type: 'text', required: false },
@@ -49,11 +49,11 @@ const COLLECTIONS = {
   matches: {
     name: 'matches',
     type: 'base',
-    listRule: '@request.auth.id != ""',
-    viewRule: '@request.auth.id != ""',
-    createRule: '@request.auth.id != ""',
-    updateRule: '@request.auth.id != ""',
-    deleteRule: 'role = "admin"',
+    listRule: '',
+    viewRule: '',
+    createRule: '',
+    updateRule: '',
+    deleteRule: '',
     schema: [
       { name: 'game_id', type: 'text', required: false },
       { name: 'date_time', type: 'date', required: false },
@@ -72,11 +72,11 @@ const COLLECTIONS = {
   auth_log: {
     name: 'auth_log',
     type: 'base',
-    listRule: 'role = "admin"',
-    viewRule: 'role = "admin"',
+    listRule: '',
+    viewRule: '',
     createRule: '',
-    updateRule: 'role = "admin"',
-    deleteRule: 'role = "admin"',
+    updateRule: '',
+    deleteRule: '',
     schema: [
       { name: 'username', type: 'text', required: false },
       { name: 'event', type: 'text', required: false },
@@ -86,14 +86,28 @@ const COLLECTIONS = {
       { name: 'details', type: 'json', required: false }
     ]
   },
+  tournaments: {
+    name: 'tournaments1',
+    type: 'base',
+    listRule: '',
+    viewRule: '',
+    createRule: '',
+    updateRule: '',
+    deleteRule: '',
+    schema: [
+      { name: 'name', type: 'text', required: true, unique: false, min: null, max: null, pattern: '' },
+      { name: 'match_type', type: 'select', required: true, maxSelect: 1, values: ['classic', 'beach'] },
+      { name: 'description', type: 'text', required: false, unique: false, min: null, max: null, pattern: '' }
+    ]
+  },
   scoreusers: {
     name: 'scoreusers',
     type: 'auth',
-    listRule: 'id = @request.auth.id',
-    viewRule: 'id = @request.auth.id',
+    listRule: '',
+    viewRule: '',
     createRule: '',
-    updateRule: 'id = @request.auth.id',
-    deleteRule: null,
+    updateRule: '',
+    deleteRule: '',
     schema: [
       { name: 'username', type: 'text', required: true, unique: true, min: 3, max: 50 },
       { name: 'name', type: 'text', required: false, max: 100 },
@@ -103,6 +117,30 @@ const COLLECTIONS = {
     options: {
       allowEmailAuth: true,
       allowOAuth2Auth: true,
+      allowUsernameAuth: true,
+      exceptEmailDomains: null,
+      manageRule: null,
+      minPasswordLength: 8,
+      onlyEmailDomains: null,
+      onlyVerified: false,
+      requireEmail: false
+    }
+  },
+  app_users: {
+    name: 'app_users',
+    type: 'auth',
+    listRule: '',
+    viewRule: '',
+    createRule: null,
+    updateRule: '',
+    deleteRule: null,
+    schema: [
+      { name: 'username', type: 'text', required: true, unique: true, min: 1, max: 100 },
+      { name: 'name', type: 'text', required: false, max: 255 }
+    ],
+    options: {
+      allowEmailAuth: true,
+      allowOAuth2Auth: false,
       allowUsernameAuth: true,
       exceptEmailDomains: null,
       manageRule: null,

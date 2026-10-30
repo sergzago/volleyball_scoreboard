@@ -277,10 +277,88 @@ $(document).ready(function() {
     );
     // Запускаем страховочный опрос после подписки (как в mobile.js)
     startCtlPolling();
+    // Загружаем список турниров для выпадающего списка "Турнир"
+    loadCtlTournamentSelect();
   }).catch(function(err) {
     console.error('DB initialization failed:', err);
   });
 });
+
+/**
+ * Загрузка списка турниров в выпадающий список "Турнир" (десктопная версия).
+ * Поскольку ctl.html использует <select> с id="in_tournament" (ранее <input>),
+ * нужно заполнить список турниров из DB.tournaments.list().
+ */
+var _ctlTournamentsLoaded = false;
+function loadCtlTournamentSelect() {
+    var select = $('#in_tournament');
+    if (!select.length || select.prop('tagName').toLowerCase() !== 'select') return;
+    if (!DB || !DB.tournaments || typeof DB.tournaments.list !== 'function') return;
+
+    DB.tournaments.list().then(function(list) {
+        if (!select.length || !list) return;
+
+        var currentVal = select.val();
+
+        // Очищаем список (оставляем placeholder)
+        while (select[0].options.length > 1) {
+            select[0].remove(1);
+        }
+        // Добавляем турниры
+        for (var i = 0; i < list.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = list[i].name;
+            opt.textContent = list[i].name + (list[i].match_type === 'beach' ? ' (пляжн.)' : '');
+            select[0].appendChild(opt);
+        }
+        // Если текущий турнир не в списке, добавляем его (поддержка кастомных названий)
+        if (currentVal) {
+            var found = false;
+            for (var j = 0; j < select[0].options.length; j++) {
+                if (select[0].options[j].value === currentVal) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                var customOpt = document.createElement('option');
+                customOpt.value = currentVal;
+                customOpt.textContent = currentVal;
+                select[0].appendChild(customOpt);
+            }
+            select.val(currentVal);
+        }
+        _ctlTournamentsLoaded = true;
+    }).catch(function(err) {
+        console.error('[Ctl] Error loading tournaments:', err);
+    });
+}
+
+/**
+ * Обеспечивает, что текущий турнир из scoreboard_data присутствует в <select>
+ * (добавляет опцию, если турнир кастомный и не загружен из коллекции).
+ */
+function ensureCtlTournamentOption(tournamentName) {
+    var select = $('#in_tournament');
+    if (!select.length || select.prop('tagName').toLowerCase() !== 'select') return;
+    if (!tournamentName) return;
+
+    // Проверяем, есть ли опция с таким значением
+    var found = false;
+    for (var i = 0; i < select[0].options.length; i++) {
+        if (select[0].options[i].value === tournamentName) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        var opt = document.createElement('option');
+        opt.value = tournamentName;
+        opt.textContent = tournamentName;
+        select[0].appendChild(opt);
+    }
+    select.val(tournamentName);
+}
 
 // Рендер состояния игры в UI пульта. Вынесено из колбэка подписки,
 // чтобы переиспользовать в страховочном опросе при недоступном realtime.
@@ -434,7 +512,10 @@ function renderCtlUI() {
     $('.home_team').html(scoreboard_data['home_team'])
     $('#in_home_team').val(scoreboard_data['home_team'])
     $('#in_away_team').val(scoreboard_data['away_team'])
-    $('#in_tournament').val(scoreboard_data['tournament_name'] || 'НВЛ');
+    // Турнир: используем <select>, который должен быть заполнен из DB.tournaments
+    var tournamentName = scoreboard_data['tournament_name'] || 'НВЛ';
+    // Если турнир ещё не загружен в список, добавляем опцию и выбираем
+    ensureCtlTournamentOption(tournamentName);
     if(typeof scoreboard_data['tournament_name'] === 'undefined'){
       update_db({tournament_name: 'НВЛ'});
     }
@@ -1458,7 +1539,9 @@ $(document).ready(function(){
           $('.home_team').html(scoreboard_data['home_team'] || '');
           $('#in_home_team').val(scoreboard_data['home_team'] || '');
           $('#in_away_team').val(scoreboard_data['away_team'] || '');
-          $('#in_tournament').val(scoreboard_data['tournament_name'] || 'НВЛ');
+          // Турнир: используем <select>, добавляем опцию если турнир кастомный
+          var tournamentName = scoreboard_data['tournament_name'] || 'НВЛ';
+          ensureCtlTournamentOption(tournamentName);
           $('#in_venue').val(scoreboard_data['venue'] || '');
           $('#col_home_team').val(scoreboard_data['home_color'] || '');
           $('#col_away_team').val(scoreboard_data['away_color'] || '');

@@ -602,7 +602,10 @@
           <div class="card-title"><span class="icon">🏆</span> Турнир и зал</div>
           <div class="form-group">
             <label for="mobileTournament">Турнир</label>
-            <input type="text" id="mobileTournament" class="form-control" placeholder="Название турнира">
+            <select id="mobileTournament" class="form-control">
+              <option value="">— выберите турнир —</option>
+            </select>
+            <span class="venue-admin-note" id="mobileTournamentNote" style="display:none;">🔒 Управление турнирами в вкладке «Админ»</span>
           </div>
           <div class="form-group">
             <label for="mobileVenue">Зал</label>
@@ -872,6 +875,42 @@
             <div class="control-row">
               <a href="online.html" target="_blank" class="btn btn-info">Активные игры</a>
               <a href="results.html" target="_blank" class="btn btn-info">История</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- ТУРНИРЫ -->
+        <div class="card" id="adminTournamentsCard" style="display:none;">
+          <div class="card-title"><span class="icon">🏆</span> Турниры</div>
+          <p style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:16px;">
+            Управление списком турниров: добавление, удаление. Только для администраторов.
+          </p>
+
+          <!-- Форма создания турнира -->
+          <div class="form-row" style="margin-bottom:16px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="adminTournamentName">Название</label>
+              <input type="text" id="adminTournamentName" class="form-control" placeholder="Название турнира">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="adminTournamentType">Тип</label>
+              <select id="adminTournamentType" class="form-control">
+                <option value="classic">Классический</option>
+                <option value="beach">Пляжный</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="adminTournamentDescription">Описание (необязательно)</label>
+            <input type="text" id="adminTournamentDescription" class="form-control" placeholder="Описание турнира">
+          </div>
+          <button class="btn btn-primary btn-block" id="adminAddTournamentBtn" style="margin-bottom:16px;">+ Добавить турнир</button>
+
+          <!-- Список турниров -->
+          <div id="adminTournamentsList">
+            <div class="loading">
+              <div class="spinner"></div>
+              <p>Загрузка турниров...</p>
             </div>
           </div>
         </div>

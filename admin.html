@@ -374,6 +374,59 @@
                 </div>
             </div>
         </div>
+
+        <!-- Турниры -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🏆 Турниры</h2>
+            </div>
+            <p style="font-size:13px;color:#666;margin-bottom:16px;">
+                Управление турнирами: добавление, удаление, просмотр.
+                Удаление доступно только администраторам.
+            </p>
+
+            <!-- Форма создания турнира -->
+            <div class="form-row" style="margin-bottom:16px;">
+                <div class="form-group">
+                    <label for="newTournamentName">Название</label>
+                    <input type="text" id="newTournamentName" placeholder="Введите название турнира">
+                </div>
+                <div class="form-group">
+                    <label for="newTournamentType">Тип</label>
+                    <select id="newTournamentType">
+                        <option value="classic">Классический</option>
+                        <option value="beach">Пляжный</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="newTournamentDescription">Описание (необязательно)</label>
+                <input type="text" id="newTournamentDescription" placeholder="Краткое описание турнира">
+            </div>
+            <button class="btn btn-primary" style="margin-bottom:16px;" onclick="addTournamentAdmin()">
+                + Добавить турнир
+            </button>
+
+            <!-- Список турниров -->
+            <table id="tournamentsTable" style="margin-top:8px;">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Тип</th>
+                        <th>Описание</th>
+                        <th style="width:80px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="tournamentsTableBody">
+                    <tr>
+                        <td colspan="4" class="loading">
+                            <div class="spinner"></div>
+                            <p>Загрузка турниров...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Модальное окно редактирования -->
@@ -677,6 +730,7 @@
                 // Загружаем список пользователей
                 document.getElementById('userInfo').textContent = `${user.email} (Администратор)`;
                 loadUsers();
+                loadTournaments();
 
             } catch (error) {
                 console.error('Auth error:', error);
@@ -1282,6 +1336,125 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ===== TOURNAMENTS =====
+
+        // Загрузка и отображение списка турниров
+        async function loadTournaments() {
+            const tbody = document.getElementById('tournamentsTableBody');
+            const table = document.getElementById('tournamentsTable');
+            if (!tbody || !table) return;
+
+            if (!DB || !DB.tournaments || typeof DB.tournaments.list !== 'function') {
+                tbody.innerHTML = '<tr><td colspan="4"><div class="alert alert-error">Коллекция турниров недоступна</div></td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '<tr><td colspan="4" class="loading"><div class="spinner"></div><p>Загрузка турниров...</p></td></tr>';
+            table.style.display = 'table';
+
+            try {
+                const list = await DB.tournaments.list();
+                if (!list || list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#999;">Турниры не созданы</td></tr>';
+                    return;
+                }
+                renderTournamentsTable(list);
+            } catch (err) {
+                console.error('Error loading tournaments:', err);
+                tbody.innerHTML = '<tr><td colspan="4"><div class="alert alert-error">Ошибка загрузки: ' + escapeHtml(err.message || err) + '</div></td></tr>';
+            }
+        }
+
+        function renderTournamentsTable(tournaments) {
+            const tbody = document.getElementById('tournamentsTableBody');
+            if (!tbody) return;
+
+            let html = '';
+            tournaments.forEach(function(t) {
+                const typeLabel = t.match_type === 'beach' ? 'Пляжный' : 'Классический';
+                const typeClass = t.match_type === 'beach' ? 'role-admin' : 'role-user';
+                html += '<tr>';
+                html += '<td><strong>' + escapeHtml(t.name) + '</strong></td>';
+                html += '<td><span class="role-badge ' + typeClass + '">' + typeLabel + '</span></td>';
+                html += '<td>' + escapeHtml(t.description || '') + '</td>';
+                html += '<td class="actions">';
+                html += '<button class="btn btn-danger btn-sm" onclick="deleteTournamentAdmin(\'' + escapeHtml(t.id) + '\')">🗑️</button>';
+                html += '</td>';
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        // Глобальная функция удаления турнира
+        async function deleteTournamentAdmin(tournamentId) {
+            if (!confirm('Удалить турнир? Это действие нельзя отменить.')) return;
+
+            if (!DB || !DB.tournaments || typeof DB.tournaments.delete !== 'function') {
+                showAlert('Коллекция турниров недоступна', 'error');
+                return;
+            }
+
+            try {
+                await DB.tournaments.delete(tournamentId);
+                showAlert('Турнир успешно удалён', 'success');
+                loadTournaments();
+            } catch (err) {
+                console.error('Delete tournament error:', err);
+                showAlert('Ошибка удаления: ' + (err.message || err), 'error');
+            }
+        }
+
+        // Глобальная функция создания турнира
+        async function addTournamentAdmin() {
+            const nameEl = document.getElementById('newTournamentName');
+            const typeEl = document.getElementById('newTournamentType');
+            const descEl = document.getElementById('newTournamentDescription');
+
+            const name = nameEl.value.trim();
+            const matchType = typeEl.value;
+            const description = descEl.value.trim();
+
+            if (!name) {
+                showAlert('Введите название турнира', 'error');
+                nameEl.focus();
+                return;
+            }
+
+            if (!DB || !DB.tournaments || typeof DB.tournaments.create !== 'function') {
+                showAlert('Коллекция турниров недоступна', 'error');
+                return;
+            }
+
+            try {
+                await DB.tournaments.create({
+                    name: name,
+                    match_type: matchType,
+                    description: description
+                });
+                showAlert('Турнир "' + name + '" успешно создан', 'success');
+                nameEl.value = '';
+                descEl.value = '';
+                loadTournaments();
+            } catch (err) {
+                console.error('Create tournament error:', err);
+                showAlert('Ошибка создания: ' + (err.message || err), 'error');
+            }
+        }
+
+        // Замена inline onclick на addEventListener для формы
+        document.getElementById('newTournamentName')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTournamentAdmin();
+            }
+        });
+        document.getElementById('newTournamentDescription')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTournamentAdmin();
+            }
+        });
 
         // Закрытие модальных окон по клику вне их
         document.getElementById('editModal').addEventListener('click', (e) => {

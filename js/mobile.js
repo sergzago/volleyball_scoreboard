@@ -136,6 +136,7 @@
       invert_tablo: _localInvertTablo,
       unlimited_score: _localUnlimitedScore,
       custom_mode: _localCustomMode,
+      tournament_name: getSelectedTournamentName() || 'НВЛ',
       template_id: document.getElementById('mobileTemplateSelect').value || ''
     };
     if (_localCustomMode) {
@@ -292,6 +293,14 @@
     // Загружаем список шаблонов после того, как DB инициализирован
     if (typeof loadMobileTemplateSelect === 'function') {
       loadMobileTemplateSelect();
+    }
+    // Загружаем список турниров для выпадающего списка
+    if (typeof loadMobileTournamentSelect === 'function') {
+      loadMobileTournamentSelect();
+    }
+    // Загружаем список турниров в админ-панель
+    if (role === 'admin' && typeof loadTournamentsAdmin === 'function') {
+      loadTournamentsAdmin();
     }
   }
 
@@ -553,6 +562,13 @@
         update: function() { return Promise.resolve(); },
         delete: function() { return Promise.resolve(); },
         getDefaultTemplate: function() { return {}; }
+      },
+      tournaments: {
+        list: function() { return Promise.resolve([]); },
+        get: function() { return Promise.resolve(null); },
+        create: function() { return Promise.resolve({ id: 'demo-' + Date.now() }); },
+        delete: function() { return Promise.resolve(); },
+        subscribe: function() { return function() {}; }
       }
     };
   }
@@ -569,6 +585,12 @@
         document.querySelectorAll('.tab-page').forEach(function(p) { p.classList.remove('active'); });
         document.getElementById(target).classList.add('active');
         if (target === 'pageGames') loadGamesList();
+        if (target === 'pageTeams') {
+          loadMobileTournamentSelect();
+        }
+        if (target === 'pageAdmin') {
+          loadTournamentsAdmin();
+        }
         // Инициализируем визуальный редактор шаблонов при открытии вкладки
         if (target === 'pageTemplates' && typeof TemplatesVisualMobile !== 'undefined') {
           TemplatesVisualMobile.init();
@@ -852,7 +874,35 @@
   // ===== TEAMS UI =====
 
   function updateTeamsUI(data) {
-    document.getElementById('mobileTournament').value = data['tournament_name'] || 'НВЛ';
+    var tournamentEl = document.getElementById('mobileTournament');
+    if (tournamentEl) {
+      var currentTournament = data['tournament_name'] || '';
+      // Если элемент — select, выбираем опцию по значению
+      if (tournamentEl.tagName && tournamentEl.tagName.toLowerCase() === 'select') {
+        // Ищем опцию по названию турнира
+        var found = false;
+        for (var i = 0; i < tournamentEl.options.length; i++) {
+          if (tournamentEl.options[i].text === currentTournament ||
+              (tournamentEl.options[i].value === currentTournament && currentTournament)) {
+            tournamentEl.selectedIndex = i;
+            found = true;
+            break;
+          }
+        }
+        // Если турнир не найден в списке, сохраняем значение через data-атрибут
+        if (!found) {
+          tournamentEl.value = '';
+          // Запоминаем выбранный турнир для восстановления после загрузки списка
+          if (currentTournament) {
+            tournamentEl.setAttribute('data-current-tournament', currentTournament);
+          }
+        } else {
+          tournamentEl.removeAttribute('data-current-tournament');
+        }
+      } else {
+        tournamentEl.value = currentTournament || 'НВЛ';
+      }
+    }
     var venueEl = document.getElementById('mobileVenue');
     venueEl.value = data['venue'] || '';
     // Поле "Зал" доступно для редактирования только администраторам
@@ -861,6 +911,9 @@
     venueEl.title = isAdmin ? '' : 'Доступно только администраторам';
     var venueNote = document.getElementById('mobileVenueNote');
     if (venueNote) venueNote.style.display = isAdmin ? 'none' : '';
+    // Примечание о том, что управление турнирами — в админ-вкладке
+    var tournamentNote = document.getElementById('mobileTournamentNote');
+    if (tournamentNote) tournamentNote.style.display = isAdmin ? 'none' : '';
     document.getElementById('mobileHomeTeam').value = data['home_team'] || '';
     document.getElementById('mobileAwayTeam').value = data['away_team'] || '';
     document.getElementById('mobileHomeColor').value = data['home_color'] || '#ff0000';
@@ -1637,6 +1690,7 @@
       document.getElementById('mobileCustomMode').checked = _localCustomMode;
       updateModeTogglesState();
       saveSettings(); // Вызываем новую функцию saveSettings
+      loadMobileTournamentSelect(); // Перезагружаем список турниров
     });
 
     document.getElementById('mobileTwoWinsMode').addEventListener('change', function() {
@@ -1646,6 +1700,7 @@
       document.getElementById('mobileCustomMode').checked = _localCustomMode;
       updateModeTogglesState(); 
       saveSettings(); // Вызываем новую функцию saveSettings
+      loadMobileTournamentSelect(); // Перезагружаем список турниров
     });
 
     document.getElementById('mobileInvertTablo').addEventListener('change', function() {
@@ -1693,6 +1748,7 @@
         _customFieldsEditing = false;
       }
       saveSettings(); // Вызываем новую функцию saveSettings
+      loadMobileTournamentSelect(); // Перезагружаем список турниров
     });
 
     function updateModeTogglesState() {
@@ -1711,6 +1767,25 @@
       if (!_recordExists) return;
       saveSettings(); // Здесь _recordExists всегда true, поэтому вызовется update_db
     });
+
+    // При изменении турнира — сохраняем в БД
+    var mobileTournamentEl = document.getElementById('mobileTournament');
+    if (mobileTournamentEl && mobileTournamentEl.tagName && mobileTournamentEl.tagName.toLowerCase() === 'select') {
+      mobileTournamentEl.addEventListener('change', function() {
+        if (!_recordExists) return;
+        // Сбрасываем data-current-tournament, так как пользователь выбрал опцию
+        this.removeAttribute('data-current-tournament');
+        saveSettings();
+      });
+    }
+
+    // Admin: add tournament button
+    var adminAddTournamentBtn = document.getElementById('adminAddTournamentBtn');
+    if (adminAddTournamentBtn) {
+      adminAddTournamentBtn.addEventListener('click', function() {
+        addTournamentAdmin();
+      });
+    }
 
     // Save custom settings — save to DB (existing record only)
     document.getElementById('saveCustomSettings').addEventListener('click', function() {
@@ -1756,7 +1831,7 @@
         away_color: document.getElementById('mobileAwayColor').value,
         home_team: document.getElementById('mobileHomeTeam').value,
         home_color: document.getElementById('mobileHomeColor').value,
-        tournament_name: document.getElementById('mobileTournament').value || 'НВЛ',
+        tournament_name: getSelectedTournamentName() || 'НВЛ',
         // Поле "Зал": для не-администраторов сохраняем текущее значение из БД
         venue: isCurrentUserAdmin()
           ? (document.getElementById('mobileVenue').value || '')
@@ -2058,7 +2133,7 @@
         away_color: document.getElementById('mobileAwayColor').value,
         home_team: document.getElementById('mobileHomeTeam').value,
         home_color: document.getElementById('mobileHomeColor').value,
-        tournament_name: document.getElementById('mobileTournament').value,
+        tournament_name: getSelectedTournamentName(),
         // Поле "Зал": для не-администраторов сохраняем текущее значение из БД
         venue: isCurrentUserAdmin()
           ? (document.getElementById('mobileVenue').value || '')
@@ -2209,7 +2284,230 @@
     });
   }
 
-  // ===== INIT =====
+  // ===== TOURNAMENT SELECT =====
+
+  /**
+   * Загрузка списка турниров для выпадающего списка.
+   * Фильтрация по типу турнира:
+   * - Пляжный режим → только пляжные турниры
+   * - Произвольные настройки → все турниры
+   * - Классический режим → только классические турниры
+   */
+  function loadMobileTournamentSelect() {
+    var select = document.getElementById('mobileTournament');
+    if (!select) return;
+    if (select.tagName && select.tagName.toLowerCase() !== 'select') return;
+
+    var listPromise = null;
+    try {
+      if (DB && DB.tournaments && typeof DB.tournaments.list === 'function') {
+        listPromise = DB.tournaments.list();
+      } else {
+        select.innerHTML = '<option value="">— коллекция турниров недоступна —</option>';
+        return;
+      }
+    } catch (e) {
+      console.error('[Mobile] Sync error loading tournament list:', e);
+      return;
+    }
+    if (!listPromise || typeof listPromise.then !== 'function') return;
+
+    listPromise.then(function(list) {
+      // Фильтруем турниры по типу
+      var filtered = list.filter(function(t) {
+        var mt = t.match_type || 'classic';
+        if (_localCustomMode) return true;
+        if (_localBeachMode) return mt === 'beach';
+        return mt === 'classic';
+      });
+
+      // Сохраняем текущее значение
+      var currentVal = select.value || '';
+      if (!currentVal) {
+        var saved = select.getAttribute('data-current-tournament');
+        currentVal = saved || (mobileScoreboardData && mobileScoreboardData['tournament_name']) || '';
+      }
+
+      // Очищаем список (оставляем placeholder)
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+      // Добавляем отфильтрованные турниры
+      for (var i = 0; i < filtered.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = filtered[i].name;
+        opt.textContent = filtered[i].name;
+        if (filtered[i].description) opt.title = filtered[i].description;
+        select.appendChild(opt);
+      }
+      // Восстанавливаем выбранное значение
+      if (currentVal) {
+        var found = false;
+        for (var j = 0; j < select.options.length; j++) {
+          if (select.options[j].value === currentVal) {
+            select.selectedIndex = j;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          select.value = '';
+          select.setAttribute('data-current-tournament', currentVal);
+        } else {
+          select.removeAttribute('data-current-tournament');
+        }
+      }
+    }).catch(function(err) {
+      console.error('[Mobile] Error loading tournament list:', err);
+      select.innerHTML = '<option value="">— ошибка загрузки турниров —</option>';
+    });
+  }
+
+  /**
+   * Получить выбранное название турнира из select.
+   * Если select пуст (placeholder), возвращает сохранённое значение или 'НВЛ'.
+   */
+  function getSelectedTournamentName() {
+    var el = document.getElementById('mobileTournament');
+    if (!el) return 'НВЛ';
+    if (el.tagName && el.tagName.toLowerCase() === 'select') {
+      var saved = el.getAttribute('data-current-tournament');
+      if (el.value) return el.value;
+      if (saved) return saved;
+      return 'НВЛ';
+    }
+    return el.value || 'НВЛ';
+  }
+
+  /**
+   * Экранирование HTML для безопасного вывода в innerHTML.
+   * (Локальная копия — TemplatesVisualMobile.escapeHtml недоступен здесь)
+   */
+  function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+
+  // ===== ADMIN TOURNAMENT MANAGEMENT =====
+
+  /**
+   * Загрузка и отображение списка турниров в админ-панели
+   */
+  function loadTournamentsAdmin() {
+    var listEl = document.getElementById('adminTournamentsList');
+    var cardEl = document.getElementById('adminTournamentsCard');
+    if (!listEl || !cardEl) return;
+    if (!isCurrentUserAdmin()) {
+      cardEl.style.display = 'none';
+      return;
+    }
+    cardEl.style.display = '';
+    listEl.innerHTML = '<div class="loading"><div class="spinner"></div><p>Загрузка турниров...</p></div>';
+    if (!DB || !DB.tournaments || typeof DB.tournaments.list !== 'function') {
+      listEl.innerHTML = '<div class="empty-state">Коллекция турниров недоступна</div>';
+      return;
+    }
+    DB.tournaments.list().then(function(list) {
+      if (!list || list.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">Турниры не созданы</div>';
+        return;
+      }
+      var classicList = list.filter(function(t) { return (t.match_type || 'classic') === 'classic'; });
+      var beachList = list.filter(function(t) { return (t.match_type || 'classic') === 'beach'; });
+      var html = '';
+      if (classicList.length > 0) {
+        html += '<h4 style="color:var(--text-primary);margin:8px 0 8px;font-size:14px;">Классические</h4>';
+        html += renderTournamentItems(classicList);
+      }
+      if (beachList.length > 0) {
+        html += '<h4 style="color:var(--text-primary);margin:8px 0 8px;font-size:14px;">Пляжные</h4>';
+        html += renderTournamentItems(beachList);
+      }
+      listEl.innerHTML = html;
+    }).catch(function(err) {
+      console.error('[Mobile] Error loading admin tournaments:', err);
+      listEl.innerHTML = '<div class="empty-state">Ошибка загрузки турниров</div>';
+    });
+  }
+
+  /**
+   * Отрисовка списка турниров с кнопками удаления
+   */
+  function renderTournamentItems(tournaments) {
+    if (!tournaments || tournaments.length === 0) return '';
+    var html = '';
+    for (var i = 0; i < tournaments.length; i++) {
+      var t = tournaments[i];
+      var typeLabel = t.match_type === 'beach' ? 'Пляжный' : 'Классический';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-bottom:4px;border-radius:6px;background:rgba(255,255,255,0.05);">';
+      html += '<div style="flex:1;min-width:0;">';
+      html += '<div style="font-size:14px;font-weight:600;color:var(--text-primary);">' + escapeHtml(t.name) + '</div>';
+      html += '<div style="font-size:12px;color:var(--text-secondary);">' + escapeHtml(typeLabel) + (t.description ? ' · ' + escapeHtml(t.description) : '') + '</div>';
+      html += '</div>';
+      html += '<button class="btn btn-danger btn-sm" style="flex-shrink:0;margin-left:8px;" onclick="window.deleteTournamentAdmin(\'' + t.id + '\')">✕</button>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  /**
+   * Удалить турнир (вызывается из onclick в админ-панели)
+   */
+  window.deleteTournamentAdmin = function(tournamentId) {
+    if (!confirm('Удалить турнир? Это действие нельзя отменить.')) return;
+    if (!DB || !DB.tournaments || typeof DB.tournaments.delete !== 'function') {
+      alert('Коллекция турниров недоступна');
+      return;
+    }
+    DB.tournaments.delete(tournamentId).then(function() {
+      loadTournamentsAdmin();
+      loadMobileTournamentSelect();
+    }).catch(function(err) {
+      console.error('[Mobile] Error deleting tournament:', err);
+      alert('Ошибка удаления турнира: ' + (err.message || err));
+    });
+  };
+
+  /**
+   * Добавить турнир из формы в админ-панели
+   */
+  function addTournamentAdmin() {
+    if (!isCurrentUserAdmin()) {
+      alert('Доступно только администраторам');
+      return;
+    }
+    var nameEl = document.getElementById('adminTournamentName');
+    var typeEl = document.getElementById('adminTournamentType');
+    var descEl = document.getElementById('adminTournamentDescription');
+    if (!nameEl || !typeEl) return;
+    var name = nameEl.value.trim();
+    var matchType = typeEl.value;
+    var description = descEl ? descEl.value.trim() : '';
+    if (!name) {
+      alert('Введите название турнира');
+      nameEl.focus();
+      return;
+    }
+    if (!DB || !DB.tournaments || typeof DB.tournaments.create !== 'function') {
+      alert('Коллекция турниров недоступна');
+      return;
+    }
+    DB.tournaments.create({
+      name: name,
+      match_type: matchType,
+      description: description
+    }).then(function() {
+      nameEl.value = '';
+      if (descEl) descEl.value = '';
+      loadTournamentsAdmin();
+      loadMobileTournamentSelect();
+    }).catch(function(err) {
+      console.error('[Mobile] Error creating tournament:', err);
+      alert('Ошибка создания турнира: ' + (err.message || err));
+    });
+  }
 
   function init() {
     initTheme();

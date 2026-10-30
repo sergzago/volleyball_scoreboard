@@ -1857,9 +1857,192 @@
     }
   };
 
-  // ============================================================================
+  // ===========================================================================
+  // TOURNAMENTS MODULE
+  // ===========================================================================
+
+  var tournaments = {
+
+    /**
+     * Получить список всех турниров
+     * @returns {Promise<Array<{id: string, name: string, match_type: string, description: string}>>}
+     */
+    list: function() {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection(DB_CONFIG.collections.TOURNAMENTS)
+          .get()
+          .then(function(snapshot) {
+            var results = [];
+            snapshot.forEach(function(doc) {
+              var data = doc.data();
+              results.push({
+                id: doc.id,
+                name: data.name || '',
+                match_type: data.match_type || 'classic',
+                description: data.description || ''
+              });
+            });
+            return results;
+          })
+          .catch(function() { return []; });
+      }
+
+      var pb = getPocketBaseClient();
+      var collection;
+      try {
+        collection = pb.collection(DB_CONFIG.collections.TOURNAMENTS);
+      } catch (e) {
+        return Promise.resolve([]);
+      }
+      return collection.getFullList()
+        .then(function(records) {
+          return records.map(function(record) {
+            var name = typeof record.get === 'function' ? (record.get('name') || '') : (record.name || '');
+            var matchType = typeof record.get === 'function' ? (record.get('match_type') || 'classic') : (record.match_type || 'classic');
+            var description = typeof record.get === 'function' ? (record.get('description') || '') : (record.description || '');
+            return { id: record.id, name: name, match_type: matchType, description: description };
+          });
+        })
+        .catch(function() { return []; });
+    },
+
+    /**
+     * Получить турнир по ID
+     * @param {string} id
+     * @returns {Promise<Object|null>}
+     */
+    get: function(id) {
+      if (provider === 'firebase') {
+        return firebase.firestore()
+          .collection(DB_CONFIG.collections.TOURNAMENTS)
+          .doc(id)
+          .get()
+          .then(function(doc) {
+            if (!doc.exists) return null;
+            var data = doc.data();
+            return { id: doc.id, name: data.name || '', match_type: data.match_type || 'classic', description: data.description || '' };
+          });
+      }
+
+      var pb = getPocketBaseClient();
+      var collection;
+      try {
+        collection = pb.collection(DB_CONFIG.collections.TOURNAMENTS);
+      } catch (e) {
+        return Promise.resolve(null);
+      }
+      return collection.getOne(id)
+        .then(function(record) {
+          var name = typeof record.get === 'function' ? (record.get('name') || '') : (record.name || '');
+          var matchType = typeof record.get === 'function' ? (record.get('match_type') || 'classic') : (record.match_type || 'classic');
+          var description = typeof record.get === 'function' ? (record.get('description') || '') : (record.description || '');
+          return { id: record.id, name: name, match_type: matchType, description: description };
+        })
+        .catch(function() { return null; });
+    },
+
+    /**
+     * Создать новый турнир (только администратор).
+     * Для PocketBase используется сервисный клиент (app_users), чтобы
+     * обходить правила коллекции — аналогично созданию пользователей.
+     * @param {Object} data - { name, match_type, description }
+     * @returns {Promise<Object>}
+     */
+    create: function(data) {
+      if (provider === 'firebase') {
+        var docRef = firebase.firestore().collection(DB_CONFIG.collections.TOURNAMENTS).doc();
+        return docRef.set(data)
+          .then(function() {
+            return { id: docRef.id, name: data.name || '', match_type: data.match_type || 'classic', description: data.description || '' };
+          });
+      }
+
+      return getPocketBaseServiceClient().then(function(pb) {
+        var collection = pb.collection(DB_CONFIG.collections.TOURNAMENTS);
+        return collection.create(data)
+          .then(function(record) {
+            var name = typeof record.get === 'function' ? record.get('name') : record.name;
+            var matchType = typeof record.get === 'function' ? record.get('match_type') : record.match_type;
+            var description = typeof record.get === 'function' ? record.get('description') : record.description;
+            return { id: record.id, name: name || '', match_type: matchType || 'classic', description: description || '' };
+          });
+      });
+    },
+
+    /**
+     * Удалить турнир (только администратор).
+     * Для PocketBase используется сервисный клиент (app_users), чтобы
+     * обходить правила коллекции — аналогично удалению пользователей.
+     * @param {string} id
+     * @returns {Promise}
+     */
+    delete: function(id) {
+      if (provider === 'firebase') {
+        return firebase.firestore().collection(DB_CONFIG.collections.TOURNAMENTS).doc(id).delete();
+      }
+
+      return getPocketBaseServiceClient().then(function(pb) {
+        var collection;
+        try {
+          collection = pb.collection(DB_CONFIG.collections.TOURNAMENTS);
+        } catch (e) {
+          return Promise.resolve();
+        }
+        return collection.delete(id).catch(function() { return Promise.resolve(); });
+      });
+    },
+
+    /**
+     * Подписаться на изменения турниров в реальном времени
+     * @param {function(Array)} onUpdate - вызывается с новым списком турниров при изменениях
+     * @param {function(Error)} [onError] - обработчик ошибок
+     * @returns {function} функция отписки
+     */
+    subscribe: function(onUpdate, onError) {
+      if (provider === 'firebase') {
+        var coll = firebase.firestore().collection(DB_CONFIG.collections.TOURNAMENTS);
+        var unsubscribe = coll.onSnapshot(function(snapshot) {
+          var results = [];
+          snapshot.forEach(function(doc) {
+            var data = doc.data();
+            results.push({
+              id: doc.id,
+              name: data.name || '',
+              match_type: data.match_type || 'classic',
+              description: data.description || ''
+            });
+          });
+          onUpdate(results);
+        }, function(err) {
+          if (onError) onError(err);
+        });
+        return function() { unsubscribe(); };
+      }
+
+      var pb = getPocketBaseClient();
+      // Одна коллекция — подписка на все изменения
+      try {
+        pb.collection(DB_CONFIG.collections.TOURNAMENTS).subscribe('*', function(e) {
+          // При любом изменении перезагружаем список и передаём его
+          DB.tournaments.list().then(function(list) {
+            onUpdate(list);
+          }).catch(function(err) {
+            if (onError) onError(err);
+          });
+        });
+      } catch (e) {
+        if (onError) onError(e);
+      }
+      return function() {
+        try { pb.collection(DB_CONFIG.collections.TOURNAMENTS).unsubscribe('*'); } catch (e) {}
+      };
+    }
+  };
+
+  // ===========================================================================
   // PUBLIC API
-  // ============================================================================
+  // ===========================================================================
 
   global.DB = {
     init: init,
@@ -1871,6 +2054,7 @@
     matches: matches,
     users: users,
     templates: templates,
+    tournaments: tournaments,
     // Получение текущего провайдера
     getProvider: function() { return provider; },
     // Проверка инициализации

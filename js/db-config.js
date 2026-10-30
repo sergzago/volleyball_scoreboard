@@ -48,14 +48,16 @@ var DB_CONFIG = {
     USERS: 'users',
     SESSIONS: 'sessions', // Только для Firebase
     AUTH_LOG: 'auth_log',
-    TEMPLATES: 'templates'
+    TEMPLATES: 'templates',
+    TOURNAMENTS: 'tournaments'
   },
   pocketbaseCollections: {
     VOLLEYBALL: 'volleyball1',
     MATCHES: 'matches1',
     USERS: 'scoreusers',
     AUTH_LOG: 'auth_log',
-    TEMPLATES: 'templates1'
+    TEMPLATES: 'templates1',
+    TOURNAMENTS: 'tournaments1'
   },
 
   // Техническая коллекция для обычных пользователей приложения (не для бизнес-логики)
@@ -111,6 +113,7 @@ var VOLLEYBALL_COLLECTION = COLLECTIONS.VOLLEYBALL;
 var MATCHES_COLLECTION = COLLECTIONS.MATCHES;
 var USERS_COLLECTION = COLLECTIONS.USERS;
 var TEMPLATES_COLLECTION = COLLECTIONS.TEMPLATES;
+var TOURNAMENTS_COLLECTION = COLLECTIONS.TOURNAMENTS;
 var GAME_CONSTANTS = DB_CONFIG.constants;
 var ENABLE_AUTH = DB_CONFIG.ENABLE_AUTH;
 var LOGO_FILE_NAME = DB_CONFIG.LOGO_FILE_NAME;
@@ -155,6 +158,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ENABLE_AUTH: ENABLE_AUTH,
     LOGO_BASE64: LOGO_BASE64,
     LOGO_FILE_NAME: LOGO_FILE_NAME,
+    TOURNAMENTS_COLLECTION: TOURNAMENTS_COLLECTION,
     firebaseConfig: firebaseConfig
   };
 }
