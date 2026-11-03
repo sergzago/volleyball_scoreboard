@@ -54,7 +54,9 @@
     setball_bg:            { bg: 'setball_bg',            text: 'setball_text' },
     setball_text:          { bg: 'setball_bg',            text: 'setball_text' },
     matchball_bg:          { bg: 'matchball_bg',          text: 'matchball_text' },
-    matchball_text:        { bg: 'matchball_bg',          text: 'matchball_text' }
+    matchball_text:        { bg: 'matchball_bg',          text: 'matchball_text' },
+    tournament_bg:         { bg: 'tournament_bg',         text: 'tournament_text' },
+    tournament_text:       { bg: 'tournament_bg',         text: 'tournament_text' }
   };
 
   // ============================================================================

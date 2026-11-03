@@ -152,6 +152,13 @@
       .timeout-btn.blinking {
         animation: blinking 1s infinite;
       }
+
+      .timeout-btn .timeout-count {
+        font-size: 15px;
+        opacity: 0.9;
+        margin-left: -1px;
+        vertical-align: middle;
+      }
       
       @keyframes blinking {
         0% { opacity: 1; }
@@ -207,7 +214,7 @@
                   <button data-team="home" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="home" class="score-btn btn btn-info" type="button">+1</button>
                   <br><br>
-                  <button data-team="home" class="timeout-btn btn btn-warning" type="button">Т</button>
+                  <button data-team="home" class="timeout-btn btn btn-warning" type="button">Т<span class="timeout-count">2</span></button>
                 </div>
                 <div class="score-col away-col text-center">
                   <h4 class="away_team">away</h4>
@@ -215,7 +222,7 @@
                   <button data-team="away" class="score-btn btn btn-default" type="button">-1</button>
                   <button data-team="away" class="score-btn btn btn-info" type="button">+1</button>
                   <br><br>
-                  <button data-team="away" class="timeout-btn btn btn-warning" type="button">Т</button>
+                  <button data-team="away" class="timeout-btn btn btn-warning" type="button">Т<span class="timeout-count">2</span></button>
                 </div>
               </div>
             </div>

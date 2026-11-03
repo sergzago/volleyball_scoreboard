@@ -446,16 +446,28 @@ function renderCtlUI() {
 
     // Timeout buttons: disabled at start of set (0:0), after set end, after match end
     // Also disable the other button when one team's timeout is active (show=6)
-    // Also disable when team has used all timeouts (classic: 2, beach: 1)
+    // Also disable when team has used all timeouts (classic: 2, beach: 1, custom: count_timeouts)
     // Note: timeout buttons should NOT be disabled during timeout (they toggle it off)
     var timeoutBaseDisabled = (pendingNewSet || matchFinished || startOfSet);
     var beachMode = isBeachMode();
-    var maxTimeouts = beachMode ? 1 : 2;
+    var customMode = !!scoreboard_data['custom_mode'];
+    var maxTimeouts;
+    if (customMode && scoreboard_data['count_timeouts'] != null) {
+      maxTimeouts = parseInt(scoreboard_data['count_timeouts'], 10) || (beachMode ? 1 : 2);
+    } else {
+      maxTimeouts = beachMode ? 1 : 2;
+    }
 
     var homeTimeouts = parseInt(scoreboard_data['home_timeouts'], 10) || 0;
     var awayTimeouts = parseInt(scoreboard_data['away_timeouts'], 10) || 0;
     var homeTimeoutsExhausted = homeTimeouts >= maxTimeouts;
     var awayTimeoutsExhausted = awayTimeouts >= maxTimeouts;
+
+    // Обновляем текст кнопок с количеством оставшихся таймаутов
+    var homeRemaining = maxTimeouts - homeTimeouts;
+    var awayRemaining = maxTimeouts - awayTimeouts;
+    $(".timeout-btn[data-team='home']").html('Т<span class="timeout-count">' + homeRemaining + '</span>');
+    $(".timeout-btn[data-team='away']").html('Т<span class="timeout-count">' + awayRemaining + '</span>');
 
     // Handle blinking effect for active timeout buttons
     $(".timeout-btn").removeClass('blinking');
@@ -1348,7 +1360,13 @@ $(document).ready(function(){
     var timeoutLabel = 'Таймаут ' + teamName;
     var currentShow = parseInt(scoreboard_data['show'], 10) || 0;
     var beachMode = isBeachMode();
-    var maxTimeouts = beachMode ? 1 : 2;
+    var customMode = !!scoreboard_data['custom_mode'];
+    var maxTimeouts;
+    if (customMode && scoreboard_data['count_timeouts'] != null) {
+      maxTimeouts = parseInt(scoreboard_data['count_timeouts'], 10) || (beachMode ? 1 : 2);
+    } else {
+      maxTimeouts = beachMode ? 1 : 2;
+    }
     var homeTimeouts = parseInt(scoreboard_data['home_timeouts'], 10) || 0;
     var awayTimeouts = parseInt(scoreboard_data['away_timeouts'], 10) || 0;
 
@@ -1368,7 +1386,7 @@ $(document).ready(function(){
 
     var timeoutKey = team === 'home' ? 'home_timeouts' : 'away_timeouts';
     var currentTimeouts = team === 'home' ? homeTimeouts : awayTimeouts;
-    if(currentTimeouts >= maxTimeouts) return;
+    if (currentTimeouts >= maxTimeouts) return;
 
     pendingTimeout = {
       team: team,

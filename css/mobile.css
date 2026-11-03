@@ -545,6 +545,13 @@ html, body {
   animation: blink 1s infinite;
 }
 
+.timeout-count {
+  font-size: 18px;
+  opacity: 0.9;
+  margin-left: -1px;
+  vertical-align: middle;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }

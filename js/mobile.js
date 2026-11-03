@@ -1045,6 +1045,14 @@
     var homeTimeouts = ensureNumber(data['home_timeouts']);
     var awayTimeouts = ensureNumber(data['away_timeouts']);
 
+    // Обновляем текст кнопок с количеством оставшихся таймаутов
+    var homeRemaining = maxTimeouts - homeTimeouts;
+    var awayRemaining = maxTimeouts - awayTimeouts;
+    var $homeTimeoutBtn = document.querySelector('.timeout-btn[data-team="home"]');
+    var $awayTimeoutBtn = document.querySelector('.timeout-btn[data-team="away"]');
+    if ($homeTimeoutBtn) $homeTimeoutBtn.innerHTML = 'Т<span class="timeout-count">' + homeRemaining + '</span>';
+    if ($awayTimeoutBtn) $awayTimeoutBtn.innerHTML = 'Т<span class="timeout-count">' + awayRemaining + '</span>';
+
     document.querySelectorAll('.timeout-btn').forEach(function(btn) { btn.classList.remove('blinking'); });
 
     if (isTimeoutActive) {

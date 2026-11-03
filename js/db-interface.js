@@ -1582,7 +1582,10 @@
     setball_text: '#ffffff',
     // Бейдж Матчбола (sb.html: --matchball-bg #d65a98)
     matchball_bg: '#d65a98',
-    matchball_text: '#ffffff'
+    matchball_text: '#ffffff',
+    // Название турнира (sb.html: плашка над верхним и нижним табло)
+    tournament_bg: '#1a2b3c',
+    tournament_text: '#ffffff'
   };
 
   /**

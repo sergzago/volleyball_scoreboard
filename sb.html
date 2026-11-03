@@ -47,6 +47,60 @@
             white-space: nowrap;
         }
 
+        /* Плашка названия турнира над верхним табло (отдельный блок над табло) */
+        .tournament-top {
+            background: var(--tournament-bg, var(--top-team-name-bg, #1a2b3c));
+            color: var(--tournament-text, var(--top-team-name-text, #ffffff));
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity 1s ease, transform 1s ease;
+            z-index: 5;
+            margin-bottom: 6px;
+            /* Выравнивание по названиям команд: логотип 64px + team-colors 16px + padding teams 12px = 92px (чуть левее) */
+            margin-left: 88px;
+        }
+        .tournament-top.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            height: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Плашка названия турнира над нижним табло (отдельный блок над табло) */
+        /* Нижнее табло увеличено в 1.5×, поэтому блок турнира выше и шире верхнего */
+        .tournament-bottom {
+            background: var(--tournament-bg, var(--top-team-name-bg, #1a2b3c));
+            color: var(--tournament-text, var(--top-team-name-text, #ffffff));
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity 1s ease, transform 1s ease;
+            z-index: 5;
+            margin-bottom: 6px;
+            align-self: flex-start;
+            /* Выравнивание по названиям команд (нижнее табло увеличено в 1.5×): логотип 96px + team-colors 24px + padding teams 18px = 138px (чуть левее) */
+            margin-left: 132px;
+        }
+        .tournament-bottom.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            height: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
         /* Контейнер самого табло с поддержкой анимаций */
         .scoreboard {
             display: flex;
@@ -506,6 +560,7 @@
         /* Блок истории сетов под основным табло */
         .set-history-block {
             position: absolute;
+            left: 0; /* Выравнивание по левому краю с табло */
             background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
             color: var(--set-history-text, var(--top-team-name-text, white));
             border-radius: 4px;
@@ -534,6 +589,9 @@
     <div class="scoreboard-container">
         <!-- Верхний лейбл (custom_label) -->
         <div class="top_label"></div>
+
+        <!-- Плашка названия турнира над верхним табло -->
+        <div class="tournament-top"></div>
 
         <div class="scoreboard">
             <!-- Левая часть: Логотип -->
@@ -590,6 +648,8 @@
 
     <!-- Нижнее табло - увеличенная копия верхнего -->
     <div class="bottom-scoreboard-container">
+        <!-- Плашка названия турнира над нижним табло -->
+        <div class="tournament-bottom"></div>
         <div class="bottom-scoreboard">
             <!-- Левая часть: Логотип -->
             <div class="logo-area">
@@ -688,6 +748,15 @@
         // Обновляем текст лейбла
         $label.text(scoreboard_data['custom_label'] || '');
 
+        // Плашка названия турнира над верхним табло — действия те же, что и с верхним табло
+        var $tournamentTop = $('.tournament-top');
+        $tournamentTop.text(scoreboard_data['tournament_name'] || '');
+        if (showTop && !showLabel) {
+            $tournamentTop.removeClass('hidden');
+        } else {
+            $tournamentTop.addClass('hidden');
+        }
+
         // Показываем/скрываем основное табло (по кнопке top - show & 1)
         // Если showLabel=true, табло скрывается (лейбл вместо табло)
         var $scoreboard = $('.scoreboard');
@@ -708,6 +777,15 @@
             $bottomScoreboard.removeClass('hidden');
         } else {
             $bottomScoreboard.addClass('hidden');
+        }
+
+        // Плашка названия турнира над нижним табло (те же цвета, что на шаблоне)
+        var $tournamentBottom = $('.tournament-bottom');
+        $tournamentBottom.text(scoreboard_data['tournament_name'] || '');
+        if (showBottom) {
+            $tournamentBottom.removeClass('hidden');
+        } else {
+            $tournamentBottom.addClass('hidden');
         }
 
         // Скрываем историю сетов если выбрано только нижнее табло или лейбл, или история пуста

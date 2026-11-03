@@ -57,7 +57,9 @@ window.TemplatesVisualMobile = (function() {
     setball_bg:            { bg: 'setball_bg',            text: 'setball_text' }, // Фон Сетбола
     setball_text:          { bg: 'setball_bg',            text: 'setball_text' }, // Текст Сетбола
     matchball_bg:          { bg: 'matchball_bg',          text: 'matchball_text' }, // Фон Матчбола
-    matchball_text:        { bg: 'matchball_bg',          text: 'matchball_text' } // Текст Матчбола
+    matchball_text:        { bg: 'matchball_bg',          text: 'matchball_text' }, // Текст Матчбола
+    tournament_bg:         { bg: 'tournament_bg',         text: 'tournament_text' }, // Фон плашки турнира
+    tournament_text:       { bg: 'tournament_bg',         text: 'tournament_text' } // Текст плашки турнира
   };
 
   // ============================================================================

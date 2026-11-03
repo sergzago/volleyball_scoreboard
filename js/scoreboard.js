@@ -234,6 +234,10 @@ function applyTemplate(data) {
   setCssVar('--matchball-bg', templateData.matchball_bg);
   setCssVar('--matchball-text', templateData.matchball_text);
 
+  // Цвета плашки названия турнира (верхнее и нижнее табло)
+  setCssVar('--tournament-bg', templateData.tournament_bg);
+  setCssVar('--tournament-text', templateData.tournament_text);
+
   // Блок истории сетов под табло и блоки счёта по сетам на нижнем табло
   setCssVar('--set-history-bg', templateData.set_history_bg);
   setCssVar('--set-history-text', templateData.set_history_text);
