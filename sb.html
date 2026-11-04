@@ -62,8 +62,7 @@
             transition: opacity 1s ease, transform 1s ease;
             z-index: 5;
             margin-bottom: 6px;
-            /* Выравнивание по названиям команд: логотип 64px + team-colors 16px + padding teams 12px = 92px (чуть левее) */
-            margin-left: 88px;
+            margin-left: 0;
         }
         .tournament-top.hidden {
             opacity: 0;
@@ -74,7 +73,6 @@
         }
 
         /* Плашка названия турнира над нижним табло (отдельный блок над табло) */
-        /* Нижнее табло увеличено в 1.5×, поэтому блок турнира выше и шире верхнего */
         .tournament-bottom {
             background: var(--tournament-bg, var(--top-team-name-bg, #1a2b3c));
             color: var(--tournament-text, var(--top-team-name-text, #ffffff));
@@ -90,8 +88,7 @@
             z-index: 5;
             margin-bottom: 6px;
             align-self: flex-start;
-            /* Выравнивание по названиям команд (нижнее табло увеличено в 1.5×): логотип 96px + team-colors 24px + padding teams 18px = 138px (чуть левее) */
-            margin-left: 132px;
+            margin-left: 0;
         }
         .tournament-bottom.hidden {
             opacity: 0;
@@ -557,10 +554,10 @@
             font-weight: bold;
         }
 
-        /* Блок истории сетов под основным табло */
+        /* Блок истории сетов под основным табло.
+           Расположен в обычном потоке flex-контейнера .scoreboard-container,
+           сразу под табло (учитывая плашку турнира tournament-top). */
         .set-history-block {
-            position: absolute;
-            left: 0; /* Выравнивание по левому краю с табло */
             background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
             color: var(--set-history-text, var(--top-team-name-text, white));
             border-radius: 4px;
@@ -569,7 +566,9 @@
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 3px;
-            top: 65px;
+            margin-top: 6px;
+            align-self: flex-start;
+            white-space: nowrap;
             display: none; /* Скрыт по умолчанию, показывается через JS */
         }
 
