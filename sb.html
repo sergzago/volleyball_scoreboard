@@ -59,17 +59,14 @@
             letter-spacing: 1px;
             white-space: nowrap;
             opacity: 1;
-            transition: opacity 1s ease, transform 1s ease;
+            will-change: opacity;
+            transition: opacity 1s ease; /* только прозрачность, без изменения размера и позиции */
             z-index: 5;
             margin-bottom: 6px;
             margin-left: 0;
         }
         .tournament-top.hidden {
-            opacity: 0;
-            transform: scale(0.95);
-            height: 0;
-            margin: 0;
-            overflow: hidden;
+            opacity: 0; /* просто исчезает на месте, без сдвига */
         }
 
         /* Плашка названия турнира над нижним табло (отдельный блок над табло) */
@@ -84,18 +81,15 @@
             letter-spacing: 1px;
             white-space: nowrap;
             opacity: 1;
-            transition: opacity 1s ease, transform 1s ease;
+            will-change: opacity;
+            transition: opacity 1s ease; /* только прозрачность, без изменения размера и позиции */
             z-index: 5;
             margin-bottom: 6px;
             align-self: flex-start;
             margin-left: 0;
         }
         .tournament-bottom.hidden {
-            opacity: 0;
-            transform: scale(0.95);
-            height: 0;
-            margin: 0;
-            overflow: hidden;
+            opacity: 0; /* просто исчезает на месте, без сдвига */
         }
 
         /* Контейнер самого табло с поддержкой анимаций */
@@ -270,6 +264,8 @@
             width: 5px;
             height: 100%;
             background-color: #cccccc;
+            opacity: 1;
+            transition: opacity 1s ease;
         }
 
         /* Блоки счета по сетам (5 сетов) */
@@ -277,6 +273,8 @@
             display: flex;
             height: 100%;
             background-color: var(--set-history-bg, var(--top-team-name-bg, #1a2b3c));
+            opacity: 1;
+            transition: opacity 1s ease;
         }
 
         .bottom-scoreboard .set-block {
@@ -569,7 +567,8 @@
             margin-top: 6px;
             align-self: flex-start;
             white-space: nowrap;
-            display: none; /* Скрыт по умолчанию, показывается через JS */
+            opacity: 1;
+            transition: opacity 1s ease;
         }
 
         @keyframes badge-pulse {
@@ -791,20 +790,20 @@
         var $history = $('#set-history-scoreboard1');
         var hasHistory = scoreboard_data['set_history'] && scoreboard_data['set_history'].length > 0;
         if (showTop && !showLabel && hasHistory) {
-            $history.show();
+            $history.css('opacity', 1);
         } else {
-            $history.hide();
+            $history.css('opacity', 0);
         }
         
         // Управление видимостью блоков сетов нижнего табло
         var $setsArea = $('.bottom-scoreboard .sets-blocks-area');
         var $separator = $('.bottom-scoreboard .scores-separator');
         if (showBottom) {
-            $setsArea.show();
-            $separator.show();
+            $setsArea.css('opacity', 1);
+            $separator.css('opacity', 1);
         } else {
-            $setsArea.hide();
-            $separator.hide();
+            $setsArea.css('opacity', 0);
+            $separator.css('opacity', 0);
         }
     }
 
