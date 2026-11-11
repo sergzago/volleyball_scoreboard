@@ -835,8 +835,7 @@
             }).join('   ');
 
             if (text.length > 0) {
-                topEl.text(text);
-                // Не показываем здесь - управление видимостью в updateScoreboard1Display
+                topEl.text(text).show();
             } else {
                 topEl.text('').hide();
             }
