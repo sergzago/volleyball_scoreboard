@@ -1039,6 +1039,14 @@
     var foulButtonsDisabled = !startOfSet && !pendingNewSet && !matchFinished;
     document.querySelectorAll('.foul-btn').forEach(function(btn) { btn.disabled = foulButtonsDisabled; });
 
+    // Фолы доступны только администраторам
+    var isAdmin = isCurrentUserAdmin();
+    document.querySelectorAll('.foul-btn').forEach(function(btn) {
+      if (!isAdmin) btn.disabled = true;
+    });
+    var setsAdminNote = document.getElementById('controlSetsAdminNote');
+    if (setsAdminNote) setsAdminNote.style.display = isAdmin ? 'none' : '';
+
     var timeoutBaseDisabled = pendingNewSet || matchFinished || startOfSet;
     if (isCustomMode()) syncCustomSettings();
     var maxTimeouts = isCustomMode() ? getCustomMaxTimeouts() : (beachMode ? 1 : 2);
@@ -1082,6 +1090,8 @@
     periodBtns.forEach(function(btn) {
       var enablePeriodButtons = (unlimitedScore || startOfSet || pendingNewSet || !!data['classic_match_finished'] || !!data['beach_match_finished']) && !matchPending;
       btn.disabled = !enablePeriodButtons;
+      // Период доступен только администраторам
+      if (!isAdmin) btn.disabled = true;
     });
 
     if (pendingNewSet && !matchFinished) {
@@ -1091,6 +1101,10 @@
       newSetBtn.style.background = '';
       newSetBtn.style.color = '';
     }
+
+    // Подсказка о доступе к периоду только для администраторов
+    var periodAdminNote = document.getElementById('controlPeriodAdminNote');
+    if (periodAdminNote) periodAdminNote.style.display = isAdmin ? 'none' : '';
 
     var classicSwitchNeeded = !!data['classic_switch_needed'];
     var beachSwitchMessage = data['beach_switch_message'];

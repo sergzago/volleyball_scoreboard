@@ -710,19 +710,20 @@
                 <div class="team-name" id="mHomeTeamFouls">Home</div>
                 <div class="team-score-value" id="mHomeFouls" style="font-size:28px;">0</div>
                 <div class="score-controls">
-                  <button class="btn btn-secondary foul-btn" data-team="home" data-delta="-1">-1</button>
-                  <button class="btn btn-primary foul-btn" data-team="home" data-delta="1">+1</button>
+                  <button class="btn btn-secondary foul-btn" data-team="home" data-delta="-1" disabled>−1</button>
+                  <button class="btn btn-primary foul-btn" data-team="home" data-delta="1" disabled>+1</button>
                 </div>
               </div>
               <div class="team-score-block">
                 <div class="team-name" id="mAwayTeamFouls">Away</div>
                 <div class="team-score-value" id="mAwayFouls" style="font-size:28px;">0</div>
                 <div class="score-controls">
-                  <button class="btn btn-secondary foul-btn" data-team="away" data-delta="-1">-1</button>
-                  <button class="btn btn-primary foul-btn" data-team="away" data-delta="1">+1</button>
+                  <button class="btn btn-secondary foul-btn" data-team="away" data-delta="-1" disabled>−1</button>
+                  <button class="btn btn-primary foul-btn" data-team="away" data-delta="1" disabled>+1</button>
                 </div>
               </div>
             </div>
+            <span class="venue-admin-note" id="controlSetsAdminNote" style="display:none;">🔒 Доступно только администраторам</span>
           </div>
 
           <!-- Period -->
@@ -730,9 +731,10 @@
             <div class="card-title"><span class="icon">📋</span> Период</div>
             <div class="period-display" id="mPeriod">1</div>
             <div class="control-row">
-              <button class="btn btn-secondary period-btn" data-delta="-1">-1</button>
-              <button class="btn btn-primary period-btn" data-delta="1">+1</button>
+              <button class="btn btn-secondary period-btn" data-delta="-1" disabled>−1</button>
+              <button class="btn btn-primary period-btn" data-delta="1" disabled>+1</button>
             </div>
+            <span class="venue-admin-note" id="controlPeriodAdminNote" style="display:none;">🔒 Доступно только администраторам</span>
           </div>
 
           <!-- Set History -->
